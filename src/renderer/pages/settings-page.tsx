@@ -10,21 +10,12 @@ import type {
   TranslationProvider
 } from '../../shared/api-types'
 
-type Palette = {
-  panel: string
-  panelSoft: string
-  text: string
-  muted: string
-  border: string
-}
-
 export function SettingsPage(props: {
   settings: AppSettings
   profiles: EngineProfile[]
   profileTests: Record<string, ProfileTestResult | undefined>
   diagnosticsMessage: string | null
   busyAction: string | null
-  palette: Palette
   onGeneralLanguageChange: (language: AppSettings['general']['language']) => void
   onThemeChange: (theme: ThemeSetting) => void
   onMinimizeToTrayChange: (enabled: boolean) => void
@@ -42,309 +33,291 @@ export function SettingsPage(props: {
   onLocalServicePortChange: (port: number | undefined) => void
   onExportDiagnostics: () => void
 }) {
-  const controlsDisabled = Boolean(props.busyAction)
+  const disabled = Boolean(props.busyAction)
 
   return (
-    <section
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-        gap: 20
-      }}
-    >
-      <SettingsCard title="General" palette={props.palette}>
-        <FieldLabel label="Language">
-          <SelectField
+    <div style={{ maxWidth: 560 }}>
+      <h1 style={{ fontSize: 24, fontWeight: 600, margin: 0 }}>Settings</h1>
+
+      <Section title="General">
+        <Row label="Language">
+          <Select
             value={props.settings.general.language}
-            disabled={controlsDisabled}
-            onChange={(event) => {
-              props.onGeneralLanguageChange(event.target.value as AppSettings['general']['language'])
-            }}
+            disabled={disabled}
+            onChange={(e) => props.onGeneralLanguageChange(e.target.value as AppSettings['general']['language'])}
           >
             <option value="zh-CN">Chinese (Simplified)</option>
             <option value="en-US">English (US)</option>
-          </SelectField>
-        </FieldLabel>
-        <FieldLabel label="Theme">
-          <SelectField
+          </Select>
+        </Row>
+        <Row label="Theme">
+          <Select
             value={props.settings.general.theme}
-            disabled={controlsDisabled}
-            onChange={(event) => {
-              props.onThemeChange(event.target.value as ThemeSetting)
-            }}
+            disabled={disabled}
+            onChange={(e) => props.onThemeChange(e.target.value as ThemeSetting)}
           >
             <option value="system">System</option>
             <option value="light">Light</option>
             <option value="dark">Dark</option>
-          </SelectField>
-        </FieldLabel>
-        <CheckboxField
-          label="Minimize main window to tray"
-          checked={props.settings.general.minimizeToTray}
-          disabled={controlsDisabled}
-          onChange={(event) => {
-            props.onMinimizeToTrayChange(event.target.checked)
-          }}
-        />
-      </SettingsCard>
+          </Select>
+        </Row>
+        <Row label="Minimize to tray">
+          <input
+            type="checkbox"
+            checked={props.settings.general.minimizeToTray}
+            disabled={disabled}
+            onChange={(e) => props.onMinimizeToTrayChange(e.target.checked)}
+          />
+        </Row>
+      </Section>
 
-      <SettingsCard title="Speech Engine" palette={props.palette}>
-        {props.profiles.map((profile) => (
-          <article
-            key={profile.id}
-            style={{
-              border: `1px solid ${props.palette.border}`,
-              borderRadius: 18,
-              padding: 14,
-              background:
-                props.settings.speech.selectedProfileId === profile.id
-                  ? props.palette.panel
-                  : props.palette.panelSoft,
-              marginBottom: 12
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-              <div>
-                <div style={{ fontSize: 16, fontWeight: 700 }}>{profile.label}</div>
-                <div style={{ marginTop: 6, color: props.palette.muted }}>{profile.preset}</div>
+      <Section title="Speech Engine">
+        {props.profiles.map((profile) => {
+          const isSelected = props.settings.speech.selectedProfileId === profile.id
+          const testResult = props.profileTests[profile.id]
+          return (
+            <div key={profile.id} style={{
+              padding: '10px 0',
+              borderBottom: '1px solid var(--border-subtle)',
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 12,
+              }}>
+                <div>
+                  <span style={{ fontWeight: isSelected ? 600 : 400, fontSize: 14 }}>
+                    {profile.label}
+                  </span>
+                  <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--text-tertiary)' }}>
+                    {profile.preset}
+                  </span>
+                  {isSelected ? (
+                    <span style={{
+                      marginLeft: 8,
+                      fontSize: 11,
+                      color: 'var(--accent-text)',
+                      fontWeight: 500,
+                    }}>
+                      active
+                    </span>
+                  ) : null}
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <SmallButton
+                    label="Select"
+                    disabled={disabled || isSelected}
+                    onClick={() => props.onSelectProfile(profile.id)}
+                  />
+                  <SmallButton
+                    label={props.busyAction === `profile-test:${profile.id}` ? 'Testing\u2026' : 'Test'}
+                    disabled={disabled}
+                    onClick={() => props.onTestProfile(profile.id)}
+                  />
+                </div>
               </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignContent: 'start' }}>
-                <button
-                  type="button"
-                  disabled={controlsDisabled}
-                  onClick={() => props.onSelectProfile(profile.id)}
-                  style={buttonStyle(Boolean(controlsDisabled))}
-                >
-                  Select
-                </button>
-                <button
-                  type="button"
-                  disabled={controlsDisabled}
-                  onClick={() => props.onTestProfile(profile.id)}
-                  style={buttonStyle(Boolean(controlsDisabled))}
-                >
-                  {props.busyAction === `profile-test:${profile.id}` ? 'Testing...' : 'Test'}
-                </button>
-              </div>
+              {testResult ? (
+                <div style={{
+                  marginTop: 6,
+                  fontSize: 12,
+                  color: testResult.ok ? 'var(--success)' : 'var(--danger)',
+                }}>
+                  {testResult.ok
+                    ? `Ready ${'\u00B7'} local service: ${testResult.localService ?? 'n/a'}`
+                    : testResult.error?.message ?? 'Test failed'}
+                </div>
+              ) : null}
             </div>
-            {props.profileTests[profile.id] ? (
-              <div style={{ marginTop: 10, color: props.palette.muted }}>
-                {props.profileTests[profile.id]?.ok
-                  ? `Ready • local service: ${props.profileTests[profile.id]?.localService ?? 'n/a'}`
-                  : props.profileTests[profile.id]?.error?.message ?? 'Test failed'}
-              </div>
-            ) : null}
-          </article>
-        ))}
-      </SettingsCard>
+          )
+        })}
+      </Section>
 
-      <SettingsCard title="Input & Output" palette={props.palette}>
-        <FieldLabel label="PTT Hotkey">
-          <SelectField
+      <Section title="Input & Output">
+        <Row label="PTT Hotkey">
+          <Select
             value={props.settings.input.pttHotkey}
-            disabled={controlsDisabled}
-            onChange={(event) => {
-              props.onPttHotkeyChange(event.target.value as PttHotkey)
-            }}
+            disabled={disabled}
+            onChange={(e) => props.onPttHotkeyChange(e.target.value as PttHotkey)}
           >
             <option value="RCtrl">Right Ctrl</option>
             <option value="RAlt">Right Alt</option>
-          </SelectField>
-        </FieldLabel>
-        <FieldLabel label="Output Method">
-          <SelectField
+          </Select>
+        </Row>
+        <Row label="Output Method">
+          <Select
             value={props.settings.output.method}
-            disabled={controlsDisabled}
-            onChange={(event) => {
-              props.onOutputMethodChange(event.target.value as OutputMethod)
-            }}
+            disabled={disabled}
+            onChange={(e) => props.onOutputMethodChange(e.target.value as OutputMethod)}
           >
             <option value="simulate_input">Simulate Input</option>
             <option value="clipboard">Clipboard</option>
             <option value="popup">Popup</option>
-          </SelectField>
-        </FieldLabel>
-        <CheckboxField
-          label="Include microphone in meetings"
-          checked={props.settings.input.includeMicrophoneInMeeting}
-          disabled={controlsDisabled}
-          onChange={(event) => {
-            props.onIncludeMicrophoneChange(event.target.checked)
-          }}
-        />
-      </SettingsCard>
+          </Select>
+        </Row>
+        <Row label="Mic in meetings">
+          <input
+            type="checkbox"
+            checked={props.settings.input.includeMicrophoneInMeeting}
+            disabled={disabled}
+            onChange={(e) => props.onIncludeMicrophoneChange(e.target.checked)}
+          />
+        </Row>
+      </Section>
 
-      <SettingsCard title="Language & Translation" palette={props.palette}>
-        <FieldLabel label="Speech Language">
-          <SelectField
+      <Section title="Language & Translation">
+        <Row label="Speech Language">
+          <Select
             value={props.settings.speech.language}
-            disabled={controlsDisabled}
-            onChange={(event) => {
-              props.onSpeechLanguageChange(event.target.value as SpeechLanguage)
-            }}
+            disabled={disabled}
+            onChange={(e) => props.onSpeechLanguageChange(e.target.value as SpeechLanguage)}
           >
             <option value="auto">Auto</option>
             <option value="zh">Chinese</option>
             <option value="en">English</option>
             <option value="ja">Japanese</option>
             <option value="ko">Korean</option>
-          </SelectField>
-        </FieldLabel>
-        <CheckboxField
-          label="Translate quick dictation"
-          checked={props.settings.translation.enabledForPtt}
-          disabled={controlsDisabled}
-          onChange={(event) => {
-            props.onTranslatePttChange(event.target.checked)
-          }}
-        />
-        <CheckboxField
-          label="Translate live session"
-          checked={props.settings.translation.enabledForMeeting}
-          disabled={controlsDisabled}
-          onChange={(event) => {
-            props.onTranslateMeetingChange(event.target.checked)
-          }}
-        />
-        <FieldLabel label="Target Language">
-          <TextField
-            value={props.settings.translation.targetLanguage}
-            disabled={controlsDisabled}
-            onChange={(event) => {
-              props.onTranslationTargetLanguageChange(event.target.value)
-            }}
+          </Select>
+        </Row>
+        <Row label="Translate dictation">
+          <input
+            type="checkbox"
+            checked={props.settings.translation.enabledForPtt}
+            disabled={disabled}
+            onChange={(e) => props.onTranslatePttChange(e.target.checked)}
           />
-        </FieldLabel>
-        <FieldLabel label="Translation Provider">
-          <SelectField
+        </Row>
+        <Row label="Translate live session">
+          <input
+            type="checkbox"
+            checked={props.settings.translation.enabledForMeeting}
+            disabled={disabled}
+            onChange={(e) => props.onTranslateMeetingChange(e.target.checked)}
+          />
+        </Row>
+        <Row label="Target Language">
+          <Input
+            value={props.settings.translation.targetLanguage}
+            disabled={disabled}
+            onChange={(e) => props.onTranslationTargetLanguageChange(e.target.value)}
+          />
+        </Row>
+        <Row label="Translation Provider">
+          <Select
             value={props.settings.translation.provider}
-            disabled={controlsDisabled}
-            onChange={(event) => {
-              props.onTranslationProviderChange(event.target.value as TranslationProvider)
-            }}
+            disabled={disabled}
+            onChange={(e) => props.onTranslationProviderChange(e.target.value as TranslationProvider)}
           >
             <option value="openai-compatible">OpenAI Compatible</option>
-          </SelectField>
-        </FieldLabel>
-      </SettingsCard>
+          </Select>
+        </Row>
+      </Section>
 
-      <SettingsCard title="Advanced" palette={props.palette}>
-        <FieldLabel label="Local Service Host">
-          <TextField
+      <Section title="Advanced">
+        <Row label="Local Service Host">
+          <Input
             value={props.settings.advanced.localServiceHost ?? ''}
-            disabled={controlsDisabled}
+            disabled={disabled}
             placeholder="127.0.0.1"
-            onChange={(event) => {
-              props.onLocalServiceHostChange(event.target.value)
-            }}
+            onChange={(e) => props.onLocalServiceHostChange(e.target.value)}
           />
-        </FieldLabel>
-        <FieldLabel label="Local Service Port">
-          <TextField
+        </Row>
+        <Row label="Local Service Port">
+          <Input
             value={props.settings.advanced.localServicePort?.toString() ?? ''}
-            disabled={controlsDisabled}
+            disabled={disabled}
             placeholder="8765"
             inputMode="numeric"
-            onChange={(event) => {
-              const trimmed = event.target.value.trim()
+            onChange={(e) => {
+              const trimmed = e.target.value.trim()
               props.onLocalServicePortChange(trimmed ? Number.parseInt(trimmed, 10) : undefined)
             }}
           />
-        </FieldLabel>
-        <SettingRow
-          label="Diagnostics"
-          value={props.settings.advanced.diagnosticsEnabled ? 'enabled' : 'disabled'}
-        />
-        <button
-          type="button"
-          onClick={props.onExportDiagnostics}
-          disabled={controlsDisabled}
-          style={buttonStyle(Boolean(controlsDisabled))}
-        >
-          {props.busyAction === 'diagnostics-export' ? 'Exporting...' : 'Export Diagnostics'}
-        </button>
+        </Row>
+        <Row label="Diagnostics">
+          <span style={{ fontSize: 13, fontWeight: 500 }}>
+            {props.settings.advanced.diagnosticsEnabled ? 'enabled' : 'disabled'}
+          </span>
+        </Row>
+        <div style={{ marginTop: 8 }}>
+          <SmallButton
+            label={props.busyAction === 'diagnostics-export' ? 'Exporting\u2026' : 'Export Diagnostics'}
+            disabled={disabled}
+            onClick={props.onExportDiagnostics}
+          />
+        </div>
         {props.diagnosticsMessage ? (
-          <div style={{ marginTop: 12, color: props.palette.muted }}>{props.diagnosticsMessage}</div>
+          <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-tertiary)' }}>
+            {props.diagnosticsMessage}
+          </div>
         ) : null}
-      </SettingsCard>
-    </section>
-  )
-}
-
-function SettingsCard(props: { title: string; palette: Palette; children: ReactNode }) {
-  return (
-    <article
-      style={{
-        border: `1px solid ${props.palette.border}`,
-        background: props.palette.panelSoft,
-        borderRadius: 28,
-        padding: 24
-      }}
-    >
-      <div style={{ fontSize: 12, letterSpacing: '0.16em', textTransform: 'uppercase', color: props.palette.muted }}>
-        {props.title}
-      </div>
-      <div style={{ marginTop: 18 }}>{props.children}</div>
-    </article>
-  )
-}
-
-function FieldLabel(props: { label: string; children: ReactNode }) {
-  return (
-    <label style={{ display: 'grid', gap: 8, marginBottom: 14 }}>
-      <span>{props.label}</span>
-      {props.children}
-    </label>
-  )
-}
-
-function SettingRow(props: { label: string; value: string }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
-      <span>{props.label}</span>
-      <span style={{ fontWeight: 700 }}>{props.value}</span>
+      </Section>
     </div>
   )
 }
 
-function CheckboxField(props: {
-  label: string
-  checked: boolean
-  disabled?: boolean
-  onChange: (event: ChangeEvent<HTMLInputElement>) => void
-}) {
+function Section(props: { title: string; children: ReactNode }) {
   return (
-    <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-      <input type="checkbox" checked={props.checked} disabled={props.disabled} onChange={props.onChange} />
-      <span>{props.label}</span>
-    </label>
+    <section style={{ marginTop: 28 }}>
+      <h2 style={{
+        fontSize: 12,
+        fontWeight: 600,
+        letterSpacing: '0.04em',
+        color: 'var(--text-tertiary)',
+        textTransform: 'uppercase',
+        margin: '0 0 12px',
+      }}>
+        {props.title}
+      </h2>
+      <div>{props.children}</div>
+    </section>
   )
 }
 
-function SelectField(props: {
+function Row(props: { label: string; children: ReactNode }) {
+  return (
+    <div style={{
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      gap: 16,
+      padding: '8px 0',
+      borderBottom: '1px solid var(--border-subtle)',
+      fontSize: 14,
+    }}>
+      <span style={{ color: 'var(--text-secondary)' }}>{props.label}</span>
+      {props.children}
+    </div>
+  )
+}
+
+function Select(props: {
   value: string
   disabled?: boolean
-  onChange: (event: ChangeEvent<HTMLSelectElement>) => void
+  onChange: (e: ChangeEvent<HTMLSelectElement>) => void
   children: ReactNode
 }) {
   return (
-    <select
-      value={props.value}
-      disabled={props.disabled}
-      onChange={props.onChange}
-      style={inputStyle(Boolean(props.disabled))}
-    >
+    <select value={props.value} disabled={props.disabled} onChange={props.onChange} style={{
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--radius)',
+      padding: '5px 8px',
+      background: 'var(--bg-surface)',
+      color: 'var(--text-primary)',
+      fontSize: 13,
+      fontFamily: 'inherit',
+    }}>
       {props.children}
     </select>
   )
 }
 
-function TextField(props: {
+function Input(props: {
   value: string
   disabled?: boolean
   placeholder?: string
   inputMode?: 'text' | 'numeric'
-  onChange: (event: ChangeEvent<HTMLInputElement>) => void
+  onChange: (e: ChangeEvent<HTMLInputElement>) => void
 }) {
   return (
     <input
@@ -353,29 +326,34 @@ function TextField(props: {
       placeholder={props.placeholder}
       inputMode={props.inputMode}
       onChange={props.onChange}
-      style={inputStyle(Boolean(props.disabled))}
+      style={{
+        width: 160,
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius)',
+        padding: '5px 8px',
+        background: 'var(--bg-surface)',
+        color: 'var(--text-primary)',
+        fontSize: 13,
+        fontFamily: 'inherit',
+      }}
     />
   )
 }
 
-function inputStyle(disabled: boolean) {
-  return {
-    width: '100%',
-    borderRadius: 14,
-    border: '1px solid rgba(255, 255, 255, 0.12)',
-    padding: '10px 12px',
-    background: disabled ? 'rgba(120, 130, 145, 0.12)' : 'rgba(255, 255, 255, 0.03)',
-    color: 'inherit'
-  } as const
-}
-
-function buttonStyle(disabled: boolean) {
-  return {
-    border: '1px solid rgba(255, 255, 255, 0.12)',
-    borderRadius: 999,
-    padding: '10px 14px',
-    background: 'transparent',
-    color: 'inherit',
-    cursor: disabled ? 'not-allowed' : 'pointer'
-  } as const
+function SmallButton(props: { label: string; disabled?: boolean; onClick: () => void }) {
+  return (
+    <button type="button" onClick={props.onClick} disabled={props.disabled} style={{
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--radius)',
+      padding: '5px 10px',
+      background: 'transparent',
+      color: 'var(--text-secondary)',
+      fontSize: 12,
+      cursor: props.disabled ? 'not-allowed' : 'pointer',
+      fontFamily: 'inherit',
+      opacity: props.disabled ? 0.5 : 1,
+    }}>
+      {props.label}
+    </button>
+  )
 }

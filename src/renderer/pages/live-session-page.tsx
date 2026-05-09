@@ -2,14 +2,6 @@ import type { AppSettings, AppRuntimeSnapshot, ExportFormat, MeetingStatus } fro
 import { formatDuration } from '../app/app-model'
 import { selectLiveSessionTimeline } from '../features/runtime/runtime-selectors'
 
-type Palette = {
-  panel: string
-  panelSoft: string
-  text: string
-  muted: string
-  border: string
-}
-
 export function LiveSessionPage(props: {
   runtime: AppRuntimeSnapshot
   settings: AppSettings
@@ -17,7 +9,6 @@ export function LiveSessionPage(props: {
   liveSessionMessage: string | null
   meetingStartDisabled: boolean
   meetingStopDisabled: boolean
-  palette: Palette
   onStartMeeting: () => void
   onStopMeeting: () => void
   onCopyLiveSession: () => void
@@ -26,231 +17,211 @@ export function LiveSessionPage(props: {
 }) {
   const liveSession = props.runtime.liveSession
   const timeline = selectLiveSessionTimeline(props.runtime)
-  const liveSessionStatus = describeLiveSessionStatus(liveSession?.status)
-  const canActOnLiveSession = Boolean(liveSession) && !props.busyAction
+  const status = describeStatus(liveSession?.status)
+  const canAct = Boolean(liveSession) && !props.busyAction
+  const isStreaming = liveSession?.status === 'streaming'
 
-  return (
-    <section
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1.4fr) minmax(280px, 0.6fr)',
-        gap: 20
-      }}
-    >
-      <article
-        style={{
-          border: `1px solid ${props.palette.border}`,
-          background: props.palette.panel,
-          borderRadius: 28,
-          padding: 24
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-          <div>
-            <div style={{ fontSize: 12, letterSpacing: '0.16em', textTransform: 'uppercase', color: props.palette.muted }}>
-              Live Session
-            </div>
-            <h2 style={{ margin: '10px 0 0', fontSize: 32 }}>
-              {liveSession ? `Status: ${liveSession.status}` : 'Start a meeting transcript'}
-            </h2>
-          </div>
-          <div style={{ color: props.palette.muted, fontSize: 14 }}>
-            {liveSession ? formatDuration(liveSession.durationSec) : '00:00'}
-          </div>
-        </div>
-
-        <div style={{ marginTop: 18, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <ActionButton
-            label={props.busyAction === 'meeting-start' ? 'Starting meeting...' : 'Start Meeting'}
-            disabled={props.meetingStartDisabled}
-            onClick={props.onStartMeeting}
-          />
-          <ActionButton
-            label={props.busyAction === 'meeting-stop' ? 'Stopping meeting...' : 'Stop Meeting'}
-            disabled={props.meetingStopDisabled}
-            onClick={props.onStopMeeting}
-          />
-          <GhostButton
-            label={props.busyAction === 'live-session-copy' ? 'Copying...' : 'Copy'}
-            disabled={!canActOnLiveSession}
-            onClick={props.onCopyLiveSession}
-          />
-          <GhostButton
-            label={
-              props.busyAction === 'live-session-export:plain_text' ? 'Exporting text...' : 'Export Text'
-            }
-            disabled={!canActOnLiveSession}
-            onClick={() => {
-              props.onExportLiveSession('plain_text')
-            }}
-          />
-          <GhostButton
-            label={
-              props.busyAction === 'live-session-export:bilingual_text'
-                ? 'Exporting bilingual...'
-                : 'Export Bilingual'
-            }
-            disabled={!canActOnLiveSession}
-            onClick={() => {
-              props.onExportLiveSession('bilingual_text')
-            }}
-          />
-          <GhostButton label="Open History" onClick={props.onOpenHistory} />
-        </div>
-
-        <div
-          style={{
-            marginTop: 18,
-            border: `1px solid ${props.palette.border}`,
-            background: props.palette.panelSoft,
-            borderRadius: 18,
-            padding: 16
-          }}
-        >
-          <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.12em', color: props.palette.muted }}>
-            Session Status
-          </div>
-          <div style={{ marginTop: 10, fontSize: 18, fontWeight: 700 }}>{liveSessionStatus.title}</div>
-          <div style={{ marginTop: 8, color: props.palette.muted, lineHeight: 1.5 }}>{liveSessionStatus.description}</div>
-          {props.liveSessionMessage ? (
-            <div style={{ marginTop: 12, color: props.palette.muted }}>{props.liveSessionMessage}</div>
-          ) : null}
-        </div>
-
-        <div style={{ marginTop: 22, display: 'grid', gap: 14 }}>
-          {timeline.length === 0 ? (
-            <div style={{ color: props.palette.muted }}>
-              No transcript blocks yet. Once the session is streaming, committed text and drafts will land here.
-            </div>
-          ) : (
-            timeline.map((item) => (
-              <article
-                key={`${item.kind}:${item.id}`}
-                style={{
-                  border: `1px solid ${props.palette.border}`,
-                  background: item.kind === 'draft' ? 'rgba(255, 255, 255, 0.02)' : props.palette.panelSoft,
-                  borderRadius: 18,
-                  padding: 16
-                }}
-              >
-                <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.12em', color: props.palette.muted }}>
-                  {item.kind} • {item.source}
-                </div>
-                <div style={{ marginTop: 10, fontSize: 18, lineHeight: 1.45 }}>{item.primaryText || '...'}</div>
-                {item.secondaryText ? (
-                  <div style={{ marginTop: 8, color: props.palette.muted, lineHeight: 1.45 }}>{item.secondaryText}</div>
-                ) : null}
-              </article>
-            ))
-          )}
-        </div>
-      </article>
-
-      <article
-        style={{
-          border: `1px solid ${props.palette.border}`,
-          background: props.palette.panelSoft,
-          borderRadius: 28,
-          padding: 24,
-          display: 'grid',
-          gap: 14,
-          alignContent: 'start'
-        }}
-      >
-        <SidebarStat label="Profile" value={props.settings.speech.selectedProfileId} palette={props.palette} />
-        <SidebarStat label="Language" value={props.settings.speech.language} palette={props.palette} />
-        <SidebarStat
-          label="Mic In Meeting"
-          value={props.settings.input.includeMicrophoneInMeeting ? 'enabled' : 'disabled'}
-          palette={props.palette}
-        />
-      </article>
-    </section>
-  )
-}
-
-function describeLiveSessionStatus(status: MeetingStatus | undefined) {
-  switch (status) {
-    case 'preparing':
-      return {
-        title: 'Preparing capture and engine',
-        description: 'JustSay is warming up the recognition engine and attaching the meeting capture source.'
-      }
-    case 'streaming':
-      return {
-        title: 'Streaming live transcript',
-        description: 'Committed blocks and in-progress drafts update here as the meeting continues.'
-      }
-    case 'recovering':
-      return {
-        title: 'Recovering the session',
-        description: 'A recoverable warning occurred, so JustSay is rebuilding the engine while keeping the session alive.'
-      }
-    case 'finishing':
-      return {
-        title: 'Finishing the live session',
-        description: 'Capture has stopped and the last recognition blocks are being finalized.'
-      }
-    case 'persisting':
-      return {
-        title: 'Saving to history',
-        description: 'The finished session is being persisted so it shows up in History with export support.'
-      }
-    case 'stopped_unexpectedly':
-      return {
-        title: 'Session stopped unexpectedly',
-        description: 'Review the latest notification for recovery details, then restart the meeting if needed.'
-      }
-    case 'completed':
-      return {
-        title: 'Session completed',
-        description: 'The live session finished successfully and is about to clear from this page.'
-      }
-    case 'error':
-      return {
-        title: 'Session failed',
-        description: 'An unrecoverable error interrupted the live session.'
-      }
-    case 'idle':
-    case undefined:
-      return {
-        title: 'No active live session',
-        description: 'Start a meeting to stream transcript blocks here, then copy or export them before opening History.'
-      }
-    default:
-      return {
-        title: `Status: ${String(status)}`,
-        description: 'The live session is updating.'
-      }
-  }
-}
-
-function SidebarStat(props: { label: string; value: string; palette: Palette }) {
   return (
     <div>
-      <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.12em', color: props.palette.muted }}>
-        {props.label}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 600, margin: 0 }}>Live Session</h1>
+        {liveSession ? (
+          <span style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 14,
+            fontVariantNumeric: 'tabular-nums',
+            color: isStreaming ? 'var(--accent)' : 'var(--text-secondary)',
+          }}>
+            {formatDuration(liveSession.durationSec)}
+          </span>
+        ) : null}
       </div>
-      <div style={{ marginTop: 8, fontSize: 20, fontWeight: 700 }}>{props.value}</div>
+
+      <div style={{
+        marginTop: 16,
+        padding: '10px 14px',
+        background: 'var(--bg-surface)',
+        borderRadius: 'var(--radius)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        fontSize: 13,
+      }}>
+        <StatusDot active={isStreaming} />
+        <span style={{ fontWeight: 500 }}>{status.title}</span>
+        <span style={{ color: 'var(--text-tertiary)' }}>{status.description}</span>
+      </div>
+
+      {props.liveSessionMessage ? (
+        <div style={{
+          marginTop: 8,
+          fontSize: 12,
+          color: 'var(--text-tertiary)',
+          padding: '0 2px',
+        }}>
+          {props.liveSessionMessage}
+        </div>
+      ) : null}
+
+      <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
+        <PrimaryButton
+          label={props.busyAction === 'meeting-start' ? 'Starting\u2026' : 'Start Meeting'}
+          disabled={props.meetingStartDisabled}
+          onClick={props.onStartMeeting}
+        />
+        <SecondaryButton
+          label={props.busyAction === 'meeting-stop' ? 'Stopping\u2026' : 'Stop Meeting'}
+          disabled={props.meetingStopDisabled}
+          onClick={props.onStopMeeting}
+        />
+        <GhostButton
+          label={props.busyAction === 'live-session-copy' ? 'Copying\u2026' : 'Copy'}
+          disabled={!canAct}
+          onClick={props.onCopyLiveSession}
+        />
+        <GhostButton
+          label={props.busyAction === 'live-session-export:plain_text' ? 'Exporting\u2026' : 'Export Text'}
+          disabled={!canAct}
+          onClick={() => props.onExportLiveSession('plain_text')}
+        />
+        <GhostButton
+          label={props.busyAction === 'live-session-export:bilingual_text' ? 'Exporting\u2026' : 'Export Bilingual'}
+          disabled={!canAct}
+          onClick={() => props.onExportLiveSession('bilingual_text')}
+        />
+        <GhostButton
+          label="History"
+          onClick={props.onOpenHistory}
+        />
+      </div>
+
+      <hr style={{ marginTop: 24, border: 'none', borderTop: '1px solid var(--border-subtle)' }} />
+
+      <div style={{ marginTop: 20 }}>
+        {timeline.length === 0 ? (
+          <div style={{ color: 'var(--text-tertiary)', fontSize: 14 }}>
+            No transcript blocks yet. Start a meeting to see live text here.
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gap: 2 }}>
+            {timeline.map((item) => (
+              <div
+                key={`${item.kind}:${item.id}`}
+                style={{
+                  padding: '10px 0',
+                  borderBottom: '1px solid var(--border-subtle)',
+                }}
+              >
+                <div style={{
+                  fontSize: 11,
+                  color: 'var(--text-tertiary)',
+                  marginBottom: 4,
+                  display: 'flex',
+                  gap: 8,
+                }}>
+                  <span style={{
+                    color: item.kind === 'draft' ? 'var(--accent-text)' : 'var(--text-tertiary)',
+                  }}>
+                    {item.kind}
+                  </span>
+                  <span>{item.source}</span>
+                </div>
+                <div style={{
+                  fontSize: 15,
+                  lineHeight: 1.55,
+                  color: item.kind === 'draft' ? 'var(--text-secondary)' : 'var(--text-primary)',
+                }}>
+                  {item.primaryText || '\u2026'}
+                </div>
+                {item.secondaryText ? (
+                  <div style={{
+                    marginTop: 4,
+                    fontSize: 14,
+                    lineHeight: 1.5,
+                    color: 'var(--text-tertiary)',
+                  }}>
+                    {item.secondaryText}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
 
-function ActionButton(props: { label: string; disabled?: boolean; onClick: () => void }) {
+function StatusDot(props: { active: boolean }) {
   return (
-    <button
-      type="button"
-      onClick={props.onClick}
-      disabled={props.disabled}
-      style={{
-        border: '1px solid rgba(255, 255, 255, 0.12)',
-        borderRadius: 999,
-        padding: '12px 16px',
-        background: props.disabled ? 'rgba(120, 130, 145, 0.18)' : 'rgba(22, 163, 74, 0.18)',
-        color: '#f6fbff',
-        cursor: props.disabled ? 'not-allowed' : 'pointer'
-      }}
-    >
+    <span style={{
+      display: 'inline-block',
+      width: 8,
+      height: 8,
+      borderRadius: '50%',
+      background: props.active ? 'var(--success)' : 'var(--text-tertiary)',
+      animation: props.active ? 'pulse 2s ease-in-out infinite' : 'none',
+      flexShrink: 0,
+    }} />
+  )
+}
+
+function describeStatus(status: MeetingStatus | undefined) {
+  switch (status) {
+    case 'preparing':
+      return { title: 'Preparing', description: 'Warming up engine and capture source.' }
+    case 'streaming':
+      return { title: 'Streaming', description: 'Live transcript active.' }
+    case 'recovering':
+      return { title: 'Recovering', description: 'Rebuilding engine, session alive.' }
+    case 'finishing':
+      return { title: 'Finishing', description: 'Finalizing last recognition blocks.' }
+    case 'persisting':
+      return { title: 'Saving', description: 'Persisting to history.' }
+    case 'stopped_unexpectedly':
+      return { title: 'Stopped', description: 'Unexpected stop. Check notifications.' }
+    case 'completed':
+      return { title: 'Completed', description: 'Session finished successfully.' }
+    case 'error':
+      return { title: 'Error', description: 'Unrecoverable error.' }
+    case 'idle':
+    case undefined:
+      return { title: 'Idle', description: 'No active session.' }
+    default:
+      return { title: String(status), description: 'Updating.' }
+  }
+}
+
+function PrimaryButton(props: { label: string; disabled?: boolean; onClick: () => void }) {
+  return (
+    <button type="button" onClick={props.onClick} disabled={props.disabled} style={{
+      border: 'none',
+      borderRadius: 'var(--radius)',
+      padding: '8px 16px',
+      background: props.disabled ? 'var(--bg-elevated)' : 'var(--accent)',
+      color: props.disabled ? 'var(--text-tertiary)' : 'var(--accent-on)',
+      fontWeight: 600,
+      fontSize: 13,
+      cursor: props.disabled ? 'not-allowed' : 'pointer',
+      fontFamily: 'inherit',
+    }}>
+      {props.label}
+    </button>
+  )
+}
+
+function SecondaryButton(props: { label: string; disabled?: boolean; onClick: () => void }) {
+  return (
+    <button type="button" onClick={props.onClick} disabled={props.disabled} style={{
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--radius)',
+      padding: '7px 14px',
+      background: 'var(--bg-surface)',
+      color: props.disabled ? 'var(--text-tertiary)' : 'var(--text-primary)',
+      fontSize: 13,
+      cursor: props.disabled ? 'not-allowed' : 'pointer',
+      fontFamily: 'inherit',
+    }}>
       {props.label}
     </button>
   )
@@ -258,20 +229,16 @@ function ActionButton(props: { label: string; disabled?: boolean; onClick: () =>
 
 function GhostButton(props: { label: string; disabled?: boolean; onClick: () => void }) {
   return (
-    <button
-      type="button"
-      onClick={props.onClick}
-      disabled={props.disabled}
-      style={{
-        border: '1px solid rgba(255, 255, 255, 0.12)',
-        borderRadius: 999,
-        padding: '12px 16px',
-        background: 'transparent',
-        color: 'inherit',
-        cursor: props.disabled ? 'not-allowed' : 'pointer',
-        opacity: props.disabled ? 0.6 : 1
-      }}
-    >
+    <button type="button" onClick={props.onClick} disabled={props.disabled} style={{
+      border: 'none',
+      borderRadius: 'var(--radius)',
+      padding: '8px 14px',
+      background: 'transparent',
+      color: props.disabled ? 'var(--text-tertiary)' : 'var(--text-secondary)',
+      fontSize: 13,
+      cursor: props.disabled ? 'not-allowed' : 'pointer',
+      fontFamily: 'inherit',
+    }}>
       {props.label}
     </button>
   )

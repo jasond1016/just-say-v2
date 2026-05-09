@@ -2,14 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ExportFormat, SavedTranscript } from '../../shared/api-types'
 import type { CaptureSource } from '../../shared/primitive-types'
 
-type Palette = {
-  panel: string
-  panelSoft: string
-  text: string
-  muted: string
-  border: string
-}
-
 type HistoryTimeFilter = 'all' | 'today' | 'last_7_days' | 'last_30_days'
 
 export function HistoryPage(props: {
@@ -22,7 +14,6 @@ export function HistoryPage(props: {
   selectedTranscript: SavedTranscript | null
   exportMessage: string | null
   busyAction: string | null
-  palette: Palette
   onSearchQueryChange: (value: string) => void
   onModeChange: (value: 'all' | SavedTranscript['mode']) => void
   onSourceChange: (value: 'all' | CaptureSource) => void
@@ -39,339 +30,274 @@ export function HistoryPage(props: {
   }, [props.selectedTranscript?.id])
 
   const filteredBlocks = useMemo(() => {
-    if (!props.selectedTranscript) {
-      return []
-    }
-
+    if (!props.selectedTranscript) return []
     const keyword = detailQuery.trim().toLowerCase()
-    if (!keyword) {
-      return props.selectedTranscript.blocks
-    }
-
+    if (!keyword) return props.selectedTranscript.blocks
     return props.selectedTranscript.blocks.filter((block) =>
       [block.text, block.translatedText ?? '', block.speakerLabel ?? '']
-        .some((value) => value.toLowerCase().includes(keyword))
+        .some((v) => v.toLowerCase().includes(keyword))
     )
   }, [detailQuery, props.selectedTranscript])
 
+  const sel = props.selectedTranscript
+
   return (
-    <section
-      style={{
-        border: `1px solid ${props.palette.border}`,
-        background: props.palette.panel,
-        borderRadius: 28,
-        padding: 24
-      }}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-        <div>
-          <div style={{ fontSize: 12, letterSpacing: '0.16em', textTransform: 'uppercase', color: props.palette.muted }}>
-            History
-          </div>
-          <h2 style={{ margin: '10px 0 0', fontSize: 32 }}>Search your transcript assets.</h2>
-        </div>
-        <div style={{ color: props.palette.muted }}>{props.total} records</div>
+    <div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 600, margin: 0 }}>History</h1>
+        <span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>{props.total} records</span>
       </div>
 
-      <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: 'minmax(220px, 1.2fr) repeat(3, minmax(160px, 0.4fr))', gap: 12 }}>
+      <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
         <input
           value={props.searchQuery}
-          onChange={(event) => {
-            props.onSearchQueryChange(event.target.value)
-          }}
-          placeholder="Search transcript text"
-          style={inputStyle(props.palette)}
+          onChange={(e) => props.onSearchQueryChange(e.target.value)}
+          placeholder="Search transcripts"
+          style={inputStyle()}
         />
         <select
           value={props.selectedMode}
-          onChange={(event) => {
-            props.onModeChange(event.target.value as 'all' | SavedTranscript['mode'])
-          }}
-          style={inputStyle(props.palette)}
+          onChange={(e) => props.onModeChange(e.target.value as 'all' | SavedTranscript['mode'])}
+          style={selectStyle()}
         >
-          <option value="all">All Modes</option>
+          <option value="all">All modes</option>
           <option value="ptt">PTT</option>
           <option value="meeting">Meeting</option>
         </select>
         <select
           value={props.selectedSource}
-          onChange={(event) => {
-            props.onSourceChange(event.target.value as 'all' | CaptureSource)
-          }}
-          style={inputStyle(props.palette)}
+          onChange={(e) => props.onSourceChange(e.target.value as 'all' | CaptureSource)}
+          style={selectStyle()}
         >
-          <option value="all">All Sources</option>
+          <option value="all">All sources</option>
           <option value="microphone">Microphone</option>
-          <option value="system">System Audio</option>
+          <option value="system">System</option>
         </select>
         <select
           value={props.selectedTimeFilter}
-          onChange={(event) => {
-            props.onTimeFilterChange(event.target.value as HistoryTimeFilter)
-          }}
-          style={inputStyle(props.palette)}
+          onChange={(e) => props.onTimeFilterChange(e.target.value as HistoryTimeFilter)}
+          style={selectStyle()}
         >
-          <option value="all">All Time</option>
+          <option value="all">All time</option>
           <option value="today">Today</option>
-          <option value="last_7_days">Last 7 Days</option>
-          <option value="last_30_days">Last 30 Days</option>
+          <option value="last_7_days">Last 7 days</option>
+          <option value="last_30_days">Last 30 days</option>
         </select>
       </div>
 
-      <div style={{ marginTop: 20, display: 'grid', gap: 12 }}>
-        {props.items.length === 0 ? (
-          <div style={{ color: props.palette.muted }}>No matching transcripts.</div>
-        ) : (
-          props.items.map((item) => {
-            const sources = describeTranscriptSources(item)
-
-            return (
-              <article
-                key={item.id}
-                style={{
-                  border: `1px solid ${props.palette.border}`,
-                  borderRadius: 18,
-                  padding: 16,
-                  background: props.palette.panelSoft
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                  <div>
-                    <div style={{ fontSize: 12, letterSpacing: '0.12em', textTransform: 'uppercase', color: props.palette.muted }}>
-                      {item.mode} • {sources}
+      <div style={{
+        marginTop: 20,
+        display: 'grid',
+        gridTemplateColumns: sel ? '1fr 1.2fr' : '1fr',
+        gap: 1,
+        background: 'var(--border-subtle)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius)',
+        overflow: 'hidden',
+        minHeight: 400,
+      }}>
+        {/* List pane */}
+        <div style={{ background: 'var(--bg-page)', overflow: 'auto', maxHeight: 'calc(100vh - 220px)' }}>
+          {props.items.length === 0 ? (
+            <div style={{ padding: 20, color: 'var(--text-tertiary)', fontSize: 14 }}>No matching transcripts.</div>
+          ) : (
+            props.items.map((item) => {
+              const sources = describeTranscriptSources(item)
+              const isSelected = sel?.id === item.id
+              return (
+                <div
+                  key={item.id}
+                  onClick={() => props.onOpen(item.id)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter') props.onOpen(item.id) }}
+                  style={{
+                    padding: '12px 16px',
+                    borderBottom: '1px solid var(--border-subtle)',
+                    background: isSelected ? 'var(--accent-muted)' : 'transparent',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                    <div style={{
+                      fontSize: 14,
+                      fontWeight: 500,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {item.title}
                     </div>
-                    <div style={{ marginTop: 8, fontSize: 20, fontWeight: 700 }}>{item.title}</div>
-                    <div style={{ marginTop: 8, color: props.palette.muted }}>
-                      {formatDateTime(item.startedAt)} • {formatDurationMs(item.endedAt - item.startedAt)}
+                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>
+                      {formatDateTime(item.startedAt)}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                    <button
-                      type="button"
-                      disabled={Boolean(props.busyAction)}
-                      onClick={() => {
-                        props.onOpen(item.id)
-                      }}
-                      style={pillButtonStyle(Boolean(props.busyAction))}
-                    >
-                      {props.busyAction === `open:${item.id}` ? 'Opening...' : 'Open'}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={Boolean(props.busyAction)}
-                      onClick={() => {
-                        props.onDelete(item.id)
-                      }}
-                      style={pillButtonStyle(Boolean(props.busyAction))}
-                    >
-                      {props.busyAction === `delete:${item.id}` ? 'Deleting...' : 'Delete'}
-                    </button>
+                  <div style={{ marginTop: 4, fontSize: 12, color: 'var(--text-tertiary)' }}>
+                    {item.mode} {'\u00B7'} {sources} {'\u00B7'} {formatDurationMs(item.endedAt - item.startedAt)}
+                  </div>
+                  <div style={{
+                    marginTop: 4,
+                    fontSize: 13,
+                    color: 'var(--text-secondary)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {item.plainText}
                   </div>
                 </div>
-                <div style={{ marginTop: 10, lineHeight: 1.5 }}>{item.plainText}</div>
-                {item.translatedPlainText ? (
-                  <div style={{ marginTop: 8, color: props.palette.muted, lineHeight: 1.5 }}>{item.translatedPlainText}</div>
-                ) : null}
-              </article>
-            )
-          })
-        )}
-      </div>
+              )
+            })
+          )}
+        </div>
 
-      {props.selectedTranscript ? (
-        <section
-          style={{
-            marginTop: 24,
-            border: `1px solid ${props.palette.border}`,
-            background: props.palette.panelSoft,
-            borderRadius: 22,
-            padding: 20
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-            <div>
-              <div style={{ fontSize: 12, letterSpacing: '0.12em', textTransform: 'uppercase', color: props.palette.muted }}>
-                Selected Transcript
-              </div>
-              <h3 style={{ margin: '10px 0 0', fontSize: 24 }}>{props.selectedTranscript.title}</h3>
+        {/* Detail pane */}
+        {sel ? (
+          <div style={{
+            background: 'var(--bg-surface)',
+            overflow: 'auto',
+            maxHeight: 'calc(100vh - 220px)',
+            padding: 20,
+          }}>
+            <div style={{ fontSize: 18, fontWeight: 600 }}>{sel.title}</div>
+            <div style={{
+              marginTop: 8,
+              fontSize: 12,
+              color: 'var(--text-tertiary)',
+              display: 'flex',
+              gap: 12,
+            }}>
+              <span>{sel.mode}</span>
+              <span>{describeTranscriptSources(sel)}</span>
+              <span>{formatDurationMs(sel.endedAt - sel.startedAt)}</span>
+              <span>{sel.metadata.engineProfileId}</span>
             </div>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <button
-                type="button"
+
+            <div style={{ marginTop: 12, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <SmallButton
+                label="Copy text"
                 disabled={Boolean(props.busyAction)}
-                onClick={() => {
-                  props.onCopy(props.selectedTranscript!.id, 'plain_text')
-                }}
-                style={pillButtonStyle(Boolean(props.busyAction))}
-              >
-                {props.busyAction === `copy:${props.selectedTranscript.id}:plain_text` ? 'Copying...' : 'Copy Text'}
-              </button>
-              <button
-                type="button"
+                onClick={() => props.onCopy(sel.id, 'plain_text')}
+              />
+              <SmallButton
+                label="Copy bilingual"
                 disabled={Boolean(props.busyAction)}
-                onClick={() => {
-                  props.onCopy(props.selectedTranscript!.id, 'bilingual_text')
-                }}
-                style={pillButtonStyle(Boolean(props.busyAction))}
-              >
-                {props.busyAction === `copy:${props.selectedTranscript.id}:bilingual_text` ? 'Copying...' : 'Copy Bilingual'}
-              </button>
-              <button
-                type="button"
+                onClick={() => props.onCopy(sel.id, 'bilingual_text')}
+              />
+              <SmallButton
+                label="Export text"
                 disabled={Boolean(props.busyAction)}
-                onClick={() => {
-                  props.onExport(props.selectedTranscript!.id, 'plain_text')
-                }}
-                style={pillButtonStyle(Boolean(props.busyAction))}
-              >
-                {props.busyAction === `export:${props.selectedTranscript.id}:plain_text` ? 'Exporting...' : 'Export Text'}
-              </button>
-              <button
-                type="button"
+                onClick={() => props.onExport(sel.id, 'plain_text')}
+              />
+              <SmallButton
+                label="Export bilingual"
                 disabled={Boolean(props.busyAction)}
-                onClick={() => {
-                  props.onExport(props.selectedTranscript!.id, 'bilingual_text')
-                }}
-                style={pillButtonStyle(Boolean(props.busyAction))}
-              >
-                {props.busyAction === `export:${props.selectedTranscript.id}:bilingual_text`
-                  ? 'Exporting...'
-                  : 'Export Bilingual'}
-              </button>
-              <button
-                type="button"
+                onClick={() => props.onExport(sel.id, 'bilingual_text')}
+              />
+              <SmallButton
+                label="Export JSON"
                 disabled={Boolean(props.busyAction)}
-                onClick={() => {
-                  props.onExport(props.selectedTranscript!.id, 'json')
-                }}
-                style={pillButtonStyle(Boolean(props.busyAction))}
-              >
-                {props.busyAction === `export:${props.selectedTranscript.id}:json` ? 'Exporting...' : 'Export JSON'}
-              </button>
+                onClick={() => props.onExport(sel.id, 'json')}
+              />
+              <SmallButton
+                label="Delete"
+                disabled={Boolean(props.busyAction)}
+                onClick={() => props.onDelete(sel.id)}
+                danger
+              />
             </div>
-          </div>
 
-          <div
-            style={{
-              marginTop: 16,
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-              gap: 12
-            }}
-          >
-            <DetailStat label="Mode" value={props.selectedTranscript.mode} palette={props.palette} />
-            <DetailStat
-              label="Sources"
-              value={describeTranscriptSources(props.selectedTranscript)}
-              palette={props.palette}
-            />
-            <DetailStat
-              label="Duration"
-              value={formatDurationMs(props.selectedTranscript.endedAt - props.selectedTranscript.startedAt)}
-              palette={props.palette}
-            />
-            <DetailStat
-              label="Engine"
-              value={props.selectedTranscript.metadata.engineProfileId}
-              palette={props.palette}
-            />
-          </div>
-
-          <div style={{ marginTop: 18, display: 'grid', gap: 12 }}>
-            <input
-              value={detailQuery}
-              onChange={(event) => {
-                setDetailQuery(event.target.value)
-              }}
-              placeholder="Search within this transcript"
-              style={inputStyle(props.palette)}
-            />
-            <div style={{ color: props.palette.muted }}>
-              {filteredBlocks.length} of {props.selectedTranscript.blocks.length} blocks shown • {formatDateTime(props.selectedTranscript.startedAt)}
-            </div>
-          </div>
-
-          <div style={{ marginTop: 18, display: 'grid', gap: 12 }}>
-            {filteredBlocks.map((block) => (
-              <article
-                key={block.id}
-                style={{
-                  border: `1px solid ${props.palette.border}`,
-                  borderRadius: 18,
-                  padding: 16,
-                  background: props.palette.panel
-                }}
-              >
-                <div style={{ fontSize: 12, letterSpacing: '0.12em', textTransform: 'uppercase', color: props.palette.muted }}>
-                  {block.source} • {formatTimeRange(block.startedAt, block.endedAt)}
-                </div>
-                <div style={{ marginTop: 10, lineHeight: 1.6 }}>{block.text}</div>
-                {block.translatedText ? (
-                  <div style={{ marginTop: 8, lineHeight: 1.6, color: props.palette.muted }}>{block.translatedText}</div>
-                ) : null}
-              </article>
-            ))}
-            {filteredBlocks.length === 0 ? (
-              <div style={{ color: props.palette.muted }}>No blocks match the current detail search.</div>
+            {props.exportMessage ? (
+              <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-tertiary)' }}>{props.exportMessage}</div>
             ) : null}
+
+            <div style={{ marginTop: 16 }}>
+              <input
+                value={detailQuery}
+                onChange={(e) => setDetailQuery(e.target.value)}
+                placeholder="Search within blocks"
+                style={inputStyle()}
+              />
+              <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-tertiary)' }}>
+                {filteredBlocks.length} of {sel.blocks.length} blocks
+              </div>
+            </div>
+
+            <div style={{ marginTop: 12 }}>
+              {filteredBlocks.map((block) => (
+                <div key={block.id} style={{
+                  padding: '8px 0',
+                  borderBottom: '1px solid var(--border-subtle)',
+                }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                    {block.source} {'\u00B7'} {formatTimeRange(block.startedAt, block.endedAt)}
+                  </div>
+                  <div style={{ marginTop: 4, fontSize: 14, lineHeight: 1.55 }}>{block.text}</div>
+                  {block.translatedText ? (
+                    <div style={{ marginTop: 2, fontSize: 13, lineHeight: 1.5, color: 'var(--text-secondary)' }}>
+                      {block.translatedText}
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+              {filteredBlocks.length === 0 ? (
+                <div style={{ padding: '12px 0', color: 'var(--text-tertiary)', fontSize: 13 }}>No blocks match.</div>
+              ) : null}
+            </div>
           </div>
-
-          {props.exportMessage ? (
-            <div style={{ marginTop: 16, color: props.palette.muted }}>{props.exportMessage}</div>
-          ) : null}
-        </section>
-      ) : null}
-    </section>
-  )
-}
-
-function DetailStat(props: { label: string; value: string; palette: Palette }) {
-  return (
-    <div
-      style={{
-        border: `1px solid ${props.palette.border}`,
-        borderRadius: 18,
-        padding: 14,
-        background: props.palette.panel
-      }}
-    >
-      <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.12em', color: props.palette.muted }}>
-        {props.label}
+        ) : null}
       </div>
-      <div style={{ marginTop: 8, fontWeight: 700 }}>{props.value}</div>
     </div>
   )
 }
 
+function SmallButton(props: { label: string; disabled?: boolean; danger?: boolean; onClick: () => void }) {
+  return (
+    <button type="button" onClick={props.onClick} disabled={props.disabled} style={{
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--radius)',
+      padding: '5px 10px',
+      background: 'transparent',
+      color: props.danger ? 'var(--danger)' : 'var(--text-secondary)',
+      fontSize: 12,
+      cursor: props.disabled ? 'not-allowed' : 'pointer',
+      fontFamily: 'inherit',
+      opacity: props.disabled ? 0.5 : 1,
+    }}>
+      {props.label}
+    </button>
+  )
+}
+
+function inputStyle() {
+  return {
+    flex: 1,
+    minWidth: 0,
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius)',
+    padding: '7px 10px',
+    background: 'var(--bg-surface)',
+    color: 'var(--text-primary)',
+    fontSize: 13,
+    fontFamily: 'inherit',
+  } as const
+}
+
+function selectStyle() {
+  return {
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius)',
+    padding: '7px 10px',
+    background: 'var(--bg-surface)',
+    color: 'var(--text-primary)',
+    fontSize: 13,
+    fontFamily: 'inherit',
+  } as const
+}
+
 function describeTranscriptSources(transcript: SavedTranscript): string {
-  const sources = [...new Set(transcript.blocks.map((block) => block.source))]
-
-  if (sources.length === 0) {
-    return 'unknown'
-  }
-
-  return sources.join(' + ')
-}
-
-function inputStyle(palette: Palette) {
-  return {
-    borderRadius: 16,
-    border: `1px solid ${palette.border}`,
-    background: palette.panelSoft,
-    color: palette.text,
-    padding: '12px 14px'
-  } as const
-}
-
-function pillButtonStyle(disabled: boolean) {
-  return {
-    border: '1px solid rgba(255, 255, 255, 0.12)',
-    borderRadius: 999,
-    padding: '10px 14px',
-    background: 'transparent',
-    color: 'inherit',
-    cursor: disabled ? 'not-allowed' : 'pointer'
-  } as const
+  const sources = [...new Set(transcript.blocks.map((b) => b.source))]
+  return sources.length === 0 ? 'unknown' : sources.join(' + ')
 }
 
 function formatDateTime(timestamp: number): string {
