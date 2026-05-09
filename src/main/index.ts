@@ -2,6 +2,7 @@ import { app, BrowserWindow, desktopCapturer, ipcMain, Menu, session, Tray } fro
 import path from 'node:path'
 import { profileCatalog } from '../core/settings/profile-catalog'
 import type { SettingsPatch } from '../shared/api-types'
+import { resolveAppPaths } from './app-paths'
 import { createApp } from './bootstrap/create-app'
 import { wireAppLifecycle } from './bootstrap/lifecycle'
 import { createRecognitionEngine } from './engines/create-recognition-engine'
@@ -38,8 +39,7 @@ void wireAppLifecycle(app, {
   onReady: async () => {
     registerElectronDisplayMediaHandler(session.defaultSession, desktopCapturer)
 
-    const preloadPath = path.join(__dirname, '../preload/index.js')
-    const resourcesPath = path.join(__dirname, '../resources')
+    const { preloadPath, resourcesPath, rendererIndexPath, iconPath } = resolveAppPaths(__dirname)
     const userDataPath = app.getPath('userData')
     const transcriptDatabase = openSqliteDatabase(path.join(userDataPath, 'history.db'))
     const transcriptRepository = new SqliteTranscriptRepository(transcriptDatabase)
@@ -192,25 +192,24 @@ void wireAppLifecycle(app, {
             width: title === 'JustSay Capture' ? 800 : 1280,
             height: title === 'JustSay Capture' ? 600 : 860,
             backgroundColor: '#10161f',
-            icon: path.join(__dirname, '../icon.png'),
+            icon: iconPath,
             ...(webPreferences ? { webPreferences } : {})
           }),
-        rendererUrl: `file://${path.join(__dirname, '../renderer/index.html')}`,
-        captureUrl: `file://${path.join(__dirname, '../renderer/index.html')}#capture`,
+        rendererUrl: `file://${rendererIndexPath}`,
+        captureUrl: `file://${rendererIndexPath}#capture`,
         preloadPath
       }
     })
+    captureTransport.attachWindow(appBootstrap.windows.captureWindow)
     const trayController = new TrayController({
       mainWindow: appBootstrap.windows.mainWindow as BrowserWindow,
       getSettings: () => cachedSettings,
       createTray: (iconPath) => new Tray(iconPath),
       buildMenu: (template) => Menu.buildFromTemplate(template),
-      iconPath: path.join(__dirname, '../icon.png'),
+      iconPath,
       quitApp: () => app.quit()
     })
     trayController.start()
-
-    captureTransport.attachWindow(appBootstrap.windows.captureWindow)
     app.on('before-quit', () => {
       trayController.prepareForQuit()
       trayController.dispose()
