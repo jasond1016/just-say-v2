@@ -132,6 +132,36 @@ describe('AppController', () => {
     dispose()
   })
 
+  it('copies and exports the active live session through the API', async () => {
+    const copyLiveSession = vi.fn(async () => undefined)
+    const exportLiveSession = vi.fn(async () => ({
+      ok: true,
+      path: 'C:\\exports\\live-session-meeting-1.txt'
+    }))
+    const controller = new AppController({
+      api: createApi({
+        runtime: createLiveRuntimeSnapshot(),
+        copyLiveSession,
+        exportLiveSession
+      }),
+      runtimeStore: new RuntimeStore()
+    })
+
+    const dispose = controller.start()
+    await flushPromises()
+
+    await controller.copyLiveSession()
+    await controller.exportLiveSession('plain_text')
+
+    expect(copyLiveSession).toHaveBeenCalled()
+    expect(exportLiveSession).toHaveBeenCalledWith('plain_text')
+    expect(controller.getSnapshot().liveSessionMessage).toBe(
+      'Exported live session to C:\\exports\\live-session-meeting-1.txt'
+    )
+
+    dispose()
+  })
+
   it('updates editable settings fields through the API and refreshes local state', async () => {
     let settings = createSettings()
     const updateSettings = vi.fn(async (patch: SettingsPatch) => {
@@ -289,6 +319,9 @@ function createApi(overrides: Partial<AppApi> & {
     stopPtt: overrides.stopPtt ?? vi.fn(async () => undefined),
     startMeeting: overrides.startMeeting ?? vi.fn(async () => undefined),
     stopMeeting: overrides.stopMeeting ?? vi.fn(async () => undefined),
+    copyLiveSession: overrides.copyLiveSession ?? vi.fn(async () => undefined),
+    exportLiveSession:
+      overrides.exportLiveSession ?? vi.fn(async () => ({ ok: false, error: 'not implemented' })),
     listHistory:
       overrides.listHistory ??
       vi.fn(async () => ({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 0 })),

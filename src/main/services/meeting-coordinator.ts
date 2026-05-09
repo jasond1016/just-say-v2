@@ -359,6 +359,10 @@ export class MeetingCoordinator {
       blockCount: session.transcript.committedBlocks.length
     })
 
+    this.notify({
+      level: 'info',
+      message: 'Live session saved to history.'
+    })
     this.transition({ type: 'PERSIST_SUCCEEDED' })
     session.completion.settle()
     this.resetAfterTerminalState()

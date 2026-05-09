@@ -1,4 +1,4 @@
-import type { AppRuntimeSnapshot, StartMeetingCommand } from '../../shared/api-types'
+import type { AppRuntimeSnapshot, ExportFormat, ExportResult, StartMeetingCommand } from '../../shared/api-types'
 import type { SessionMode } from '../../shared/primitive-types'
 import { IPC_CHANNELS } from './channels'
 
@@ -9,6 +9,8 @@ export type SessionHandlerService = {
   stopPtt(): Promise<void>
   startMeeting(input?: StartMeetingCommand): Promise<void>
   stopMeeting(): Promise<void>
+  copyLiveSession(): Promise<void>
+  exportLiveSession(format: ExportFormat): Promise<ExportResult>
 }
 
 export type SessionHandlers = {
@@ -18,6 +20,8 @@ export type SessionHandlers = {
   [IPC_CHANNELS.sessionStopPtt]: () => Promise<void>
   [IPC_CHANNELS.sessionStartMeeting]: (input?: StartMeetingCommand) => Promise<void>
   [IPC_CHANNELS.sessionStopMeeting]: () => Promise<void>
+  [IPC_CHANNELS.sessionCopyLiveSession]: () => Promise<void>
+  [IPC_CHANNELS.sessionExportLiveSession]: (format: ExportFormat) => Promise<ExportResult>
 }
 
 export function createSessionHandlers(sessionService: SessionHandlerService): SessionHandlers {
@@ -27,6 +31,8 @@ export function createSessionHandlers(sessionService: SessionHandlerService): Se
     [IPC_CHANNELS.sessionStartPtt]: async () => sessionService.startPtt(),
     [IPC_CHANNELS.sessionStopPtt]: async () => sessionService.stopPtt(),
     [IPC_CHANNELS.sessionStartMeeting]: async (input) => sessionService.startMeeting(input),
-    [IPC_CHANNELS.sessionStopMeeting]: async () => sessionService.stopMeeting()
+    [IPC_CHANNELS.sessionStopMeeting]: async () => sessionService.stopMeeting(),
+    [IPC_CHANNELS.sessionCopyLiveSession]: async () => sessionService.copyLiveSession(),
+    [IPC_CHANNELS.sessionExportLiveSession]: async (format) => sessionService.exportLiveSession(format)
   }
 }

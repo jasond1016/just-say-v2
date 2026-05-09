@@ -19,7 +19,9 @@ describe('createSessionHandlers', () => {
       startPtt: vi.fn().mockResolvedValue(undefined),
       stopPtt: vi.fn().mockResolvedValue(undefined),
       startMeeting: vi.fn().mockResolvedValue(undefined),
-      stopMeeting: vi.fn().mockResolvedValue(undefined)
+      stopMeeting: vi.fn().mockResolvedValue(undefined),
+      copyLiveSession: vi.fn().mockResolvedValue(undefined),
+      exportLiveSession: vi.fn().mockResolvedValue({ ok: true, path: 'C:\\exports\\live-session.txt' })
     }
 
     const handlers = createSessionHandlers(sessionService)
@@ -34,6 +36,8 @@ describe('createSessionHandlers', () => {
       targetLanguage: 'en'
     })
     await handlers[IPC_CHANNELS.sessionStopMeeting]()
+    await handlers[IPC_CHANNELS.sessionCopyLiveSession]()
+    await handlers[IPC_CHANNELS.sessionExportLiveSession]('plain_text')
 
     expect(sessionService.getRuntimeSnapshot).toHaveBeenCalled()
     expect(sessionService.prewarm).toHaveBeenCalledWith('ptt')
@@ -45,5 +49,7 @@ describe('createSessionHandlers', () => {
       targetLanguage: 'en'
     })
     expect(sessionService.stopMeeting).toHaveBeenCalled()
+    expect(sessionService.copyLiveSession).toHaveBeenCalled()
+    expect(sessionService.exportLiveSession).toHaveBeenCalledWith('plain_text')
   })
 })

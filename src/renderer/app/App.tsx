@@ -35,6 +35,7 @@ function WorkspaceApp() {
     historyTotal,
     selectedHistory,
     exportMessage,
+    liveSessionMessage,
     diagnosticsMessage,
     activeSection,
     historyQuery,
@@ -208,6 +209,7 @@ function WorkspaceApp() {
           runtime={runtime}
           settings={settings}
           busyAction={busyAction}
+          liveSessionMessage={liveSessionMessage}
           meetingStartDisabled={meetingStartDisabled}
           meetingStopDisabled={meetingStopDisabled}
           palette={palette}
@@ -216,6 +218,12 @@ function WorkspaceApp() {
           }}
           onStopMeeting={() => {
             void controller.stopMeeting()
+          }}
+          onCopyLiveSession={() => {
+            void controller.copyLiveSession()
+          }}
+          onExportLiveSession={(format) => {
+            void controller.exportLiveSession(format)
           }}
           onOpenHistory={() => {
             controller.openHistorySection()

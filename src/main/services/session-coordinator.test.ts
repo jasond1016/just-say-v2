@@ -278,6 +278,10 @@ describe('SessionCoordinator + PTTCoordinator', () => {
       }
     })
     const chunk = new Uint8Array([9, 8, 7])
+    const notifications: Array<{ level: string; message: string }> = []
+    const unsubscribe = harness.sessionCoordinator.onNotification((notification) => {
+      notifications.push(notification)
+    })
 
     await harness.sessionCoordinator.startMeeting()
     harness.meetingCaptureTransport.emit({
@@ -384,6 +388,11 @@ describe('SessionCoordinator + PTTCoordinator', () => {
         }
       }
     ])
+    expect(notifications).toContainEqual({
+      level: 'info',
+      message: 'Live session saved to history.'
+    })
+    unsubscribe()
   })
 
   it('applies meeting start overrides without mutating settings defaults', async () => {

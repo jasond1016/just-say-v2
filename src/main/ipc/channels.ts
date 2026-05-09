@@ -12,6 +12,8 @@ export const IPC_CHANNELS = {
   sessionStopPtt: 'session.stopPtt',
   sessionStartMeeting: 'session.startMeeting',
   sessionStopMeeting: 'session.stopMeeting',
+  sessionCopyLiveSession: 'session.copyLiveSession',
+  sessionExportLiveSession: 'session.exportLiveSession',
   historyList: 'history.list',
   historySearch: 'history.search',
   historyGet: 'history.get',

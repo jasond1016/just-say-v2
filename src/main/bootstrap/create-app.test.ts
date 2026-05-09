@@ -59,7 +59,9 @@ describe('createApp', () => {
       startPtt: vi.fn().mockResolvedValue(undefined),
       stopPtt: vi.fn().mockResolvedValue(undefined),
       startMeeting: vi.fn().mockResolvedValue(undefined),
-      stopMeeting: vi.fn().mockResolvedValue(undefined)
+      stopMeeting: vi.fn().mockResolvedValue(undefined),
+      copyLiveSession: vi.fn().mockResolvedValue(undefined),
+      exportLiveSession: vi.fn().mockResolvedValue({ ok: true, path: 'C:\\exports\\live-session.txt' })
     }
     const historyService = {
       list: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 0 }),
@@ -124,6 +126,8 @@ describe('createApp', () => {
       'session.stopPtt',
       'session.startMeeting',
       'session.stopMeeting',
+      'session.copyLiveSession',
+      'session.exportLiveSession',
       'speech.listProfiles',
       'speech.testProfile',
       'history.list',

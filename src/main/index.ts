@@ -22,6 +22,7 @@ import { EngineRegistry } from './services/engine-registry'
 import { getEnvironmentCredentials } from './services/environment-credentials-provider'
 import { HistoryService } from './services/history-service'
 import { LocalServiceSupervisor } from './services/local-service-supervisor'
+import { LiveSessionActionsService } from './services/live-session-actions-service'
 import { MeetingCoordinator } from './services/meeting-coordinator'
 import { OutputDispatcher } from './services/output-dispatcher'
 import { PttCoordinator } from './services/ptt-coordinator'
@@ -132,6 +133,27 @@ void wireAppLifecycle(app, {
       diagnostics: diagnosticsService
     })
     const sessionCoordinator = new SessionCoordinator(pttCoordinator, meetingCoordinator)
+    const liveSessionActionsService = new LiveSessionActionsService({
+      getRuntimeSnapshot: () => sessionCoordinator.getRuntimeSnapshot(),
+      clipboard: clipboardService,
+      exportDir: path.join(userDataPath, 'exports')
+    })
+    const sessionService = {
+      getRuntimeSnapshot: () => sessionCoordinator.getRuntimeSnapshot(),
+      onSnapshot: (listener: Parameters<typeof sessionCoordinator.onSnapshot>[0]) =>
+        sessionCoordinator.onSnapshot(listener),
+      onNotification: (listener: Parameters<NonNullable<typeof sessionCoordinator.onNotification>>[0]) =>
+        sessionCoordinator.onNotification(listener),
+      prewarm: (mode: 'ptt' | 'meeting') => sessionCoordinator.prewarm(mode),
+      startPtt: () => sessionCoordinator.startPtt(),
+      stopPtt: () => sessionCoordinator.stopPtt(),
+      startMeeting: (input?: Parameters<typeof sessionCoordinator.startMeeting>[0]) =>
+        sessionCoordinator.startMeeting(input),
+      stopMeeting: () => sessionCoordinator.stopMeeting(),
+      copyLiveSession: () => liveSessionActionsService.copyPlainText(),
+      exportLiveSession: (format: Parameters<typeof liveSessionActionsService.export>[0]) =>
+        liveSessionActionsService.export(format)
+    }
     const pttHotkeyController = new PttHotkeyController(hotkeyService, settingsService, sessionCoordinator)
     sessionCoordinator.setLocalServiceStatus(localServiceSupervisor.getStatus())
     diagnosticsService.setLocalServiceStatus(localServiceSupervisor.getStatus())
@@ -154,7 +176,7 @@ void wireAppLifecycle(app, {
     const appBootstrap = await createApp({
       registrar: createElectronIpcRegistrar(ipcMain),
       services: {
-        sessionCoordinator,
+        sessionCoordinator: sessionService,
         diagnosticsService,
         speechService,
         historyService,

@@ -35,6 +35,7 @@ export type AppControllerState = {
   historyTotal: number
   selectedHistory: SavedTranscript | null
   exportMessage: string | null
+  liveSessionMessage: string | null
   diagnosticsMessage: string | null
   activeSection: AppSection
   historyQuery: string
@@ -62,6 +63,7 @@ export function createInitialAppControllerState(): AppControllerState {
     historyTotal: 0,
     selectedHistory: null,
     exportMessage: null,
+    liveSessionMessage: null,
     diagnosticsMessage: null,
     activeSection: 'quick-dictation',
     historyQuery: '',
@@ -201,6 +203,24 @@ export class AppController {
     await this.runAction('meeting-stop', async () => {
       await this.deps.api.stopMeeting()
       await this.refreshAll()
+    })
+  }
+
+  async copyLiveSession(): Promise<void> {
+    await this.runAction('live-session-copy', async () => {
+      await this.deps.api.copyLiveSession()
+      this.setState({
+        liveSessionMessage: 'Copied the live session transcript to the clipboard.'
+      })
+    })
+  }
+
+  async exportLiveSession(format: ExportFormat): Promise<void> {
+    await this.runAction(`live-session-export:${format}`, async () => {
+      const result = await this.deps.api.exportLiveSession(format)
+      this.setState({
+        liveSessionMessage: result.ok ? `Exported live session to ${result.path}` : result.error ?? 'Live session export failed'
+      })
     })
   }
 
@@ -509,7 +529,8 @@ export class AppController {
     this.setState({
       busyAction: label,
       error: null,
-      exportMessage: null
+      exportMessage: null,
+      liveSessionMessage: null
     })
 
     try {

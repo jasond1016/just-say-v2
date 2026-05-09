@@ -35,6 +35,8 @@ describe('createAppApi', () => {
       targetLanguage: 'ja'
     })
     await api.stopMeeting()
+    await api.copyLiveSession()
+    await api.exportLiveSession('plain_text')
     await api.listHistory({ page: 2 })
     await api.searchHistory({ query: 'hello' })
     await api.getHistory('tx-1')
@@ -70,6 +72,8 @@ describe('createAppApi', () => {
         }
       ],
       [IPC_CHANNELS.sessionStopMeeting],
+      [IPC_CHANNELS.sessionCopyLiveSession],
+      [IPC_CHANNELS.sessionExportLiveSession, 'plain_text'],
       [IPC_CHANNELS.historyList, { page: 2 }],
       [IPC_CHANNELS.historySearch, { query: 'hello' }],
       [IPC_CHANNELS.historyGet, 'tx-1'],

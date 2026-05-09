@@ -31,6 +31,8 @@ export type AppApi = {
   stopPtt: () => Promise<void>
   startMeeting: (input?: StartMeetingCommand) => Promise<void>
   stopMeeting: () => Promise<void>
+  copyLiveSession: () => Promise<void>
+  exportLiveSession: (format: ExportFormat) => Promise<ExportResult>
   listHistory: (query?: HistoryListQuery) => Promise<PaginatedHistoryResult>
   searchHistory: (query: HistorySearchQuery) => Promise<PaginatedHistoryResult>
   getHistory: (id: string) => Promise<SavedTranscript | null>
@@ -73,6 +75,9 @@ export function createAppApi(invoke: IpcInvoke, events?: IpcEventSource): AppApi
     stopPtt: async () => invoke<void>(IPC_CHANNELS.sessionStopPtt),
     startMeeting: async (input = {}) => invoke<void>(IPC_CHANNELS.sessionStartMeeting, input),
     stopMeeting: async () => invoke<void>(IPC_CHANNELS.sessionStopMeeting),
+    copyLiveSession: async () => invoke<void>(IPC_CHANNELS.sessionCopyLiveSession),
+    exportLiveSession: async (format) =>
+      invoke<ExportResult>(IPC_CHANNELS.sessionExportLiveSession, format),
     listHistory: async (query = {}) =>
       invoke<PaginatedHistoryResult>(IPC_CHANNELS.historyList, query),
     searchHistory: async (query) =>
