@@ -6,8 +6,10 @@ import { createApp } from './bootstrap/create-app'
 import { wireAppLifecycle } from './bootstrap/lifecycle'
 import { createDemoRecognitionEngine } from './engines/demo-engine-adapter'
 import { createElectronIpcRegistrar } from './ipc/electron-ipc'
+import { FileTranscriptExporter } from './persistence/file-transcript-exporter'
 import { InMemorySettingsRepository } from './persistence/settings-repository'
-import { InMemoryTranscriptRepository } from './persistence/transcript-repository'
+import { openSqliteDatabase } from './persistence/sqlite'
+import { SqliteTranscriptRepository } from './persistence/sqlite-transcript-repository'
 import { CaptureWindowService } from './platform/capture-window-service'
 import { ElectronCaptureWindowTransport } from './platform/electron-capture-window-transport'
 import { EngineRegistry } from './services/engine-registry'
@@ -22,7 +24,13 @@ import { SpeechService } from './services/speech-service'
 void wireAppLifecycle(app, {
   onReady: async () => {
     const preloadPath = path.join(__dirname, '../preload/index.js')
-    const transcriptRepository = new InMemoryTranscriptRepository()
+    const userDataPath = app.getPath('userData')
+    const transcriptDatabase = openSqliteDatabase(path.join(userDataPath, 'history.db'))
+    const transcriptRepository = new SqliteTranscriptRepository(transcriptDatabase)
+    const transcriptExporter = new FileTranscriptExporter(
+      transcriptRepository,
+      path.join(userDataPath, 'exports')
+    )
     const settingsRepository = new InMemorySettingsRepository()
     const baseSettingsService = new SettingsService(settingsRepository, {
       credentialsProvider: () => ({
@@ -60,7 +68,7 @@ void wireAppLifecycle(app, {
     const localServiceSupervisor = new LocalServiceSupervisor(createDemoLocalServiceController())
     const captureTransport = new ElectronCaptureWindowTransport(ipcMain)
     const captureWindowService = new CaptureWindowService(captureTransport)
-    const historyService = new HistoryService(transcriptRepository)
+    const historyService = new HistoryService(transcriptRepository, transcriptExporter)
     const speechService = new SpeechService(engineRegistry, localServiceSupervisor, {
       resolveProfileRuntimeConfig: (profileId, mode) =>
         baseSettingsService.resolveProfileRuntimeConfig(profileId, mode)
@@ -112,6 +120,9 @@ void wireAppLifecycle(app, {
     })
 
     captureTransport.attachWindow(appBootstrap.windows.captureWindow)
+    app.on('before-quit', () => {
+      transcriptDatabase.close()
+    })
   }
 })
 

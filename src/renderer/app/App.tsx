@@ -4,6 +4,7 @@ import type {
   AppRuntimeSnapshot,
   AppSettings,
   EngineProfile,
+  PaginatedHistoryResult,
   ProfileTestResult,
   SavedTranscript
 } from '../../shared/api-types'
@@ -13,7 +14,6 @@ import { CaptureRuntime } from '../capture/capture-runtime'
 import {
   APP_SECTIONS,
   type AppSection,
-  filterHistoryItems,
   getPreferredSection
 } from './app-model'
 import { INITIAL_RUNTIME_SNAPSHOT, RuntimeStore } from '../features/runtime/runtime-store'
@@ -30,6 +30,9 @@ export function App() {
   const [profiles, setProfiles] = useState<EngineProfile[]>([])
   const [profileTests, setProfileTests] = useState<Record<string, ProfileTestResult | undefined>>({})
   const [history, setHistory] = useState<SavedTranscript[]>([])
+  const [historyTotal, setHistoryTotal] = useState(0)
+  const [selectedHistory, setSelectedHistory] = useState<SavedTranscript | null>(null)
+  const [exportMessage, setExportMessage] = useState<string | null>(null)
   const [activeSection, setActiveSection] = useState<AppSection>('quick-dictation')
   const [historyQuery, setHistoryQuery] = useState('')
   const [historyMode, setHistoryMode] = useState<'all' | SavedTranscript['mode']>('all')
@@ -62,19 +65,35 @@ export function App() {
           dangerBg: 'rgba(128, 20, 20, 0.22)'
         }
 
+  async function refreshHistory(): Promise<void> {
+    const historyPage = await loadHistoryPage(requireApi(), historyQuery, historyMode)
+    setHistory(historyPage.items)
+    setHistoryTotal(historyPage.total)
+
+    if (selectedHistory) {
+      const freshSelection = historyPage.items.find((item) => item.id === selectedHistory.id)
+
+      if (freshSelection) {
+        const transcript = await requireApi().getHistory(selectedHistory.id)
+        setSelectedHistory(transcript)
+      } else {
+        setSelectedHistory(null)
+      }
+    }
+  }
+
   async function refreshAll(): Promise<void> {
     const api = requireApi()
-    const [runtimeSnapshot, appSettings, historyPage, speechProfiles] = await Promise.all([
+    const [runtimeSnapshot, appSettings, speechProfiles] = await Promise.all([
       runtimeStore.refresh(api),
       api.getSettings(),
-      api.listHistory(),
       api.listSpeechProfiles()
     ])
 
     setRuntime(runtimeSnapshot)
     setSettings(appSettings)
-    setHistory(historyPage.items)
     setProfiles(speechProfiles)
+    await refreshHistory()
   }
 
   async function refreshRuntimeOnly(): Promise<void> {
@@ -87,6 +106,7 @@ export function App() {
     setError(null)
 
     try {
+      setExportMessage(null)
       await action()
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : 'Unknown action error')
@@ -153,6 +173,35 @@ export function App() {
     }
   }, [activeSection, runtime.liveSession])
 
+  useEffect(() => {
+    let cancelled = false
+
+    async function refreshHistoryEffect(): Promise<void> {
+      try {
+        const historyPage = await loadHistoryPage(requireApi(), historyQuery, historyMode)
+
+        if (cancelled) {
+          return
+        }
+
+        setHistory(historyPage.items)
+        setHistoryTotal(historyPage.total)
+      } catch (historyError) {
+        if (cancelled) {
+          return
+        }
+
+        setError(historyError instanceof Error ? historyError.message : 'Unknown history error')
+      }
+    }
+
+    void refreshHistoryEffect()
+
+    return () => {
+      cancelled = true
+    }
+  }, [historyMode, historyQuery])
+
   if (window.location.hash === '#capture') {
     return (
       <main
@@ -193,7 +242,6 @@ export function App() {
   const pttStopDisabled = Boolean(busyAction) || runtime.ptt.status !== 'capturing'
   const meetingStartDisabled = Boolean(busyAction) || meetingActive
   const meetingStopDisabled = Boolean(busyAction) || !liveSession || liveSession.status !== 'streaming'
-  const visibleHistory = filterHistoryItems(history, historyQuery, historyMode)
 
   return (
     <main
@@ -344,17 +392,35 @@ export function App() {
 
       {activeSection === 'history' ? (
         <HistoryPage
-          items={visibleHistory}
+          items={history}
+          total={historyTotal}
           searchQuery={historyQuery}
           selectedMode={historyMode}
+          selectedTranscript={selectedHistory}
+          exportMessage={exportMessage}
           busyAction={busyAction}
           palette={palette}
           onSearchQueryChange={setHistoryQuery}
           onModeChange={setHistoryMode}
+          onOpen={(id) => {
+            void runAction(`open:${id}`, async () => {
+              const transcript = await requireApi().getHistory(id)
+              setSelectedHistory(transcript)
+            })
+          }}
           onDelete={(id) => {
             void runAction(`delete:${id}`, async () => {
               await requireApi().deleteHistory(id)
+              if (selectedHistory?.id === id) {
+                setSelectedHistory(null)
+              }
               await refreshAll()
+            })
+          }}
+          onExport={(id, format) => {
+            void runAction(`export:${id}:${format}`, async () => {
+              const result = await requireApi().exportHistory(id, format)
+              setExportMessage(result.ok ? `Exported to ${result.path}` : result.error ?? 'Export failed')
             })
           }}
         />
@@ -410,6 +476,24 @@ function requireApi() {
   }
 
   return window.justSay
+}
+
+async function loadHistoryPage(
+  api: ReturnType<typeof requireApi>,
+  query: string,
+  mode: 'all' | SavedTranscript['mode']
+): Promise<PaginatedHistoryResult> {
+  const normalizedMode = mode === 'all' ? undefined : mode
+  const keyword = query.trim()
+
+  if (!keyword) {
+    return api.listHistory(normalizedMode ? { mode: normalizedMode } : {})
+  }
+
+  return api.searchHistory({
+    query: keyword,
+    ...(normalizedMode ? { mode: normalizedMode } : {})
+  })
 }
 
 function toolbarButtonStyle(disabled: boolean) {
