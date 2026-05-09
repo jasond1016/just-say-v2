@@ -9,6 +9,7 @@ import type {
   ThemeSetting,
   TranslationProvider
 } from '../../shared/api-types'
+import { Button, SelectField, TextInput } from '../ui/controls'
 
 export function SettingsPage(props: {
   settings: AppSettings
@@ -36,8 +37,8 @@ export function SettingsPage(props: {
   const disabled = Boolean(props.busyAction)
 
   return (
-    <div style={{ maxWidth: 560 }}>
-      <h1 style={{ fontSize: 24, fontWeight: 600, margin: 0 }}>Settings</h1>
+    <div className="page page--narrow">
+      <h1 className="page-title">Settings</h1>
 
       <Section title="General">
         <Row label="Language">
@@ -76,53 +77,36 @@ export function SettingsPage(props: {
           const isSelected = props.settings.speech.selectedProfileId === profile.id
           const testResult = props.profileTests[profile.id]
           return (
-            <div key={profile.id} style={{
-              padding: '10px 0',
-              borderBottom: '1px solid var(--border-subtle)',
-            }}>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: 12,
-              }}>
+            <div key={profile.id} className="settings-engine-item">
+              <div className="settings-engine-item__head">
                 <div>
-                  <span style={{ fontWeight: isSelected ? 600 : 400, fontSize: 14 }}>
+                  <span className={`settings-engine-item__name ${isSelected ? 'settings-engine-item__name--active' : ''}`}>
                     {profile.label}
                   </span>
-                  <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--text-tertiary)' }}>
+                  <span className="settings-engine-item__preset">
                     {profile.preset}
                   </span>
                   {isSelected ? (
-                    <span style={{
-                      marginLeft: 8,
-                      fontSize: 11,
-                      color: 'var(--accent-text)',
-                      fontWeight: 500,
-                    }}>
-                      active
-                    </span>
+                    <span className="settings-engine-item__active">active</span>
                   ) : null}
                 </div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <SmallButton
+                <div className="settings-engine-item__actions">
+                  <Button
                     label="Select"
                     disabled={disabled || isSelected}
+                    size="small"
                     onClick={() => props.onSelectProfile(profile.id)}
                   />
-                  <SmallButton
+                  <Button
                     label={props.busyAction === `profile-test:${profile.id}` ? 'Testing\u2026' : 'Test'}
                     disabled={disabled}
+                    size="small"
                     onClick={() => props.onTestProfile(profile.id)}
                   />
                 </div>
               </div>
               {testResult ? (
-                <div style={{
-                  marginTop: 6,
-                  fontSize: 12,
-                  color: testResult.ok ? 'var(--success)' : 'var(--danger)',
-                }}>
+                <div className={`settings-engine-item__result ${testResult.ok ? 'text-success' : 'text-danger'}`}>
                   {testResult.ok
                     ? `Ready ${'\u00B7'} local service: ${testResult.localService ?? 'n/a'}`
                     : testResult.error?.message ?? 'Test failed'}
@@ -235,11 +219,11 @@ export function SettingsPage(props: {
           />
         </Row>
         <Row label="Diagnostics">
-          <span style={{ fontSize: 13, fontWeight: 500 }}>
+          <span className="settings-row__value">
             {props.settings.advanced.diagnosticsEnabled ? 'enabled' : 'disabled'}
           </span>
         </Row>
-        <div style={{ marginTop: 8 }}>
+        <div className="stack-8">
           <SmallButton
             label={props.busyAction === 'diagnostics-export' ? 'Exporting\u2026' : 'Export Diagnostics'}
             disabled={disabled}
@@ -247,7 +231,7 @@ export function SettingsPage(props: {
           />
         </div>
         {props.diagnosticsMessage ? (
-          <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-tertiary)' }}>
+          <div className="caption-text stack-8">
             {props.diagnosticsMessage}
           </div>
         ) : null}
@@ -258,17 +242,8 @@ export function SettingsPage(props: {
 
 function Section(props: { title: string; children: ReactNode }) {
   return (
-    <section style={{ marginTop: 28 }}>
-      <h2 style={{
-        fontSize: 12,
-        fontWeight: 600,
-        letterSpacing: '0.04em',
-        color: 'var(--text-tertiary)',
-        textTransform: 'uppercase',
-        margin: '0 0 12px',
-      }}>
-        {props.title}
-      </h2>
+    <section className="settings-section">
+      <h2 className="settings-section__title">{props.title}</h2>
       <div>{props.children}</div>
     </section>
   )
@@ -276,16 +251,8 @@ function Section(props: { title: string; children: ReactNode }) {
 
 function Row(props: { label: string; children: ReactNode }) {
   return (
-    <div style={{
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      gap: 16,
-      padding: '8px 0',
-      borderBottom: '1px solid var(--border-subtle)',
-      fontSize: 14,
-    }}>
-      <span style={{ color: 'var(--text-secondary)' }}>{props.label}</span>
+    <div className="settings-row">
+      <span className="settings-row__label">{props.label}</span>
       {props.children}
     </div>
   )
@@ -298,17 +265,14 @@ function Select(props: {
   children: ReactNode
 }) {
   return (
-    <select value={props.value} disabled={props.disabled} onChange={props.onChange} style={{
-      border: '1px solid var(--border)',
-      borderRadius: 'var(--radius)',
-      padding: '5px 8px',
-      background: 'var(--bg-surface)',
-      color: 'var(--text-primary)',
-      fontSize: 13,
-      fontFamily: 'inherit',
-    }}>
+    <SelectField
+      value={props.value}
+      disabled={props.disabled}
+      onChange={props.onChange}
+      className="field-select--compact"
+    >
       {props.children}
-    </select>
+    </SelectField>
   )
 }
 
@@ -320,40 +284,24 @@ function Input(props: {
   onChange: (e: ChangeEvent<HTMLInputElement>) => void
 }) {
   return (
-    <input
+    <TextInput
       value={props.value}
       disabled={props.disabled}
       placeholder={props.placeholder}
       inputMode={props.inputMode}
       onChange={props.onChange}
-      style={{
-        width: 160,
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--radius)',
-        padding: '5px 8px',
-        background: 'var(--bg-surface)',
-        color: 'var(--text-primary)',
-        fontSize: 13,
-        fontFamily: 'inherit',
-      }}
+      className="field-input--compact field-input--fixed"
     />
   )
 }
 
 function SmallButton(props: { label: string; disabled?: boolean; onClick: () => void }) {
   return (
-    <button type="button" onClick={props.onClick} disabled={props.disabled} style={{
-      border: '1px solid var(--border)',
-      borderRadius: 'var(--radius)',
-      padding: '5px 10px',
-      background: 'transparent',
-      color: 'var(--text-secondary)',
-      fontSize: 12,
-      cursor: props.disabled ? 'not-allowed' : 'pointer',
-      fontFamily: 'inherit',
-      opacity: props.disabled ? 0.5 : 1,
-    }}>
-      {props.label}
-    </button>
+    <Button
+      label={props.label}
+      disabled={props.disabled}
+      size="small"
+      onClick={props.onClick}
+    />
   )
 }

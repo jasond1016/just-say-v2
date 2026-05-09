@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ExportFormat, SavedTranscript } from '../../shared/api-types'
 import type { CaptureSource } from '../../shared/primitive-types'
+import { Button, SelectField, TextInput } from '../ui/controls'
 
 type HistoryTimeFilter = 'all' | 'today' | 'last_7_days' | 'last_30_days'
 
@@ -43,63 +44,54 @@ export function HistoryPage(props: {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 600, margin: 0 }}>History</h1>
-        <span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>{props.total} records</span>
+      <div className="page-header">
+        <h1 className="page-title">History</h1>
+        <span className="page-meta">{props.total} records</span>
       </div>
 
-      <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
-        <input
+      <div className="toolbar stack-16">
+        <TextInput
           value={props.searchQuery}
           onChange={(e) => props.onSearchQueryChange(e.target.value)}
           placeholder="Search transcripts"
-          style={inputStyle()}
+          className="field-input--full"
         />
-        <select
+        <SelectField
           value={props.selectedMode}
           onChange={(e) => props.onModeChange(e.target.value as 'all' | SavedTranscript['mode'])}
-          style={selectStyle()}
+          className="field-select"
         >
           <option value="all">All modes</option>
           <option value="ptt">PTT</option>
           <option value="meeting">Meeting</option>
-        </select>
-        <select
+        </SelectField>
+        <SelectField
           value={props.selectedSource}
           onChange={(e) => props.onSourceChange(e.target.value as 'all' | CaptureSource)}
-          style={selectStyle()}
+          className="field-select"
         >
           <option value="all">All sources</option>
           <option value="microphone">Microphone</option>
           <option value="system">System</option>
-        </select>
-        <select
+        </SelectField>
+        <SelectField
           value={props.selectedTimeFilter}
           onChange={(e) => props.onTimeFilterChange(e.target.value as HistoryTimeFilter)}
-          style={selectStyle()}
+          className="field-select"
         >
           <option value="all">All time</option>
           <option value="today">Today</option>
           <option value="last_7_days">Last 7 days</option>
           <option value="last_30_days">Last 30 days</option>
-        </select>
+        </SelectField>
       </div>
 
-      <div style={{
-        marginTop: 20,
-        display: 'grid',
-        gridTemplateColumns: sel ? '1fr 1.2fr' : '1fr',
-        gap: 1,
-        background: 'var(--border-subtle)',
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--radius)',
-        overflow: 'hidden',
-        minHeight: 400,
-      }}>
-        {/* List pane */}
-        <div style={{ background: 'var(--bg-page)', overflow: 'auto', maxHeight: 'calc(100vh - 220px)' }}>
+      <div
+        className={`panel panel--split two-pane stack-20 ${sel ? 'two-pane--detail-open' : 'two-pane--list-only'}`}
+      >
+        <div className="record-list">
           {props.items.length === 0 ? (
-            <div style={{ padding: 20, color: 'var(--text-tertiary)', fontSize: 14 }}>No matching transcripts.</div>
+            <div className="empty-copy">No matching transcripts.</div>
           ) : (
             props.items.map((item) => {
               const sources = describeTranscriptSources(item)
@@ -111,137 +103,106 @@ export function HistoryPage(props: {
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => { if (e.key === 'Enter') props.onOpen(item.id) }}
-                  style={{
-                    padding: '12px 16px',
-                    borderBottom: '1px solid var(--border-subtle)',
-                    background: isSelected ? 'var(--accent-muted)' : 'transparent',
-                    cursor: 'pointer',
-                  }}
+                  className={`list-row list-row--interactive ${isSelected ? 'list-row--selected' : ''}`}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                    <div style={{
-                      fontSize: 14,
-                      fontWeight: 500,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}>
-                      {item.title}
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>
+                  <div className="list-row__head">
+                    <div className="list-row__title">{item.title}</div>
+                    <div className="timeline-row__eyebrow">
                       {formatDateTime(item.startedAt)}
                     </div>
                   </div>
-                  <div style={{ marginTop: 4, fontSize: 12, color: 'var(--text-tertiary)' }}>
+                  <div className="list-row__meta">
                     {item.mode} {'\u00B7'} {sources} {'\u00B7'} {formatDurationMs(item.endedAt - item.startedAt)}
                   </div>
-                  <div style={{
-                    marginTop: 4,
-                    fontSize: 13,
-                    color: 'var(--text-secondary)',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}>
-                    {item.plainText}
-                  </div>
+                  <div className="list-row__preview">{item.plainText}</div>
                 </div>
               )
             })
           )}
         </div>
 
-        {/* Detail pane */}
         {sel ? (
-          <div style={{
-            background: 'var(--bg-surface)',
-            overflow: 'auto',
-            maxHeight: 'calc(100vh - 220px)',
-            padding: 20,
-          }}>
-            <div style={{ fontSize: 18, fontWeight: 600 }}>{sel.title}</div>
-            <div style={{
-              marginTop: 8,
-              fontSize: 12,
-              color: 'var(--text-tertiary)',
-              display: 'flex',
-              gap: 12,
-            }}>
+          <div className="record-detail">
+            <div className="detail-title">{sel.title}</div>
+            <div className="detail-meta">
               <span>{sel.mode}</span>
               <span>{describeTranscriptSources(sel)}</span>
               <span>{formatDurationMs(sel.endedAt - sel.startedAt)}</span>
               <span>{sel.metadata.engineProfileId}</span>
             </div>
 
-            <div style={{ marginTop: 12, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <SmallButton
+            <div className="inline-actions stack-12">
+              <Button
                 label="Copy text"
                 disabled={Boolean(props.busyAction)}
+                size="small"
                 onClick={() => props.onCopy(sel.id, 'plain_text')}
               />
-              <SmallButton
+              <Button
                 label="Copy bilingual"
                 disabled={Boolean(props.busyAction)}
+                size="small"
                 onClick={() => props.onCopy(sel.id, 'bilingual_text')}
               />
-              <SmallButton
+              <Button
                 label="Export text"
                 disabled={Boolean(props.busyAction)}
+                size="small"
                 onClick={() => props.onExport(sel.id, 'plain_text')}
               />
-              <SmallButton
+              <Button
                 label="Export bilingual"
                 disabled={Boolean(props.busyAction)}
+                size="small"
                 onClick={() => props.onExport(sel.id, 'bilingual_text')}
               />
-              <SmallButton
+              <Button
                 label="Export JSON"
                 disabled={Boolean(props.busyAction)}
+                size="small"
                 onClick={() => props.onExport(sel.id, 'json')}
               />
-              <SmallButton
+              <Button
                 label="Delete"
                 disabled={Boolean(props.busyAction)}
-                onClick={() => props.onDelete(sel.id)}
+                size="small"
                 danger
+                onClick={() => props.onDelete(sel.id)}
               />
             </div>
 
             {props.exportMessage ? (
-              <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-tertiary)' }}>{props.exportMessage}</div>
+              <div className="caption-text stack-8">{props.exportMessage}</div>
             ) : null}
 
-            <div style={{ marginTop: 16 }}>
-              <input
+            <div className="stack-16">
+              <TextInput
                 value={detailQuery}
                 onChange={(e) => setDetailQuery(e.target.value)}
                 placeholder="Search within blocks"
-                style={inputStyle()}
+                className="field-input--full"
               />
-              <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-tertiary)' }}>
+              <div className="caption-text caption-text--spaced">
                 {filteredBlocks.length} of {sel.blocks.length} blocks
               </div>
             </div>
 
-            <div style={{ marginTop: 12 }}>
+            <div className="stack-12">
               {filteredBlocks.map((block) => (
-                <div key={block.id} style={{
-                  padding: '8px 0',
-                  borderBottom: '1px solid var(--border-subtle)',
-                }}>
-                  <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                <div key={block.id} className="timeline-row">
+                  <div className="timeline-row__eyebrow">
                     {block.source} {'\u00B7'} {formatTimeRange(block.startedAt, block.endedAt)}
                   </div>
-                  <div style={{ marginTop: 4, fontSize: 14, lineHeight: 1.55 }}>{block.text}</div>
+                  <div className="timeline-row__body timeline-row__body--committed">{block.text}</div>
                   {block.translatedText ? (
-                    <div style={{ marginTop: 2, fontSize: 13, lineHeight: 1.5, color: 'var(--text-secondary)' }}>
+                    <div className="timeline-row__secondary text-secondary">
                       {block.translatedText}
                     </div>
                   ) : null}
                 </div>
               ))}
               {filteredBlocks.length === 0 ? (
-                <div style={{ padding: '12px 0', color: 'var(--text-tertiary)', fontSize: 13 }}>No blocks match.</div>
+                <div className="caption-text caption-text--padded">No blocks match.</div>
               ) : null}
             </div>
           </div>
@@ -249,50 +210,6 @@ export function HistoryPage(props: {
       </div>
     </div>
   )
-}
-
-function SmallButton(props: { label: string; disabled?: boolean; danger?: boolean; onClick: () => void }) {
-  return (
-    <button type="button" onClick={props.onClick} disabled={props.disabled} style={{
-      border: '1px solid var(--border)',
-      borderRadius: 'var(--radius)',
-      padding: '5px 10px',
-      background: 'transparent',
-      color: props.danger ? 'var(--danger)' : 'var(--text-secondary)',
-      fontSize: 12,
-      cursor: props.disabled ? 'not-allowed' : 'pointer',
-      fontFamily: 'inherit',
-      opacity: props.disabled ? 0.5 : 1,
-    }}>
-      {props.label}
-    </button>
-  )
-}
-
-function inputStyle() {
-  return {
-    flex: 1,
-    minWidth: 0,
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius)',
-    padding: '7px 10px',
-    background: 'var(--bg-surface)',
-    color: 'var(--text-primary)',
-    fontSize: 13,
-    fontFamily: 'inherit',
-  } as const
-}
-
-function selectStyle() {
-  return {
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius)',
-    padding: '7px 10px',
-    background: 'var(--bg-surface)',
-    color: 'var(--text-primary)',
-    fontSize: 13,
-    fontFamily: 'inherit',
-  } as const
 }
 
 function describeTranscriptSources(transcript: SavedTranscript): string {

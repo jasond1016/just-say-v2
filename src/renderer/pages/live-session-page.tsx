@@ -1,6 +1,7 @@
 import type { AppSettings, AppRuntimeSnapshot, ExportFormat, MeetingStatus } from '../../shared/api-types'
 import { formatDuration } from '../app/app-model'
 import { selectLiveSessionTimeline } from '../features/runtime/runtime-selectors'
+import { Button } from '../ui/controls'
 
 export function LiveSessionPage(props: {
   runtime: AppRuntimeSnapshot
@@ -22,124 +23,92 @@ export function LiveSessionPage(props: {
   const isStreaming = liveSession?.status === 'streaming'
 
   return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 600, margin: 0 }}>Live Session</h1>
+    <div className="page">
+      <div className="page-header page-header--wide">
+        <h1 className="page-title">Live Session</h1>
         {liveSession ? (
-          <span style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 14,
-            fontVariantNumeric: 'tabular-nums',
-            color: isStreaming ? 'var(--accent)' : 'var(--text-secondary)',
-          }}>
+          <span className={`mono-data ${isStreaming ? 'text-accent' : 'text-secondary'}`}>
             {formatDuration(liveSession.durationSec)}
           </span>
         ) : null}
       </div>
 
-      <div style={{
-        marginTop: 16,
-        padding: '10px 14px',
-        background: 'var(--bg-surface)',
-        borderRadius: 'var(--radius)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        fontSize: 13,
-      }}>
+      <div className="status-strip stack-16">
         <StatusDot active={isStreaming} />
-        <span style={{ fontWeight: 500 }}>{status.title}</span>
-        <span style={{ color: 'var(--text-tertiary)' }}>{status.description}</span>
+        <span className="status-strip__title">{status.title}</span>
+        <span className="text-tertiary">{status.description}</span>
       </div>
 
       {props.liveSessionMessage ? (
-        <div style={{
-          marginTop: 8,
-          fontSize: 12,
-          color: 'var(--text-tertiary)',
-          padding: '0 2px',
-        }}>
+        <div className="caption-text stack-8">
           {props.liveSessionMessage}
         </div>
       ) : null}
 
-      <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
-        <PrimaryButton
+      <div className="inline-actions stack-16">
+        <Button
           label={props.busyAction === 'meeting-start' ? 'Starting\u2026' : 'Start Meeting'}
           disabled={props.meetingStartDisabled}
+          variant="primary"
           onClick={props.onStartMeeting}
         />
-        <SecondaryButton
+        <Button
           label={props.busyAction === 'meeting-stop' ? 'Stopping\u2026' : 'Stop Meeting'}
           disabled={props.meetingStopDisabled}
+          variant="secondary"
           onClick={props.onStopMeeting}
         />
-        <GhostButton
+        <Button
           label={props.busyAction === 'live-session-copy' ? 'Copying\u2026' : 'Copy'}
           disabled={!canAct}
+          variant="ghost"
           onClick={props.onCopyLiveSession}
         />
-        <GhostButton
+        <Button
           label={props.busyAction === 'live-session-export:plain_text' ? 'Exporting\u2026' : 'Export Text'}
           disabled={!canAct}
+          variant="ghost"
           onClick={() => props.onExportLiveSession('plain_text')}
         />
-        <GhostButton
+        <Button
           label={props.busyAction === 'live-session-export:bilingual_text' ? 'Exporting\u2026' : 'Export Bilingual'}
           disabled={!canAct}
+          variant="ghost"
           onClick={() => props.onExportLiveSession('bilingual_text')}
         />
-        <GhostButton
+        <Button
           label="History"
+          variant="ghost"
           onClick={props.onOpenHistory}
         />
       </div>
 
-      <hr style={{ marginTop: 24, border: 'none', borderTop: '1px solid var(--border-subtle)' }} />
+      <hr className="page-rule" />
 
-      <div style={{ marginTop: 20 }}>
+      <div className="stack-20">
         {timeline.length === 0 ? (
-          <div style={{ color: 'var(--text-tertiary)', fontSize: 14 }}>
+          <div className="text-tertiary">
             No transcript blocks yet. Start a meeting to see live text here.
           </div>
         ) : (
-          <div style={{ display: 'grid', gap: 2 }}>
+          <div className="timeline">
             {timeline.map((item) => (
-              <div
-                key={`${item.kind}:${item.id}`}
-                style={{
-                  padding: '10px 0',
-                  borderBottom: '1px solid var(--border-subtle)',
-                }}
-              >
-                <div style={{
-                  fontSize: 11,
-                  color: 'var(--text-tertiary)',
-                  marginBottom: 4,
-                  display: 'flex',
-                  gap: 8,
-                }}>
-                  <span style={{
-                    color: item.kind === 'draft' ? 'var(--accent-text)' : 'var(--text-tertiary)',
-                  }}>
+              <div key={`${item.kind}:${item.id}`} className="timeline-row">
+                <div className="timeline-row__eyebrow">
+                  <span className={item.kind === 'draft' ? 'text-accent' : 'text-tertiary'}>
                     {item.kind}
                   </span>
                   <span>{item.source}</span>
                 </div>
-                <div style={{
-                  fontSize: 15,
-                  lineHeight: 1.55,
-                  color: item.kind === 'draft' ? 'var(--text-secondary)' : 'var(--text-primary)',
-                }}>
+                <div
+                  className={`timeline-row__body ${
+                    item.kind === 'draft' ? 'timeline-row__body--draft' : 'timeline-row__body--committed'
+                  }`}
+                >
                   {item.primaryText || '\u2026'}
                 </div>
                 {item.secondaryText ? (
-                  <div style={{
-                    marginTop: 4,
-                    fontSize: 14,
-                    lineHeight: 1.5,
-                    color: 'var(--text-tertiary)',
-                  }}>
+                  <div className="timeline-row__secondary">
                     {item.secondaryText}
                   </div>
                 ) : null}
@@ -153,17 +122,7 @@ export function LiveSessionPage(props: {
 }
 
 function StatusDot(props: { active: boolean }) {
-  return (
-    <span style={{
-      display: 'inline-block',
-      width: 8,
-      height: 8,
-      borderRadius: '50%',
-      background: props.active ? 'var(--success)' : 'var(--text-tertiary)',
-      animation: props.active ? 'pulse 2s ease-in-out infinite' : 'none',
-      flexShrink: 0,
-    }} />
-  )
+  return <span className={`status-dot ${props.active ? 'status-dot--active' : ''}`} />
 }
 
 function describeStatus(status: MeetingStatus | undefined) {
@@ -190,56 +149,4 @@ function describeStatus(status: MeetingStatus | undefined) {
     default:
       return { title: String(status), description: 'Updating.' }
   }
-}
-
-function PrimaryButton(props: { label: string; disabled?: boolean; onClick: () => void }) {
-  return (
-    <button type="button" onClick={props.onClick} disabled={props.disabled} style={{
-      border: 'none',
-      borderRadius: 'var(--radius)',
-      padding: '8px 16px',
-      background: props.disabled ? 'var(--bg-elevated)' : 'var(--accent)',
-      color: props.disabled ? 'var(--text-tertiary)' : 'var(--accent-on)',
-      fontWeight: 600,
-      fontSize: 13,
-      cursor: props.disabled ? 'not-allowed' : 'pointer',
-      fontFamily: 'inherit',
-    }}>
-      {props.label}
-    </button>
-  )
-}
-
-function SecondaryButton(props: { label: string; disabled?: boolean; onClick: () => void }) {
-  return (
-    <button type="button" onClick={props.onClick} disabled={props.disabled} style={{
-      border: '1px solid var(--border)',
-      borderRadius: 'var(--radius)',
-      padding: '7px 14px',
-      background: 'var(--bg-surface)',
-      color: props.disabled ? 'var(--text-tertiary)' : 'var(--text-primary)',
-      fontSize: 13,
-      cursor: props.disabled ? 'not-allowed' : 'pointer',
-      fontFamily: 'inherit',
-    }}>
-      {props.label}
-    </button>
-  )
-}
-
-function GhostButton(props: { label: string; disabled?: boolean; onClick: () => void }) {
-  return (
-    <button type="button" onClick={props.onClick} disabled={props.disabled} style={{
-      border: 'none',
-      borderRadius: 'var(--radius)',
-      padding: '8px 14px',
-      background: 'transparent',
-      color: props.disabled ? 'var(--text-tertiary)' : 'var(--text-secondary)',
-      fontSize: 13,
-      cursor: props.disabled ? 'not-allowed' : 'pointer',
-      fontFamily: 'inherit',
-    }}>
-      {props.label}
-    </button>
-  )
 }

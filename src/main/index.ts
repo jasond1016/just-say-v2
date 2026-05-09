@@ -44,7 +44,7 @@ void wireAppLifecycle(app, {
   onReady: async () => {
     registerElectronDisplayMediaHandler(session.defaultSession, desktopCapturer)
 
-    const { preloadPath, resourcesPath, rendererIndexPath, iconPath } = resolveAppPaths(__dirname)
+    const { preloadPath, resourcesPath, localServicePath, rendererIndexPath, iconPath } = resolveAppPaths(__dirname)
     const userDataPath = app.getPath('userData')
     const transcriptDatabase = openSqliteDatabase(path.join(userDataPath, 'history.db'))
     const transcriptRepository = new SqliteTranscriptRepository(transcriptDatabase)
@@ -90,8 +90,8 @@ void wireAppLifecycle(app, {
       new PythonLocalServiceController({
         host: localServiceHost,
         port: localServicePort,
-        scriptPath: path.join(resourcesPath, 'local-service', 'service.py'),
-        workingDirectory: path.join(resourcesPath, 'local-service'),
+        scriptPath: path.join(localServicePath, 'service.py'),
+        workingDirectory: localServicePath,
         healthTimeoutMs: 60_000
       })
     )

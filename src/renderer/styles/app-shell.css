@@ -1,0 +1,114 @@
+.app-shell {
+  display: grid;
+  grid-template-columns: 176px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.app-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 24px 0 16px;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border-subtle);
+}
+
+.app-sidebar__brand {
+  padding: 0 16px 20px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.app-sidebar__spacer {
+  flex: 1;
+}
+
+.app-sidebar__status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.app-sidebar__status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.app-sidebar__refresh {
+  margin: 4px 12px 0;
+}
+
+.app-nav-button {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 400;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.app-nav-button[data-active] {
+  background: var(--accent-muted);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.app-main {
+  max-height: 100vh;
+  overflow: auto;
+  padding: 32px 40px 48px;
+}
+
+.app-banner {
+  margin-bottom: 20px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  font-size: 13px;
+}
+
+.app-banner--error {
+  border-color: var(--danger);
+  background: var(--danger-muted);
+}
+
+.capture-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--bg-page);
+  color: var(--text-primary);
+}
+
+.capture-card__eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+}
+
+.capture-card__title {
+  margin: 8px 0 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.capture-card__body {
+  margin: 8px 0 0;
+  max-width: 50ch;
+  color: var(--text-secondary);
+}
