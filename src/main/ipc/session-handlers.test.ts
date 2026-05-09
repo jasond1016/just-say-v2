@@ -16,6 +16,8 @@ describe('createSessionHandlers', () => {
         }
       }),
       prewarm: vi.fn().mockResolvedValue(undefined),
+      startPtt: vi.fn().mockResolvedValue(undefined),
+      stopPtt: vi.fn().mockResolvedValue(undefined),
       startMeeting: vi.fn().mockResolvedValue(undefined),
       stopMeeting: vi.fn().mockResolvedValue(undefined)
     }
@@ -24,6 +26,8 @@ describe('createSessionHandlers', () => {
 
     await handlers[IPC_CHANNELS.sessionGetRuntime]()
     await handlers[IPC_CHANNELS.sessionPrewarm]('ptt')
+    await handlers[IPC_CHANNELS.sessionStartPtt]()
+    await handlers[IPC_CHANNELS.sessionStopPtt]()
     await handlers[IPC_CHANNELS.sessionStartMeeting]({
       includeMicrophone: false,
       translationEnabled: false,
@@ -33,6 +37,8 @@ describe('createSessionHandlers', () => {
 
     expect(sessionService.getRuntimeSnapshot).toHaveBeenCalled()
     expect(sessionService.prewarm).toHaveBeenCalledWith('ptt')
+    expect(sessionService.startPtt).toHaveBeenCalled()
+    expect(sessionService.stopPtt).toHaveBeenCalled()
     expect(sessionService.startMeeting).toHaveBeenCalledWith({
       includeMicrophone: false,
       translationEnabled: false,

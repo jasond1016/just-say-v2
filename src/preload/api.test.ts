@@ -18,6 +18,8 @@ describe('createAppApi', () => {
       }
     })
     await api.prewarmSession('meeting')
+    await api.startPtt()
+    await api.stopPtt()
     await api.startMeeting({
       includeMicrophone: false,
       translationEnabled: true,
@@ -42,6 +44,8 @@ describe('createAppApi', () => {
         }
       ],
       [IPC_CHANNELS.sessionPrewarm, 'meeting'],
+      [IPC_CHANNELS.sessionStartPtt],
+      [IPC_CHANNELS.sessionStopPtt],
       [
         IPC_CHANNELS.sessionStartMeeting,
         {

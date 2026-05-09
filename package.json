@@ -2,9 +2,10 @@
   "name": "justsay-v2",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.11.0",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "dev": "npm run build && electron .",
+    "dev": "pnpm build && electron .",
     "start": "electron .",
     "test": "vitest run",
     "test:watch": "vitest",

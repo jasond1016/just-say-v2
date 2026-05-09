@@ -12,6 +12,8 @@ describe('createApp', () => {
         services: { localService: 'stopped' }
       }),
       prewarm: vi.fn().mockResolvedValue(undefined),
+      startPtt: vi.fn().mockResolvedValue(undefined),
+      stopPtt: vi.fn().mockResolvedValue(undefined),
       startMeeting: vi.fn().mockResolvedValue(undefined),
       stopMeeting: vi.fn().mockResolvedValue(undefined)
     }
@@ -81,6 +83,8 @@ describe('createApp', () => {
     expect(registrations).toEqual([
       'session.getRuntime',
       'session.prewarm',
+      'session.startPtt',
+      'session.stopPtt',
       'session.startMeeting',
       'session.stopMeeting',
       'history.list',

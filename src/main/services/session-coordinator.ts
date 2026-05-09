@@ -1,6 +1,6 @@
 import type { AppRuntimeSnapshot, StartMeetingCommand } from '../../shared/api-types'
 import type { SessionMode } from '../../shared/primitive-types'
-import { INITIAL_RUNTIME_SNAPSHOT } from '../../renderer/features/runtime/runtime-store'
+import { INITIAL_RUNTIME_SNAPSHOT } from '../../shared/runtime-snapshot'
 import type { MeetingCoordinator } from './meeting-coordinator'
 import type { PttCoordinator } from './ptt-coordinator'
 

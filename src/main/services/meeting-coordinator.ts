@@ -57,6 +57,9 @@ export class MeetingCoordinator {
   constructor(private readonly dependencies: MeetingCoordinatorDependencies) {
     this.now = dependencies.now ?? Date.now
     this.createSessionId = dependencies.createSessionId ?? (() => `meeting-${this.now()}`)
+    this.dependencies.captureWindowService.onEvent((event) => {
+      void this.handleCaptureEvent(event)
+    })
   }
 
   getSnapshot(): MeetingRuntimeSnapshot | null {
@@ -217,6 +220,30 @@ export class MeetingCoordinator {
       }
     } catch (error) {
       await this.fail(error)
+    }
+  }
+
+  private async handleCaptureEvent(
+    event: Parameters<CaptureWindowService['onEvent']>[0] extends (payload: infer Event) => void ? Event : never
+  ): Promise<void> {
+    const session = this.activeSession
+
+    if (!session || event.requestId !== session.sessionId) {
+      return
+    }
+
+    switch (event.type) {
+      case 'audio-chunk':
+        session.engine.pushAudio(event.chunk)
+        return
+      case 'capture-error':
+        await this.fail(event.error)
+        return
+      case 'capture-started':
+      case 'capture-stopped':
+        return
+      default:
+        return assertNever(event)
     }
   }
 

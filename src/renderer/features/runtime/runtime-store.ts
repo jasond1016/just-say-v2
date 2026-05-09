@@ -1,14 +1,6 @@
 import type { AppRuntimeSnapshot } from '../../../shared/api-types'
-
-export const INITIAL_RUNTIME_SNAPSHOT: AppRuntimeSnapshot = {
-  ptt: {
-    status: 'idle'
-  },
-  liveSession: null,
-  services: {
-    localService: 'stopped'
-  }
-}
+import { INITIAL_RUNTIME_SNAPSHOT } from '../../../shared/runtime-snapshot'
+export { INITIAL_RUNTIME_SNAPSHOT }
 
 export class RuntimeStore {
   private snapshot: AppRuntimeSnapshot = INITIAL_RUNTIME_SNAPSHOT

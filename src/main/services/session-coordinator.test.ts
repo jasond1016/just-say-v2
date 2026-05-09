@@ -34,6 +34,7 @@ describe('SessionCoordinator + PTTCoordinator', () => {
   it('runs the happy path and publishes the final runtime snapshot', async () => {
     const harness = createHarness()
     const snapshots: AppRuntimeSnapshot[] = []
+    const chunk = new Uint8Array([1, 2, 3, 4])
 
     snapshots.push(harness.sessionCoordinator.getRuntimeSnapshot())
     await harness.sessionCoordinator.startPtt()
@@ -43,6 +44,17 @@ describe('SessionCoordinator + PTTCoordinator', () => {
       type: 'capture-started',
       requestId: 'ptt-1',
       sources: ['microphone']
+    })
+    harness.captureTransport.emit({
+      type: 'audio-chunk',
+      requestId: 'ptt-1',
+      chunk: {
+        source: 'microphone',
+        data: chunk,
+        sampleRate: 16000,
+        channels: 1,
+        timestamp: 1111
+      }
     })
     snapshots.push(harness.sessionCoordinator.getRuntimeSnapshot())
 
@@ -80,6 +92,15 @@ describe('SessionCoordinator + PTTCoordinator', () => {
       {
         text: 'hello world',
         method: 'simulate_input'
+      }
+    ])
+    expect(harness.engine.pushAudioCalls).toEqual([
+      {
+        source: 'microphone',
+        data: chunk,
+        sampleRate: 16000,
+        channels: 1,
+        timestamp: 1111
       }
     ])
     expect(harness.captureTransport.commands).toEqual([
@@ -217,8 +238,20 @@ describe('SessionCoordinator + PTTCoordinator', () => {
         }
       }
     })
+    const chunk = new Uint8Array([9, 8, 7])
 
     await harness.sessionCoordinator.startMeeting()
+    harness.meetingCaptureTransport.emit({
+      type: 'audio-chunk',
+      requestId: 'meeting-1',
+      chunk: {
+        source: 'system',
+        data: chunk,
+        sampleRate: 16000,
+        channels: 1,
+        timestamp: 3333
+      }
+    })
     harness.meetingEngine.emit({
       type: 'session-ready'
     })
@@ -270,6 +303,15 @@ describe('SessionCoordinator + PTTCoordinator', () => {
       ],
       revision: 3
     })
+    expect(harness.meetingEngine.pushAudioCalls).toEqual([
+      {
+        source: 'system',
+        data: chunk,
+        sampleRate: 16000,
+        channels: 1,
+        timestamp: 3333
+      }
+    ])
 
     const stopPromise = harness.sessionCoordinator.stopMeeting()
     harness.meetingEngine.emit({
@@ -430,6 +472,7 @@ function createHarness(options: HarnessOptions = {}) {
 class FakeRecognitionEngine implements RecognitionEngine {
   readonly warmupCalls: Array<{ mode: 'ptt' | 'meeting'; language: string }> = []
   readonly startSessionCalls: Array<Parameters<RecognitionEngine['startSession']>[0]> = []
+  readonly pushAudioCalls: Array<Parameters<RecognitionEngine['pushAudio']>[0]> = []
   private readonly listeners = new Set<(event: RecognitionEvent) => void>()
 
   async getCapabilities(): Promise<EngineCapabilities> {
@@ -451,7 +494,9 @@ class FakeRecognitionEngine implements RecognitionEngine {
     this.startSessionCalls.push(input)
   }
 
-  pushAudio(): void {}
+  pushAudio(chunk: Parameters<RecognitionEngine['pushAudio']>[0]): void {
+    this.pushAudioCalls.push(chunk)
+  }
 
   async stopSession(): Promise<void> {}
 

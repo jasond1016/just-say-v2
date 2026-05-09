@@ -5,6 +5,8 @@ export const IPC_CHANNELS = {
   speechTestProfile: 'speech.testProfile',
   sessionGetRuntime: 'session.getRuntime',
   sessionPrewarm: 'session.prewarm',
+  sessionStartPtt: 'session.startPtt',
+  sessionStopPtt: 'session.stopPtt',
   sessionStartMeeting: 'session.startMeeting',
   sessionStopMeeting: 'session.stopMeeting',
   historyList: 'history.list',

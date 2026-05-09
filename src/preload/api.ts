@@ -18,6 +18,8 @@ export type AppApi = {
   getSettings: () => Promise<AppSettings>
   updateSettings: (patch: SettingsPatch) => Promise<AppSettings>
   prewarmSession: (mode: SessionMode) => Promise<void>
+  startPtt: () => Promise<void>
+  stopPtt: () => Promise<void>
   startMeeting: (input?: StartMeetingCommand) => Promise<void>
   stopMeeting: () => Promise<void>
   listHistory: (query?: HistoryListQuery) => Promise<PaginatedHistoryResult>
@@ -35,6 +37,8 @@ export function createAppApi(invoke: IpcInvoke): AppApi {
     getSettings: async () => invoke<AppSettings>(IPC_CHANNELS.settingsGet),
     updateSettings: async (patch) => invoke<AppSettings>(IPC_CHANNELS.settingsUpdate, patch),
     prewarmSession: async (mode) => invoke<void>(IPC_CHANNELS.sessionPrewarm, mode),
+    startPtt: async () => invoke<void>(IPC_CHANNELS.sessionStartPtt),
+    stopPtt: async () => invoke<void>(IPC_CHANNELS.sessionStopPtt),
     startMeeting: async (input = {}) => invoke<void>(IPC_CHANNELS.sessionStartMeeting, input),
     stopMeeting: async () => invoke<void>(IPC_CHANNELS.sessionStopMeeting),
     listHistory: async (query = {}) =>

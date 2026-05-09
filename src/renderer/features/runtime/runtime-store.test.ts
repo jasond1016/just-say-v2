@@ -90,6 +90,8 @@ describe('RuntimeStore', () => {
         }
       }),
       prewarmSession: async () => undefined,
+      startPtt: async () => undefined,
+      stopPtt: async () => undefined,
       startMeeting: async () => undefined,
       stopMeeting: async () => undefined,
       listHistory: async () => ({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 0 }),

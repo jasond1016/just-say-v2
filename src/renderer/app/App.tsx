@@ -165,6 +165,8 @@ export function App() {
   const nextTheme = settings.general.theme === 'light' ? 'dark' : 'light'
   const liveSession = runtime.liveSession
   const meetingActive = Boolean(liveSession)
+  const pttStartDisabled = Boolean(busyAction) || runtime.ptt.status !== 'idle'
+  const pttStopDisabled = Boolean(busyAction) || runtime.ptt.status !== 'capturing'
   const meetingStartDisabled = Boolean(busyAction) || meetingActive
   const meetingStopDisabled = Boolean(busyAction) || !liveSession || liveSession.status !== 'streaming'
 
@@ -258,6 +260,38 @@ export function App() {
 
               setSettings(updated)
               await refreshRuntimeOnly()
+            })
+          }}
+        />
+        <ActionButton
+          label={busyAction === 'ptt-start' ? 'Starting PTT...' : 'Start PTT demo'}
+          disabled={pttStartDisabled}
+          onClick={() => {
+            void runAction('ptt-start', async () => {
+              const api = window.justSay
+
+              if (!api) {
+                throw new Error('window.justSay is not available')
+              }
+
+              await api.startPtt()
+              await refreshRuntimeOnly()
+            })
+          }}
+        />
+        <ActionButton
+          label={busyAction === 'ptt-stop' ? 'Stopping PTT...' : 'Stop PTT'}
+          disabled={pttStopDisabled}
+          onClick={() => {
+            void runAction('ptt-stop', async () => {
+              const api = window.justSay
+
+              if (!api) {
+                throw new Error('window.justSay is not available')
+              }
+
+              await api.stopPtt()
+              await refreshAll()
             })
           }}
         />
