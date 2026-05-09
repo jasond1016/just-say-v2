@@ -29,6 +29,7 @@ describe('RuntimeStore', () => {
 
     const api: AppApi = {
       getRuntime: async () => nextSnapshot,
+      onRuntimeSnapshot: () => () => {},
       getSettings: async () => ({
         general: {
           language: 'zh-CN',
@@ -109,4 +110,86 @@ describe('RuntimeStore', () => {
     await expect(store.hydrate(api)).resolves.toEqual(nextSnapshot)
     expect(store.getSnapshot()).toEqual(nextSnapshot)
   })
+
+  it('updates the current snapshot from runtime push events', () => {
+    const store = new RuntimeStore()
+    const nextSnapshot: import('../../../shared/api-types').AppRuntimeSnapshot = {
+      ptt: {
+        status: 'capturing' as const
+      },
+      liveSession: null,
+      services: {
+        localService: 'starting' as const
+      }
+    }
+
+    let runtimeListener: ((snapshot: import('../../../shared/api-types').AppRuntimeSnapshot) => void) | undefined
+    const api: AppApi = {
+      getRuntime: async () => nextSnapshot,
+      onRuntimeSnapshot: (listener) => {
+        runtimeListener = listener
+        return () => {
+          runtimeListener = undefined
+        }
+      },
+      getSettings: async () => createSettings(),
+      updateSettings: async () => createSettings(),
+      listSpeechProfiles: async () => [],
+      testSpeechProfile: async () => ({ ok: true, profileId: 'local-fast' }),
+      prewarmSession: async () => undefined,
+      startPtt: async () => undefined,
+      stopPtt: async () => undefined,
+      startMeeting: async () => undefined,
+      stopMeeting: async () => undefined,
+      listHistory: async () => ({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 0 }),
+      searchHistory: async () => ({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 0 }),
+      getHistory: async () => null,
+      deleteHistory: async () => false,
+      exportHistory: async () => ({ ok: false, error: 'not implemented' })
+    }
+
+    const seen: Array<typeof nextSnapshot> = []
+    const disconnect = store.connect((snapshot) => {
+      seen.push(snapshot)
+    }, api)
+
+    runtimeListener?.(nextSnapshot)
+    disconnect()
+
+    expect(seen).toEqual([nextSnapshot])
+    expect(store.getSnapshot()).toEqual(nextSnapshot)
+  })
 })
+
+function createSettings() {
+  return {
+    general: {
+      language: 'zh-CN' as const,
+      theme: 'system' as const,
+      launchAtLogin: false,
+      minimizeToTray: true
+    },
+    speech: {
+      selectedProfileId: 'local-fast',
+      language: 'auto' as const
+    },
+    input: {
+      pttHotkey: 'RCtrl' as const,
+      includeMicrophoneInMeeting: false,
+      microphoneDeviceId: 'default' as const
+    },
+    output: {
+      method: 'simulate_input' as const
+    },
+    translation: {
+      enabledForPtt: false,
+      enabledForMeeting: false,
+      targetLanguage: 'en',
+      provider: 'openai-compatible' as const
+    },
+    advanced: {
+      diagnosticsEnabled: true,
+      experimentalFlags: []
+    }
+  }
+}

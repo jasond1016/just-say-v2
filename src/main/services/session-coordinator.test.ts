@@ -31,6 +31,26 @@ describe('SessionCoordinator + PTTCoordinator', () => {
     ])
   })
 
+  it('broadcasts runtime snapshots to subscribers', async () => {
+    const harness = createHarness()
+    const seenStatuses: string[] = []
+    const unsubscribe = harness.sessionCoordinator.onSnapshot((snapshot) => {
+      seenStatuses.push(snapshot.ptt.status)
+    })
+
+    await harness.sessionCoordinator.startPtt()
+    harness.captureTransport.emit({
+      type: 'capture-started',
+      requestId: 'ptt-1',
+      sources: ['microphone']
+    })
+
+    expect(seenStatuses).toContain('arming')
+    expect(seenStatuses).toContain('capturing')
+
+    unsubscribe()
+  })
+
   it('runs the happy path and publishes the final runtime snapshot', async () => {
     const harness = createHarness()
     const snapshots: AppRuntimeSnapshot[] = []

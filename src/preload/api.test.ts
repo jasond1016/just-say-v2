@@ -8,9 +8,14 @@ describe('createAppApi', () => {
   it('routes runtime and history methods to the expected IPC channels', async () => {
     const invokeMock = vi.fn(async () => undefined)
     const invoke: IpcInvoke = invokeMock as IpcInvoke
-    const api = createAppApi(invoke)
+    const events = {
+      on: vi.fn(),
+      off: vi.fn()
+    }
+    const api = createAppApi(invoke, events)
 
     await api.getRuntime()
+    const unsubscribe = api.onRuntimeSnapshot(() => {})
     await api.getSettings()
     await api.updateSettings({
       general: {
@@ -33,6 +38,7 @@ describe('createAppApi', () => {
     await api.getHistory('tx-1')
     await api.deleteHistory('tx-1')
     await api.exportHistory('tx-1', 'json')
+    unsubscribe()
 
     expect(invokeMock.mock.calls).toEqual([
       [IPC_CHANNELS.sessionGetRuntime],
@@ -65,5 +71,7 @@ describe('createAppApi', () => {
       [IPC_CHANNELS.historyDelete, 'tx-1'],
       [IPC_CHANNELS.historyExport, 'tx-1', 'json']
     ])
+    expect(events.on).toHaveBeenCalledWith(IPC_CHANNELS.runtimeSnapshot, expect.any(Function))
+    expect(events.off).toHaveBeenCalledWith(IPC_CHANNELS.runtimeSnapshot, expect.any(Function))
   })
 })

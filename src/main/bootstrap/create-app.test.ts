@@ -5,11 +5,20 @@ import { createApp } from './create-app'
 describe('createApp', () => {
   it('registers session/history handlers and creates the app windows', async () => {
     const registrations: string[] = []
+    const mainWindowEvents: Array<{ channel: string; payload: unknown }> = []
     const sessionCoordinator = {
       getRuntimeSnapshot: vi.fn().mockReturnValue({
         ptt: { status: 'idle' },
         liveSession: null,
         services: { localService: 'stopped' }
+      }),
+      onSnapshot: vi.fn().mockImplementation((listener) => {
+        listener({
+          ptt: { status: 'idle' },
+          liveSession: null,
+          services: { localService: 'stopped' }
+        })
+        return () => {}
       }),
       prewarm: vi.fn().mockResolvedValue(undefined),
       startPtt: vi.fn().mockResolvedValue(undefined),
@@ -77,7 +86,16 @@ describe('createApp', () => {
       windows: {
         browserWindowFactory: ({ title }) => ({
           loadURL: vi.fn(),
-          title
+          title,
+          ...(title === 'JustSay V2'
+            ? {
+                webContents: {
+                  send(channel: string, payload?: unknown) {
+                    mainWindowEvents.push({ channel, payload })
+                  }
+                }
+              }
+            : {})
         }),
         rendererUrl: 'app://renderer',
         captureUrl: 'app://capture',
@@ -104,5 +122,23 @@ describe('createApp', () => {
     ])
     expect(app.windows.mainWindow).toBeDefined()
     expect(app.windows.captureWindow).toBeDefined()
+    expect(mainWindowEvents).toEqual([
+      {
+        channel: 'runtime.snapshot',
+        payload: {
+          ptt: { status: 'idle' },
+          liveSession: null,
+          services: { localService: 'stopped' }
+        }
+      },
+      {
+        channel: 'runtime.snapshot',
+        payload: {
+          ptt: { status: 'idle' },
+          liveSession: null,
+          services: { localService: 'stopped' }
+        }
+      }
+    ])
   })
 })

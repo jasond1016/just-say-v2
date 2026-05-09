@@ -8,6 +8,7 @@ export class SessionCoordinator {
   private snapshot: AppRuntimeSnapshot = INITIAL_RUNTIME_SNAPSHOT
   private readonly unsubscribePtt: () => void
   private readonly unsubscribeMeeting: () => void
+  private readonly listeners = new Set<(snapshot: AppRuntimeSnapshot) => void>()
 
   constructor(
     private readonly pttCoordinator: PttCoordinator,
@@ -18,12 +19,14 @@ export class SessionCoordinator {
         ...this.snapshot,
         ptt: pttSnapshot
       }
+      this.emitSnapshot()
     })
     this.unsubscribeMeeting = this.meetingCoordinator.onSnapshot((meetingSnapshot) => {
       this.snapshot = {
         ...this.snapshot,
         liveSession: meetingSnapshot
       }
+      this.emitSnapshot()
     })
   }
 
@@ -70,6 +73,14 @@ export class SessionCoordinator {
     }
   }
 
+  onSnapshot(listener: (snapshot: AppRuntimeSnapshot) => void): () => void {
+    this.listeners.add(listener)
+
+    return () => {
+      this.listeners.delete(listener)
+    }
+  }
+
   async prewarm(mode: SessionMode): Promise<void> {
     if (mode === 'ptt') {
       await this.pttCoordinator.prewarm()
@@ -106,6 +117,15 @@ export class SessionCoordinator {
         ...this.snapshot.services,
         localService: status
       }
+    }
+    this.emitSnapshot()
+  }
+
+  private emitSnapshot(): void {
+    const snapshot = this.getRuntimeSnapshot()
+
+    for (const listener of this.listeners) {
+      listener(snapshot)
     }
   }
 }

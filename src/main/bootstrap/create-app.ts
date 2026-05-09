@@ -1,4 +1,5 @@
 import { createHistoryHandlers } from '../ipc/history-handlers'
+import { IPC_CHANNELS } from '../ipc/channels'
 import { registerIpcHandlers, type IpcRegistrar } from '../ipc/register-ipc'
 import { createSessionHandlers } from '../ipc/session-handlers'
 import { createSettingsHandlers } from '../ipc/settings-handlers'
@@ -10,7 +11,9 @@ import type { SettingsHandlerService } from '../ipc/settings-handlers'
 import type { SpeechHandlerService } from '../ipc/speech-handlers'
 
 export type CreateAppServices = {
-  sessionCoordinator: SessionHandlerService
+  sessionCoordinator: SessionHandlerService & {
+    onSnapshot(listener: (snapshot: ReturnType<SessionHandlerService['getRuntimeSnapshot']>) => void): () => void
+  }
   speechService: SpeechHandlerService
   historyService: HistoryHandlerService
   settingsService: SettingsHandlerService
@@ -36,6 +39,11 @@ export async function createApp(options: CreateAppOptions): Promise<AppBootstrap
   )
 
   const windows = await createWindows(options.windows)
+  const initialSnapshot = options.services.sessionCoordinator.getRuntimeSnapshot()
+  windows.mainWindow.webContents?.send?.(IPC_CHANNELS.runtimeSnapshot, initialSnapshot)
+  options.services.sessionCoordinator.onSnapshot((snapshot) => {
+    windows.mainWindow.webContents?.send?.(IPC_CHANNELS.runtimeSnapshot, snapshot)
+  })
 
   return {
     windows

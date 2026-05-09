@@ -17,6 +17,7 @@ import { IPC_CHANNELS } from '../main/ipc/channels'
 
 export type AppApi = {
   getRuntime: () => Promise<AppRuntimeSnapshot>
+  onRuntimeSnapshot: (listener: (snapshot: AppRuntimeSnapshot) => void) => () => void
   getSettings: () => Promise<AppSettings>
   updateSettings: (patch: SettingsPatch) => Promise<AppSettings>
   listSpeechProfiles: () => Promise<EngineProfile[]>
@@ -34,10 +35,29 @@ export type AppApi = {
 }
 
 export type IpcInvoke = <TResult>(channel: string, ...args: unknown[]) => Promise<TResult>
+export type IpcEventSource = {
+  on(channel: string, listener: (_event: unknown, payload: unknown) => void): void
+  off(channel: string, listener: (_event: unknown, payload: unknown) => void): void
+}
 
-export function createAppApi(invoke: IpcInvoke): AppApi {
+export function createAppApi(invoke: IpcInvoke, events?: IpcEventSource): AppApi {
   return {
     getRuntime: async () => invoke<AppRuntimeSnapshot>(IPC_CHANNELS.sessionGetRuntime),
+    onRuntimeSnapshot(listener) {
+      if (!events) {
+        return () => {}
+      }
+
+      const handler = (_event: unknown, payload: unknown) => {
+        listener(payload as AppRuntimeSnapshot)
+      }
+
+      events.on(IPC_CHANNELS.runtimeSnapshot, handler)
+
+      return () => {
+        events.off(IPC_CHANNELS.runtimeSnapshot, handler)
+      }
+    },
     getSettings: async () => invoke<AppSettings>(IPC_CHANNELS.settingsGet),
     updateSettings: async (patch) => invoke<AppSettings>(IPC_CHANNELS.settingsUpdate, patch),
     listSpeechProfiles: async () => invoke<EngineProfile[]>(IPC_CHANNELS.speechListProfiles),

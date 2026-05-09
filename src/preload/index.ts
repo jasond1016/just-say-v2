@@ -1,5 +1,6 @@
 import { api, createAppApi } from './api'
 import { createCaptureApi } from './capture'
+import { IPC_CHANNELS } from '../main/ipc/channels'
 
 export type ContextBridgeLike = {
   exposeInMainWorld(key: string, api: unknown): void
@@ -18,8 +19,10 @@ export function installPreloadBridge(
 ): void {
   contextBridge.exposeInMainWorld(
     'justSay',
-    createAppApi(<TResult>(channel: string, ...args: unknown[]) =>
-      ipcRenderer.invoke(channel, ...args) as Promise<TResult>
+    createAppApi(
+      <TResult>(channel: string, ...args: unknown[]) =>
+        ipcRenderer.invoke(channel, ...args) as Promise<TResult>,
+      ipcRenderer
     )
   )
   contextBridge.exposeInMainWorld('justSayCapture', createCaptureApi(ipcRenderer))

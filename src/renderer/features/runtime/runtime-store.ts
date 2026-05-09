@@ -26,4 +26,18 @@ export class RuntimeStore {
   async hydrate(api = window.justSay): Promise<AppRuntimeSnapshot> {
     return this.refresh(api)
   }
+
+  connect(
+    listener: (snapshot: AppRuntimeSnapshot) => void,
+    api = window.justSay
+  ): () => void {
+    if (!api) {
+      throw new Error('window.justSay is not available')
+    }
+
+    return api.onRuntimeSnapshot((snapshot) => {
+      this.setSnapshot(snapshot)
+      listener(this.getSnapshot())
+    })
+  }
 }

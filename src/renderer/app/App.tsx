@@ -96,6 +96,17 @@ export function App() {
   }
 
   useEffect(() => {
+    const api = requireApi()
+    const disconnect = runtimeStore.connect((snapshot) => {
+      setRuntime(snapshot)
+    }, api)
+
+    return () => {
+      disconnect()
+    }
+  }, [])
+
+  useEffect(() => {
     let cancelled = false
 
     async function bootstrap(): Promise<void> {
@@ -141,28 +152,6 @@ export function App() {
       setActiveSection('live-session')
     }
   }, [activeSection, runtime.liveSession])
-
-  useEffect(() => {
-    if (!runtime.liveSession) {
-      return
-    }
-
-    let cancelled = false
-    const intervalId = window.setInterval(() => {
-      void refreshRuntimeOnly().catch((pollError) => {
-        if (cancelled) {
-          return
-        }
-
-        setError(pollError instanceof Error ? pollError.message : 'Unknown runtime refresh error')
-      })
-    }, 800)
-
-    return () => {
-      cancelled = true
-      window.clearInterval(intervalId)
-    }
-  }, [runtime.liveSession?.sessionId, runtime.liveSession?.status])
 
   if (window.location.hash === '#capture') {
     return (
