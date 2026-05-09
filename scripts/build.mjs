@@ -1,11 +1,20 @@
-import { mkdir, rm, writeFile, copyFile } from 'node:fs/promises'
+import { execFile as execFileCallback } from 'node:child_process'
+import { mkdir, rm, writeFile, cp } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { promisify } from 'node:util'
 import { build } from 'esbuild'
 
+const execFile = promisify(execFileCallback)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, '..')
 const distDir = path.join(rootDir, 'dist')
+const windowsHotkeyProjectDir = path.join(rootDir, 'native', 'windows-hotkey-helper')
+const windowsHotkeyOutputDir = path.join(distDir, 'resources', 'windows-hotkey-helper')
+const windowsHotkeyExecutablePath = path.join(
+  windowsHotkeyOutputDir,
+  'JustSayHotkeyHelper.exe'
+)
 
 await rm(distDir, { recursive: true, force: true })
 await mkdir(path.join(distDir, 'main'), { recursive: true })
@@ -20,7 +29,7 @@ await Promise.all([
     format: 'cjs',
     bundle: true,
     target: 'node20',
-    external: ['electron']
+    external: ['electron', 'node-global-key-listener']
   }),
   build({
     entryPoints: [path.join(rootDir, 'src/preload/entry.ts')],
@@ -77,4 +86,33 @@ await writeFile(
   'utf8'
 )
 
-await copyFile(path.join(rootDir, 'resources/icon.png'), path.join(distDir, 'icon.png'))
+await cp(path.join(rootDir, 'resources'), path.join(distDir, 'resources'), {
+  recursive: true,
+  force: true
+})
+await publishWindowsHotkeyHelper()
+
+async function publishWindowsHotkeyHelper() {
+  if (process.platform !== 'win32') {
+    return
+  }
+
+  await rm(windowsHotkeyOutputDir, { recursive: true, force: true })
+  await mkdir(windowsHotkeyOutputDir, { recursive: true })
+
+  await execFile(
+    'go',
+    [
+      'build',
+      '-trimpath',
+      '-ldflags=-s -w',
+      '-o',
+      windowsHotkeyExecutablePath,
+      '.'
+    ],
+    {
+      cwd: windowsHotkeyProjectDir,
+      windowsHide: true
+    }
+  )
+}

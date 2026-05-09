@@ -22,5 +22,8 @@
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"
   },
-  "main": "dist/main/index.js"
+  "main": "dist/main/index.js",
+  "dependencies": {
+    "node-global-key-listener": "^0.3.0"
+  }
 }

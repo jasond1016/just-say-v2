@@ -4,30 +4,36 @@ import { profileCatalog } from '../core/settings/profile-catalog'
 import type { SettingsPatch } from '../shared/api-types'
 import { createApp } from './bootstrap/create-app'
 import { wireAppLifecycle } from './bootstrap/lifecycle'
-import { createDemoRecognitionEngine } from './engines/demo-engine-adapter'
+import { createRecognitionEngine } from './engines/create-recognition-engine'
 import { createElectronIpcRegistrar } from './ipc/electron-ipc'
 import { FileTranscriptExporter } from './persistence/file-transcript-exporter'
-import { InMemorySettingsRepository } from './persistence/settings-repository'
+import { FileSettingsRepository } from './persistence/settings-repository'
 import { openSqliteDatabase } from './persistence/sqlite'
 import { SqliteTranscriptRepository } from './persistence/sqlite-transcript-repository'
 import { ElectronClipboardService } from './platform/clipboard-service'
 import { CaptureWindowService } from './platform/capture-window-service'
 import { ElectronCaptureWindowTransport } from './platform/electron-capture-window-transport'
+import { HotkeyService } from './platform/hotkey-service'
 import { OutputWindowService } from './platform/output-window-service'
+import { WindowsInputService } from './platform/windows-input-service'
 import { DiagnosticsService } from './services/diagnostics-service'
 import { EngineRegistry } from './services/engine-registry'
+import { getEnvironmentCredentials } from './services/environment-credentials-provider'
 import { HistoryService } from './services/history-service'
 import { LocalServiceSupervisor } from './services/local-service-supervisor'
 import { MeetingCoordinator } from './services/meeting-coordinator'
 import { OutputDispatcher } from './services/output-dispatcher'
 import { PttCoordinator } from './services/ptt-coordinator'
+import { PttHotkeyController } from './services/ptt-hotkey-controller'
 import { SessionCoordinator } from './services/session-coordinator'
 import { SettingsService } from './services/settings-service'
 import { SpeechService } from './services/speech-service'
+import { PythonLocalServiceController } from './services/python-local-service-controller'
 
 void wireAppLifecycle(app, {
   onReady: async () => {
     const preloadPath = path.join(__dirname, '../preload/index.js')
+    const resourcesPath = path.join(__dirname, '../resources')
     const userDataPath = app.getPath('userData')
     const transcriptDatabase = openSqliteDatabase(path.join(userDataPath, 'history.db'))
     const transcriptRepository = new SqliteTranscriptRepository(transcriptDatabase)
@@ -35,12 +41,9 @@ void wireAppLifecycle(app, {
       transcriptRepository,
       path.join(userDataPath, 'exports')
     )
-    const settingsRepository = new InMemorySettingsRepository()
+    const settingsRepository = new FileSettingsRepository(path.join(userDataPath, 'settings.json'))
     const baseSettingsService = new SettingsService(settingsRepository, {
-      credentialsProvider: () => ({
-        cloudApiKey: 'dev-cloud-key',
-        translationApiKey: 'dev-translation-key'
-      })
+      credentialsProvider: () => getEnvironmentCredentials()
     })
     let cachedSettings = await baseSettingsService.getSettings()
     let cachedRuntimeConfigs = {
@@ -70,15 +73,31 @@ void wireAppLifecycle(app, {
       onChanged: (listener: (settings: Awaited<ReturnType<typeof baseSettingsService.getSettings>>) => void) =>
         baseSettingsService.onChanged(listener)
     }
-    const engineRegistry = new EngineRegistry(profileCatalog, createDemoRecognitionEngine)
-    const localServiceSupervisor = new LocalServiceSupervisor(createDemoLocalServiceController())
+    const localServiceHost = cachedSettings.advanced.localServiceHost ?? '127.0.0.1'
+    const localServicePort = cachedSettings.advanced.localServicePort ?? 8765
+    const localServiceSupervisor = new LocalServiceSupervisor(
+      new PythonLocalServiceController({
+        host: localServiceHost,
+        port: localServicePort,
+        scriptPath: path.join(resourcesPath, 'local-service', 'service.py'),
+        workingDirectory: path.join(resourcesPath, 'local-service')
+      })
+    )
+    const engineRegistry = new EngineRegistry(profileCatalog, (config) =>
+      createRecognitionEngine(config, { localServiceSupervisor })
+    )
     const captureTransport = new ElectronCaptureWindowTransport(ipcMain)
     const captureWindowService = new CaptureWindowService(captureTransport)
     const clipboardService = new ElectronClipboardService()
     const outputWindowService = new OutputWindowService()
+    const inputService = process.platform === 'win32' ? new WindowsInputService(clipboardService) : undefined
     const outputDispatcher = new OutputDispatcher({
       clipboard: clipboardService,
-      popup: outputWindowService
+      popup: outputWindowService,
+      ...(inputService ? { input: inputService } : {})
+    })
+    const hotkeyService = new HotkeyService({
+      windowsHelperPath: path.join(resourcesPath, 'windows-hotkey-helper', 'JustSayHotkeyHelper.exe')
     })
     const historyService = new HistoryService(transcriptRepository, transcriptExporter)
     const diagnosticsService = new DiagnosticsService({
@@ -106,6 +125,7 @@ void wireAppLifecycle(app, {
       diagnostics: diagnosticsService
     })
     const sessionCoordinator = new SessionCoordinator(pttCoordinator, meetingCoordinator)
+    const pttHotkeyController = new PttHotkeyController(hotkeyService, settingsService, sessionCoordinator)
     sessionCoordinator.setLocalServiceStatus(localServiceSupervisor.getStatus())
     diagnosticsService.setLocalServiceStatus(localServiceSupervisor.getStatus())
     localServiceSupervisor.onStatusChange((status) => {
@@ -122,6 +142,7 @@ void wireAppLifecycle(app, {
         diagnosticsService.clearLatestFailedSession()
       }
     })
+    await pttHotkeyController.start()
 
     const appBootstrap = await createApp({
       registrar: createElectronIpcRegistrar(ipcMain),
@@ -151,25 +172,9 @@ void wireAppLifecycle(app, {
 
     captureTransport.attachWindow(appBootstrap.windows.captureWindow)
     app.on('before-quit', () => {
+      pttHotkeyController.dispose()
+      void localServiceSupervisor.stop()
       transcriptDatabase.close()
     })
   }
 })
-
-function createDemoLocalServiceController() {
-  let started = false
-
-  return {
-    async start() {
-      started = true
-    },
-    async stop() {
-      started = false
-    },
-    async healthCheck() {
-      return {
-        ok: started
-      }
-    }
-  }
-}

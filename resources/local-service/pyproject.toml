@@ -1,0 +1,16 @@
+[project]
+name = "justsay-local-service"
+version = "0.1.0"
+description = "Local SenseVoiceSmall websocket service for JustSay V2"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+  "funasr>=1.1.0",
+  "modelscope>=1.17.1",
+  "numpy>=1.26.0",
+  "torch>=2.3.0",
+  "torchaudio>=2.3.0",
+  "websockets>=12.0",
+]
+
+[tool.uv]
+package = false
