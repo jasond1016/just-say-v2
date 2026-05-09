@@ -1,6 +1,9 @@
 export const IPC_CHANNELS = {
   settingsGet: 'settings.get',
   settingsUpdate: 'settings.update',
+  captureCommand: 'capture.command',
+  captureEvent: 'capture.event',
+  captureReady: 'capture.ready',
   speechListProfiles: 'speech.listProfiles',
   speechTestProfile: 'speech.testProfile',
   sessionGetRuntime: 'session.getRuntime',

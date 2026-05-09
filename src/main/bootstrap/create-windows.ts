@@ -2,6 +2,7 @@ export type BrowserWindowLike = {
   loadURL(url: string): Promise<void> | void
   webContents?: {
     openDevTools?: () => void
+    send?: (channel: string, payload?: unknown) => void
   }
 }
 

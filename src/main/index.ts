@@ -6,14 +6,15 @@ import { createElectronIpcRegistrar } from './ipc/electron-ipc'
 import type { SettingsPatch } from '../shared/api-types'
 import { InMemorySettingsRepository } from './persistence/settings-repository'
 import { InMemoryTranscriptRepository } from './persistence/transcript-repository'
-import { CaptureWindowService, type CaptureWindowTransport } from './platform/capture-window-service'
+import { CaptureWindowService } from './platform/capture-window-service'
+import { ElectronCaptureWindowTransport } from './platform/electron-capture-window-transport'
 import { HistoryService } from './services/history-service'
 import { MeetingCoordinator } from './services/meeting-coordinator'
 import { PttCoordinator } from './services/ptt-coordinator'
 import { SessionCoordinator } from './services/session-coordinator'
 import { SettingsService } from './services/settings-service'
 import type { RecognitionEngine, RecognitionEvent, StartSessionInput } from '../core/contracts/engine'
-import type { CaptureCommand, CaptureEvent, ResolvedRuntimeConfig } from '../shared/api-types'
+import type { CaptureCommand, ResolvedRuntimeConfig } from '../shared/api-types'
 
 void wireAppLifecycle(app, {
   onReady: async () => {
@@ -49,7 +50,8 @@ void wireAppLifecycle(app, {
         return updated
       }
     }
-    const captureWindowService = new CaptureWindowService(createNoopCaptureTransport())
+    const captureTransport = new ElectronCaptureWindowTransport(ipcMain)
+    const captureWindowService = new CaptureWindowService(captureTransport)
     const historyService = new HistoryService(transcriptRepository)
     const pttCoordinator = new PttCoordinator({
       settingsProvider,
@@ -68,7 +70,7 @@ void wireAppLifecycle(app, {
     })
     const sessionCoordinator = new SessionCoordinator(pttCoordinator, meetingCoordinator)
 
-    await createApp({
+    const appBootstrap = await createApp({
       registrar: createElectronIpcRegistrar(ipcMain),
       services: {
         sessionCoordinator,
@@ -91,45 +93,10 @@ void wireAppLifecycle(app, {
         preloadPath
       }
     })
+
+    captureTransport.attachWindow(appBootstrap.windows.captureWindow)
   }
 })
-
-function createNoopCaptureTransport(): CaptureWindowTransport {
-  const listeners = new Set<(event: CaptureEvent) => void>()
-
-  return {
-    async ensureReady() {},
-    async sendCommand(command) {
-      queueMicrotask(() => {
-        switch (command.type) {
-          case 'start':
-            emitCaptureEvent(listeners, {
-              type: 'capture-started',
-              requestId: command.requestId,
-              sources: [...command.sources]
-            })
-            return
-          case 'stop':
-          case 'abort':
-            emitCaptureEvent(listeners, {
-              type: 'capture-stopped',
-              requestId: command.requestId
-            })
-            return
-          default:
-            assertNever(command)
-        }
-      })
-    },
-    onEvent(listener) {
-      listeners.add(listener)
-      return () => {
-        listeners.delete(listener)
-      }
-    }
-  }
-}
-
 function createStubRecognitionEngine(config: ResolvedRuntimeConfig): RecognitionEngine {
   const listeners = new Set<(event: RecognitionEvent) => void>()
   let activeSession: StartSessionInput | null = null
@@ -177,15 +144,6 @@ function createStubRecognitionEngine(config: ResolvedRuntimeConfig): Recognition
         listeners.delete(listener)
       }
     }
-  }
-}
-
-function emitCaptureEvent(
-  listeners: Set<(event: CaptureEvent) => void>,
-  event: CaptureEvent
-): void {
-  for (const listener of listeners) {
-    listener(event)
   }
 }
 

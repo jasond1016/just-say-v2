@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 
 import type { AppRuntimeSnapshot, AppSettings, SavedTranscript } from '../../shared/api-types'
 import { createDefaultSettings } from '../../core/settings/settings-schema'
+import { createBrowserCaptureSourceManager } from '../capture/browser-capture-source'
+import { CaptureRuntime } from '../capture/capture-runtime'
 import { INITIAL_RUNTIME_SNAPSHOT, RuntimeStore } from '../features/runtime/runtime-store'
 
 const runtimeStore = new RuntimeStore()
@@ -104,6 +106,19 @@ export function App() {
 
     return () => {
       cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (window.location.hash !== '#capture' || !window.justSayCapture) {
+      return
+    }
+
+    const captureRuntime = new CaptureRuntime(window.justSayCapture, createBrowserCaptureSourceManager())
+    captureRuntime.start()
+
+    return () => {
+      captureRuntime.dispose()
     }
   }, [])
 
