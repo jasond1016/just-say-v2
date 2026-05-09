@@ -13,7 +13,10 @@ export function QuickDictationPage(props: {
 }) {
   const latestText = props.runtime.ptt.lastResult?.text ?? getFailedTranscriptText(props.runtime)
   const isCapturing = props.runtime.ptt.status === 'capturing'
-  const isProcessing = props.runtime.ptt.status === 'processing'
+  const isProcessing =
+    props.runtime.ptt.status === 'recognizing' ||
+    props.runtime.ptt.status === 'post_processing' ||
+    props.runtime.ptt.status === 'delivering'
 
   return (
     <div style={{ maxWidth: 640 }}>

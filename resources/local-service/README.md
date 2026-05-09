@@ -7,7 +7,7 @@ This directory contains the `uv`-managed local ASR service used by JustSay V2.
 The Electron main process launches the service with:
 
 ```powershell
-uv run --project resources/local-service service.py
+uv run --project resources/local-service python resources/local-service/service.py
 ```
 
 The service reads:
@@ -18,6 +18,9 @@ The service reads:
 - `JUSTSAY_LOCAL_SERVICE_DEVICE`
 
 Default model: `iic/SenseVoiceSmall`
+Default device: `auto` (prefers `cuda`, falls back to `cpu`)
+
+On Windows, this project pins `torch` and `torchaudio` to the official PyTorch CUDA 12.8 wheel index so `auto` can use NVIDIA GPUs when available.
 
 ## Notes
 

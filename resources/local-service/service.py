@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import torch
 from funasr import AutoModel
 from funasr.utils.postprocess_utils import rich_transcription_postprocess
 from websockets.asyncio.server import serve
@@ -18,7 +19,7 @@ from websockets.exceptions import ConnectionClosed
 HOST = os.environ.get("JUSTSAY_LOCAL_SERVICE_HOST", "127.0.0.1")
 PORT = int(os.environ.get("JUSTSAY_LOCAL_SERVICE_PORT", "8765"))
 MODEL_NAME = os.environ.get("JUSTSAY_LOCAL_SERVICE_MODEL", "iic/SenseVoiceSmall")
-DEVICE = os.environ.get("JUSTSAY_LOCAL_SERVICE_DEVICE", "cpu")
+DEVICE = os.environ.get("JUSTSAY_LOCAL_SERVICE_DEVICE", "auto")
 
 CAPABILITIES = {
     "streaming": True,
@@ -37,13 +38,20 @@ class SenseVoiceRuntime:
     def __init__(self, model_name: str, device: str) -> None:
         self.model_name = model_name
         self.device = device
+        self.requested_device = device
         self.error: str | None = None
         self.model: AutoModel | None = None
+        self.load_errors: dict[str, str] = {}
 
-        try:
-            self.model = AutoModel(model=model_name, device=device)
-        except Exception as exc:  # pragma: no cover - depends on local runtime
-            self.error = str(exc)
+        for candidate in resolve_device_candidates(device):
+            try:
+                self.model = AutoModel(model=model_name, device=candidate)
+                self.device = candidate
+                return
+            except Exception as exc:  # pragma: no cover - depends on local runtime
+                self.load_errors[candidate] = str(exc)
+
+        self.error = format_device_error(model_name, device, self.load_errors)
 
     @property
     def ready(self) -> bool:
@@ -354,6 +362,33 @@ def rms_energy(samples: np.ndarray) -> float:
     return float(np.sqrt(np.mean(np.square(samples))))
 
 
+def resolve_device_candidates(requested_device: str) -> list[str]:
+    normalized = requested_device.strip().lower()
+
+    if normalized == "auto":
+        return ["cuda", "cpu"] if torch.cuda.is_available() else ["cpu"]
+
+    if normalized.startswith("cuda"):
+        return [requested_device, "cpu"] if torch.cuda.is_available() else ["cpu"]
+
+    return [requested_device]
+
+
+def format_device_error(
+    model_name: str, requested_device: str, load_errors: dict[str, str]
+) -> str:
+    if not load_errors:
+        return f"Failed to load {model_name} on requested device {requested_device}"
+
+    attempts = ", ".join(
+        f"{device}: {message}" for device, message in load_errors.items()
+    )
+    return (
+        f"Failed to load {model_name} on requested device {requested_device}. "
+        f"Attempts: {attempts}"
+    )
+
+
 async def main() -> None:
     runtime = SenseVoiceRuntime(MODEL_NAME, DEVICE)
     service = JustSayLocalService(runtime)
@@ -366,6 +401,7 @@ async def main() -> None:
                     "host": HOST,
                     "port": PORT,
                     "model": MODEL_NAME,
+                    "device": runtime.device,
                     "ts": int(time.time() * 1000),
                 }
             ),

@@ -1,9 +1,10 @@
 import json
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 
-from service import JustSayLocalService, SessionState
+from service import JustSayLocalService, SenseVoiceRuntime, SessionState
 
 
 class FakeRuntime:
@@ -65,6 +66,46 @@ class JustSayLocalServiceDraftTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(websocket.messages[1]["payload"]["block"]["text"], "hello from commit")
         self.assertEqual(source_state.block_index, 1)
         self.assertEqual(source_state.chunk_count, 0)
+
+
+class SenseVoiceRuntimeTests(unittest.TestCase):
+    def test_prefers_cuda_and_falls_back_to_cpu(self) -> None:
+        created_devices: list[str] = []
+
+        def fake_auto_model(*, model: str, device: str) -> object:
+            created_devices.append(device)
+            if device == "cuda":
+                raise RuntimeError("CUDA unavailable")
+            return object()
+
+        with (
+            patch("service.torch.cuda.is_available", return_value=True),
+            patch("service.AutoModel", side_effect=fake_auto_model),
+        ):
+            runtime = SenseVoiceRuntime("iic/SenseVoiceSmall", "auto")
+
+        self.assertTrue(runtime.ready)
+        self.assertEqual(runtime.device, "cpu")
+        self.assertEqual(runtime.requested_device, "auto")
+        self.assertEqual(created_devices, ["cuda", "cpu"])
+        self.assertEqual(runtime.load_errors, {"cuda": "CUDA unavailable"})
+
+    def test_cpu_request_only_uses_cpu(self) -> None:
+        created_devices: list[str] = []
+
+        def fake_auto_model(*, model: str, device: str) -> object:
+            created_devices.append(device)
+            return object()
+
+        with (
+            patch("service.torch.cuda.is_available", return_value=True),
+            patch("service.AutoModel", side_effect=fake_auto_model),
+        ):
+            runtime = SenseVoiceRuntime("iic/SenseVoiceSmall", "cpu")
+
+        self.assertTrue(runtime.ready)
+        self.assertEqual(runtime.device, "cpu")
+        self.assertEqual(created_devices, ["cpu"])
 
 
 if __name__ == "__main__":

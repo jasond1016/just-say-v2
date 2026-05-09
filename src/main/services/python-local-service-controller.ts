@@ -1,12 +1,16 @@
 import { spawn as spawnChildProcess } from 'node:child_process'
+import { execFile as execFileCallback } from 'node:child_process'
 import path from 'node:path'
 import type { ChildProcessWithoutNullStreams, SpawnOptionsWithoutStdio } from 'node:child_process'
+import { promisify } from 'node:util'
 import type { EngineCapabilities } from '../../shared/api-types'
 import type { LocalServiceHealthResult, LocalServiceController } from './local-service-supervisor'
 import type {
   LocalServiceClientMessage,
   LocalServiceServerMessage
 } from '../../shared/local-service-types'
+
+const execFile = promisify(execFileCallback)
 
 export interface WebSocketLike {
   addEventListener(type: 'message', listener: (event: { data: string }) => void): void
@@ -17,8 +21,15 @@ export interface WebSocketLike {
   close(): void
 }
 
+interface LocalServiceReadable {
+  on(event: 'data', listener: (chunk: string | Buffer) => void): void
+}
+
 export interface SpawnedLocalServiceProcess {
   killed: boolean
+  pid: number | undefined
+  stdout: LocalServiceReadable
+  stderr: LocalServiceReadable
   once(event: 'exit', listener: () => void): void
   kill(): boolean
 }
@@ -40,6 +51,7 @@ export type PythonLocalServiceControllerOptions = {
   env?: NodeJS.ProcessEnv
   healthTimeoutMs?: number
   spawn?: SpawnLocalServiceProcess
+  terminateProcessTree?: (pid: number) => Promise<void>
   webSocketFactory?: (url: string) => WebSocketLike
 }
 
@@ -49,8 +61,11 @@ export class PythonLocalServiceController implements LocalServiceController {
   private readonly runnerArgs: string[]
   private readonly healthTimeoutMs: number
   private readonly spawn: SpawnLocalServiceProcess
+  private readonly terminateProcessTree: ((pid: number) => Promise<void>) | undefined
   private readonly webSocketFactory: (url: string) => WebSocketLike
   private childProcess: SpawnedLocalServiceProcess | null = null
+  private stdoutBuffer = ''
+  private stderrBuffer = ''
 
   constructor(private readonly options: PythonLocalServiceControllerOptions) {
     this.modelName = options.modelName ?? 'iic/SenseVoiceSmall'
@@ -58,6 +73,8 @@ export class PythonLocalServiceController implements LocalServiceController {
     this.runnerArgs = options.runnerArgs ?? []
     this.healthTimeoutMs = options.healthTimeoutMs ?? 10_000
     this.spawn = options.spawn ?? defaultSpawnLocalServiceProcess
+    this.terminateProcessTree =
+      options.terminateProcessTree ?? (process.platform === 'win32' ? terminateWindowsProcessTree : undefined)
     this.webSocketFactory = options.webSocketFactory ?? defaultWebSocketFactory
   }
 
@@ -73,6 +90,7 @@ export class PythonLocalServiceController implements LocalServiceController {
         'run',
         '--project',
         this.options.workingDirectory ?? path.dirname(this.options.scriptPath),
+        'python',
         this.options.scriptPath
       ],
       {
@@ -90,8 +108,14 @@ export class PythonLocalServiceController implements LocalServiceController {
     )
 
     this.childProcess = child
+    this.attachChildLogging(child)
 
-    await this.waitForHealth()
+    try {
+      await this.waitForHealth()
+    } catch (error) {
+      await this.stopChildProcess(child)
+      throw error
+    }
   }
 
   async stop(): Promise<void> {
@@ -101,11 +125,7 @@ export class PythonLocalServiceController implements LocalServiceController {
       return
     }
 
-    await new Promise<void>((resolve) => {
-      child.once('exit', () => resolve())
-      child.kill()
-    })
-    this.childProcess = null
+    await this.stopChildProcess(child)
   }
 
   async healthCheck(): Promise<LocalServiceHealthResult> {
@@ -158,6 +178,81 @@ export class PythonLocalServiceController implements LocalServiceController {
   private getServiceUrl(): string {
     return `ws://${this.options.host}:${this.options.port}`
   }
+
+  private attachChildLogging(child: SpawnedLocalServiceProcess): void {
+    this.stdoutBuffer = ''
+    this.stderrBuffer = ''
+
+    child.stdout.on('data', (chunk) => {
+      this.stdoutBuffer += chunk.toString()
+
+      for (const line of drainLines(() => this.stdoutBuffer, (value) => {
+        this.stdoutBuffer = value
+      })) {
+        const trimmed = line.trim()
+
+        if (trimmed) {
+          console.log(`[local-service] ${trimmed}`)
+        }
+      }
+    })
+
+    child.stderr.on('data', (chunk) => {
+      this.stderrBuffer += chunk.toString()
+
+      for (const line of drainLines(() => this.stderrBuffer, (value) => {
+        this.stderrBuffer = value
+      })) {
+        const trimmed = line.trim()
+
+        if (trimmed) {
+          console.error(`[local-service] ${trimmed}`)
+        }
+      }
+    })
+
+    child.once('exit', () => {
+      this.flushBufferedOutput()
+    })
+  }
+
+  private flushBufferedOutput(): void {
+    const stdout = this.stdoutBuffer.trim()
+    const stderr = this.stderrBuffer.trim()
+
+    if (stdout) {
+      console.log(`[local-service] ${stdout}`)
+    }
+
+    if (stderr) {
+      console.error(`[local-service] ${stderr}`)
+    }
+
+    this.stdoutBuffer = ''
+    this.stderrBuffer = ''
+  }
+
+  private async stopChildProcess(child: SpawnedLocalServiceProcess): Promise<void> {
+    const waitForExit = new Promise<void>((resolve) => {
+      child.once('exit', () => resolve())
+    })
+
+    if (typeof child.pid === 'number' && this.terminateProcessTree) {
+      try {
+        await this.terminateProcessTree(child.pid)
+      } catch {
+        child.kill()
+      }
+    } else {
+      child.kill()
+    }
+
+    await waitForExit
+
+    if (this.childProcess === child) {
+      this.childProcess = null
+    }
+  }
 }
 
 function defaultSpawnLocalServiceProcess(
@@ -165,7 +260,24 @@ function defaultSpawnLocalServiceProcess(
   args: string[],
   options: SpawnOptionsWithoutStdio
 ): SpawnedLocalServiceProcess {
-  return spawnChildProcess(command, args, options) as ChildProcessWithoutNullStreams
+  const child = spawnChildProcess(command, args, options) as ChildProcessWithoutNullStreams
+
+  return {
+    get killed() {
+      return child.killed
+    },
+    get pid() {
+      return child.pid
+    },
+    stdout: child.stdout,
+    stderr: child.stderr,
+    once(event, listener) {
+      child.once(event, listener)
+    },
+    kill() {
+      return child.kill()
+    }
+  }
 }
 
 export function getDefaultLocalServiceCapabilities(): EngineCapabilities {
@@ -225,8 +337,32 @@ function defaultWebSocketFactory(url: string): WebSocketLike {
   return new WebSocket(url) as unknown as WebSocketLike
 }
 
+export async function terminateWindowsProcessTree(pid: number): Promise<void> {
+  await execFile('taskkill', ['/PID', String(pid), '/T', '/F'], {
+    windowsHide: true
+  })
+}
+
 function delay(timeoutMs: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, timeoutMs)
   })
+}
+
+function drainLines(
+  getBuffer: () => string,
+  setBuffer: (value: string) => void
+): string[] {
+  const lines: string[] = []
+  let buffer = getBuffer()
+  let newlineIndex = buffer.indexOf('\n')
+
+  while (newlineIndex >= 0) {
+    lines.push(buffer.slice(0, newlineIndex))
+    buffer = buffer.slice(newlineIndex + 1)
+    newlineIndex = buffer.indexOf('\n')
+  }
+
+  setBuffer(buffer)
+  return lines
 }

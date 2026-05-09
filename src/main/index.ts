@@ -91,7 +91,8 @@ void wireAppLifecycle(app, {
         host: localServiceHost,
         port: localServicePort,
         scriptPath: path.join(resourcesPath, 'local-service', 'service.py'),
-        workingDirectory: path.join(resourcesPath, 'local-service')
+        workingDirectory: path.join(resourcesPath, 'local-service'),
+        healthTimeoutMs: 60_000
       })
     )
     const engineRegistry = new EngineRegistry(profileCatalog, (config) =>
@@ -215,12 +216,32 @@ void wireAppLifecycle(app, {
       quitApp: () => app.quit()
     })
     trayController.start()
-    app.on('before-quit', () => {
+    let shutdownPromise: Promise<void> | null = null
+    const shutdown = async (): Promise<void> => {
       trayController.prepareForQuit()
       trayController.dispose()
       pttHotkeyController.dispose()
-      void localServiceSupervisor.stop()
+      await localServiceSupervisor.stop()
       transcriptDatabase.close()
+    }
+    app.on('before-quit', (event) => {
+      if (shutdownPromise) {
+        event.preventDefault()
+        return
+      }
+
+      event.preventDefault()
+      shutdownPromise = shutdown()
+      void shutdownPromise
+        .catch((error) => {
+          console.error(
+            '[app] Failed to shut down local resources cleanly',
+            error instanceof Error ? error.message : error
+          )
+        })
+        .finally(() => {
+          app.exit(0)
+        })
     })
   }
 })

@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   PythonLocalServiceController,
   getDefaultLocalServiceCapabilities
@@ -8,6 +8,21 @@ import type {
   LocalServiceClientMessage,
   LocalServiceServerMessage
 } from '../../shared/local-service-types'
+
+type FakeChildProcess = {
+  killed: boolean
+  pid: number | undefined
+  stdout: EventEmitter
+  stderr: EventEmitter
+  once: EventEmitter['once']
+  on: EventEmitter['on']
+  emit: EventEmitter['emit']
+  kill: ReturnType<typeof vi.fn<() => boolean>>
+}
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 describe('PythonLocalServiceController', () => {
   it('starts the python service and waits for a healthy websocket response', async () => {
@@ -26,7 +41,7 @@ describe('PythonLocalServiceController', () => {
 
     expect(spawn).toHaveBeenCalledWith(
       'uv',
-      ['run', '--project', '.', 'service.py'],
+      ['run', '--project', '.', 'python', 'service.py'],
       expect.objectContaining({
         env: expect.objectContaining({
           JUSTSAY_LOCAL_SERVICE_HOST: '127.0.0.1',
@@ -71,6 +86,95 @@ describe('PythonLocalServiceController', () => {
 
     expect(child.kill).toHaveBeenCalledTimes(1)
   })
+
+  it('terminates the full process tree when a pid is available', async () => {
+    const child = createFakeChildProcess({ pid: 4242 })
+    const terminateProcessTree = vi.fn(async () => {
+      child.emit('exit')
+    })
+    const controller = createController({
+      spawn: vi.fn(() => child),
+      terminateProcessTree,
+      webSocketFactory: createFakeWebSocketFactory([
+        {
+          type: 'health-status',
+          ok: true,
+          model: 'iic/SenseVoiceSmall',
+          capabilities: getDefaultLocalServiceCapabilities()
+        }
+      ])
+    })
+
+    await controller.start()
+    await controller.stop()
+
+    expect(terminateProcessTree).toHaveBeenCalledWith(4242)
+    expect(child.kill).not.toHaveBeenCalled()
+  })
+
+  it('kills the spawned process if health never becomes ready', async () => {
+    const child = createFakeChildProcess()
+    const controller = createController({
+      healthTimeoutMs: 20,
+      spawn: vi.fn(() => child),
+      webSocketFactory: createFailingWebSocketFactory()
+    })
+
+    await expect(controller.start()).rejects.toThrow('Local service websocket request failed')
+    expect(child.kill).toHaveBeenCalledTimes(1)
+  })
+
+  it('forwards child stdout and stderr to the main process logs', async () => {
+    const child = createFakeChildProcess()
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const controller = createController({
+      spawn: vi.fn(() => child),
+      webSocketFactory: createFakeWebSocketFactory([
+        {
+          type: 'health-status',
+          ok: true,
+          model: 'iic/SenseVoiceSmall',
+          capabilities: getDefaultLocalServiceCapabilities()
+        }
+      ])
+    })
+
+    const startPromise = controller.start()
+    child.stdout.emit('data', Buffer.from('hello from python\n{"type":"ready"}\n', 'utf8'))
+    child.stderr.emit('data', Buffer.from('stderr line 1\nstderr line 2\n', 'utf8'))
+    await startPromise
+
+    expect(logSpy).toHaveBeenCalledWith('[local-service] hello from python')
+    expect(logSpy).toHaveBeenCalledWith('[local-service] {"type":"ready"}')
+    expect(errorSpy).toHaveBeenCalledWith('[local-service] stderr line 1')
+    expect(errorSpy).toHaveBeenCalledWith('[local-service] stderr line 2')
+  })
+
+  it('flushes buffered child output when the process exits', async () => {
+    const child = createFakeChildProcess()
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const controller = createController({
+      spawn: vi.fn(() => child),
+      webSocketFactory: createFakeWebSocketFactory([
+        {
+          type: 'health-status',
+          ok: true,
+          model: 'iic/SenseVoiceSmall',
+          capabilities: getDefaultLocalServiceCapabilities()
+        }
+      ])
+    })
+
+    await controller.start()
+    child.stdout.emit('data', Buffer.from('partial stdout', 'utf8'))
+    child.stderr.emit('data', Buffer.from('partial stderr', 'utf8'))
+    await controller.stop()
+
+    expect(logSpy).toHaveBeenCalledWith('[local-service] partial stdout')
+    expect(errorSpy).toHaveBeenCalledWith('[local-service] partial stderr')
+  })
 })
 
 function createController(
@@ -86,15 +190,19 @@ function createController(
   })
 }
 
-function createFakeChildProcess() {
+function createFakeChildProcess(overrides: { pid?: number } = {}): FakeChildProcess {
   const emitter = new EventEmitter()
+  const stdout = new EventEmitter()
+  const stderr = new EventEmitter()
 
   return {
     killed: false,
-    stdout: new EventEmitter(),
-    stderr: new EventEmitter(),
+    pid: overrides.pid,
+    stdout,
+    stderr,
     once: emitter.once.bind(emitter),
     on: emitter.on.bind(emitter),
+    emit: emitter.emit.bind(emitter),
     kill: vi.fn(() => {
       emitter.emit('exit')
       return true
@@ -140,6 +248,35 @@ function createFakeWebSocketFactory(responses: LocalServiceServerMessage[]) {
           }
         })
       },
+      close() {
+        for (const listener of listeners.close) {
+          listener()
+        }
+      }
+    }
+  })
+}
+
+function createFailingWebSocketFactory() {
+  return vi.fn(() => {
+    const listeners = {
+      open: [] as Array<() => void>,
+      message: [] as Array<(event: { data: string }) => void>,
+      error: [] as Array<(event: unknown) => void>,
+      close: [] as Array<() => void>
+    }
+
+    queueMicrotask(() => {
+      for (const listener of listeners.error) {
+        listener({ type: 'error' })
+      }
+    })
+
+    return {
+      addEventListener(type: keyof typeof listeners, listener: never) {
+        listeners[type].push(listener)
+      },
+      send() {},
       close() {
         for (const listener of listeners.close) {
           listener()
