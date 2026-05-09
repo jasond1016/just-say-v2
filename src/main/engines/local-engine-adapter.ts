@@ -15,6 +15,7 @@ import type { WebSocketLike } from '../services/python-local-service-controller'
 export type LocalEngineAdapterOptions = {
   ensureLocalServiceReady: () => Promise<unknown>
   webSocketFactory?: (url: string) => WebSocketLike
+  connectTimeoutMs?: number
 }
 
 export class LocalEngineAdapter implements RecognitionEngine {
@@ -22,12 +23,14 @@ export class LocalEngineAdapter implements RecognitionEngine {
   private activeSession: StartSessionInput | null = null
   private readonly listeners = new Set<(event: RecognitionEvent) => void>()
   private readonly webSocketFactory: (url: string) => WebSocketLike
+  private readonly connectTimeoutMs: number
 
   constructor(
     private readonly config: ResolvedRuntimeConfig,
     private readonly options: LocalEngineAdapterOptions
   ) {
     this.webSocketFactory = options.webSocketFactory ?? defaultWebSocketFactory
+    this.connectTimeoutMs = options.connectTimeoutMs ?? 5_000
   }
 
   async getCapabilities() {
@@ -42,8 +45,9 @@ export class LocalEngineAdapter implements RecognitionEngine {
 
   async startSession(input: StartSessionInput): Promise<void> {
     await this.options.ensureLocalServiceReady()
+    const socket = await this.connect(this.getSocketUrl())
+    this.socket = socket
     this.activeSession = input
-    this.socket = this.connect(this.getSocketUrl())
 
     this.send({
       type: 'start-session',
@@ -115,35 +119,76 @@ export class LocalEngineAdapter implements RecognitionEngine {
     }
   }
 
-  private connect(url: string): WebSocketLike {
+  private async connect(url: string): Promise<WebSocketLike> {
     const socket = this.webSocketFactory(url)
+    let isOpen = false
+    let hasSettled = false
+
+    const waitForOpen = new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        hasSettled = true
+        socket.close()
+        reject(new Error('Timed out waiting for local engine websocket to connect'))
+      }, this.connectTimeoutMs)
+
+      const settle = (callback: () => void) => {
+        if (hasSettled) {
+          return
+        }
+
+        hasSettled = true
+        clearTimeout(timeout)
+        callback()
+      }
+
+      socket.addEventListener('open', () => {
+        isOpen = true
+        settle(resolve)
+      })
+      socket.addEventListener('error', (event) => {
+        const message = normalizeSocketError(event)
+        this.emit({
+          type: 'error',
+          payload: {
+            code: 'E_ENGINE_UNAVAILABLE',
+            message,
+            retryable: true
+          }
+        })
+
+        if (!isOpen) {
+          settle(() => reject(new Error(message)))
+        }
+      })
+      socket.addEventListener('close', () => {
+        if (!isOpen) {
+          settle(() => reject(new Error('Local engine websocket closed before connecting')))
+          return
+        }
+
+        if (!this.activeSession) {
+          return
+        }
+
+        this.emit({
+          type: 'session-ended'
+        })
+        this.activeSession = null
+        this.socket = null
+      })
+    })
 
     socket.addEventListener('message', (event) => {
       this.handleServerMessage(JSON.parse(event.data) as LocalServiceServerMessage)
     })
-    socket.addEventListener('error', (event) => {
-      this.emit({
-        type: 'error',
-        payload: {
-          code: 'E_ENGINE_UNAVAILABLE',
-          message: normalizeSocketError(event),
-          retryable: true
-        }
-      })
-    })
-    socket.addEventListener('close', () => {
-      if (!this.activeSession) {
-        return
-      }
 
-      this.emit({
-        type: 'session-ended'
-      })
-      this.activeSession = null
-      this.socket = null
-    })
-
-    return socket
+    try {
+      await waitForOpen
+      return socket
+    } catch (error) {
+      socket.close()
+      throw error
+    }
   }
 
   private handleServerMessage(message: LocalServiceServerMessage): void {

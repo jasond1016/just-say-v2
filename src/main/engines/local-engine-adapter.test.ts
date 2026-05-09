@@ -29,6 +29,41 @@ describe('LocalEngineAdapter', () => {
     })
   })
 
+  it('waits for the websocket to open before sending the start-session message', async () => {
+    const socket = createFakeSocket({ autoOpen: false })
+    const harness = createHarness({ socket })
+    let resolved = false
+
+    const startPromise = harness.engine
+      .startSession({
+        sessionId: 'session-1',
+        mode: 'ptt',
+        sources: ['microphone'],
+        language: 'auto',
+        translation: {
+          enabled: false
+        }
+      })
+      .then(() => {
+        resolved = true
+      })
+
+    await Promise.resolve()
+    expect(resolved).toBe(false)
+    expect(harness.socket.sentMessages).toEqual([])
+
+    harness.socket.emitOpen()
+    await startPromise
+
+    expect(harness.socket.sentMessages).toContainEqual({
+      type: 'start-session',
+      sessionId: 'session-1',
+      mode: 'ptt',
+      language: 'auto',
+      translationEnabled: false
+    })
+  })
+
   it('forwards websocket messages as unified recognition events', async () => {
     const harness = createHarness()
     const seenEvents: RecognitionEvent[] = []
@@ -162,8 +197,8 @@ describe('LocalEngineAdapter', () => {
   })
 })
 
-function createHarness() {
-  const socket = createFakeSocket()
+function createHarness(overrides: { socket?: ReturnType<typeof createFakeSocket> } = {}) {
+  const socket = overrides.socket ?? createFakeSocket()
   const ensureLocalServiceReady = vi.fn(async () => {})
   const config: ResolvedRuntimeConfig = {
     engineProfile: profileCatalog[0]!,
@@ -193,29 +228,37 @@ function createHarness() {
   }
 }
 
-function createFakeSocket() {
+function createFakeSocket(options: { autoOpen?: boolean } = {}) {
   const listeners = {
     message: [] as Array<(event: { data: string }) => void>,
     error: [] as Array<(event: unknown) => void>,
     open: [] as Array<() => void>,
     close: [] as Array<() => void>
   }
+  let isOpen = false
+  let openScheduled = false
 
-  queueMicrotask(() => {
-    for (const listener of listeners.open) {
-      listener()
-    }
-  })
-
-  return {
+  const socket = {
     sentMessages: [] as LocalServiceClientMessage[],
     addEventListener(type: keyof typeof listeners, listener: never) {
       listeners[type].push(listener)
+
+      if (type === 'open' && (options.autoOpen ?? true) && !openScheduled) {
+        openScheduled = true
+        queueMicrotask(() => {
+          socket.emitOpen()
+        })
+      }
     },
     send(data: string) {
+      if (!isOpen) {
+        throw new DOMException('Sent before connected.', 'InvalidStateError')
+      }
+
       this.sentMessages.push(JSON.parse(data) as LocalServiceClientMessage)
     },
     close() {
+      isOpen = false
       for (const listener of listeners.close) {
         listener()
       }
@@ -226,6 +269,14 @@ function createFakeSocket() {
           data: JSON.stringify(message)
         })
       }
+    },
+    emitOpen() {
+      isOpen = true
+      for (const listener of listeners.open) {
+        listener()
+      }
     }
   }
+
+  return socket
 }
