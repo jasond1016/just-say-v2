@@ -90,6 +90,36 @@ describe('AppController', () => {
     dispose()
   })
 
+  it('applies history source and time filters when refreshing history', async () => {
+    const listHistory = vi.fn(async () => ({
+      items: [createHistoryItem('meeting-2', 'meeting')],
+      total: 1,
+      page: 1,
+      pageSize: 20,
+      totalPages: 1
+    }))
+    const controller = new AppController({
+      api: createApi({
+        listHistory
+      }),
+      runtimeStore: new RuntimeStore(),
+      now: () => new Date('2026-01-15T12:00:00.000Z').getTime()
+    })
+
+    const dispose = controller.start()
+    await flushPromises()
+
+    await controller.setHistorySource('system')
+    await controller.setHistoryTimeFilter('last_7_days')
+
+    expect(listHistory).toHaveBeenLastCalledWith({
+      source: 'system',
+      startedAfter: new Date('2026-01-08T12:00:00.000Z').getTime()
+    })
+
+    dispose()
+  })
+
   it('starts a meeting with settings-derived options and refreshes runtime state', async () => {
     const startMeeting = vi.fn(async () => undefined)
     let runtime = createIdleRuntimeSnapshot()
@@ -235,6 +265,26 @@ describe('AppController', () => {
     dispose()
   })
 
+  it('copies history detail text through the API', async () => {
+    const copyHistory = vi.fn(async () => undefined)
+    const controller = new AppController({
+      api: createApi({
+        copyHistory
+      }),
+      runtimeStore: new RuntimeStore()
+    })
+
+    const dispose = controller.start()
+    await flushPromises()
+
+    await controller.copyHistoryItem('tx-1', 'plain_text')
+
+    expect(copyHistory).toHaveBeenCalledWith('tx-1', 'plain_text')
+    expect(controller.getSnapshot().exportMessage).toBe('Copied transcript text to the clipboard.')
+
+    dispose()
+  })
+
   it('cancels pending bootstrap work when stopped before startup completes', async () => {
     const firstRuntime = createDeferred<AppRuntimeSnapshot>()
     const firstSettings = createDeferred<AppSettings>()
@@ -330,6 +380,7 @@ function createApi(overrides: Partial<AppApi> & {
       vi.fn(async () => ({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 0 })),
     getHistory: overrides.getHistory ?? vi.fn(async () => null),
     deleteHistory: overrides.deleteHistory ?? vi.fn(async () => false),
+    copyHistory: overrides.copyHistory ?? vi.fn(async () => undefined),
     exportHistory: overrides.exportHistory ?? vi.fn(async () => ({ ok: false, error: 'not implemented' })),
     exportDiagnostics: overrides.exportDiagnostics ?? vi.fn(async () => ({ ok: false, error: 'not implemented' }))
   }

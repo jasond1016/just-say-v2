@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import type {
   ExportFormat,
@@ -35,22 +35,36 @@ describe('HistoryService', () => {
       ok: false,
       error: 'History export is not implemented'
     })
+    await expect(service.copy('tx-1', 'plain_text')).rejects.toThrow('History copy is not implemented')
   })
 
   it('delegates export to the configured exporter', async () => {
     const exporter = new FakeTranscriptExporter()
-    const service = new HistoryService(new InMemoryTranscriptRepository(), exporter)
+    const clipboard = {
+      writeText: vi.fn(async () => undefined)
+    }
+    const repository = new InMemoryTranscriptRepository()
+    await repository.save(
+      createTranscript({
+        id: 'tx-2',
+        plainText: 'plain body',
+        translatedPlainText: 'bilingual body'
+      })
+    )
+    const service = new HistoryService(repository, exporter, clipboard)
 
     await expect(service.export('tx-2', 'plain_text')).resolves.toEqual({
       ok: true,
       path: 'C:/exports/tx-2.txt'
     })
+    await service.copy('tx-2', 'bilingual_text')
     expect(exporter.calls).toEqual([
       {
         id: 'tx-2',
         format: 'plain_text'
       }
     ])
+    expect(clipboard.writeText).toHaveBeenCalledWith('plain body\n\nbilingual body')
   })
 })
 

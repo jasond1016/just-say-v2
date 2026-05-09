@@ -11,7 +11,10 @@ import type { TranscriptExporter, TranscriptRepository } from '../../core/contra
 export class HistoryService {
   constructor(
     private readonly repository: TranscriptRepository,
-    private readonly exporter?: TranscriptExporter
+    private readonly exporter?: TranscriptExporter,
+    private readonly clipboard?: {
+      writeText(text: string): Promise<void>
+    }
   ) {}
 
   async list(query: HistoryListQuery = {}): Promise<PaginatedHistoryResult> {
@@ -39,5 +42,26 @@ export class HistoryService {
     }
 
     return this.exporter.export(id, format)
+  }
+
+  async copy(id: string, format: ExportFormat): Promise<void> {
+    if (!this.clipboard) {
+      throw new Error('History copy is not implemented')
+    }
+
+    const transcript = await this.repository.getById(id)
+
+    if (!transcript) {
+      throw new Error(`Transcript not found: ${id}`)
+    }
+
+    const text =
+      format === 'json'
+        ? JSON.stringify(transcript, null, 2)
+        : format === 'bilingual_text'
+          ? [transcript.plainText, transcript.translatedPlainText ?? ''].filter(Boolean).join('\n\n')
+          : transcript.plainText
+
+    await this.clipboard.writeText(text)
   }
 }

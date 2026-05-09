@@ -108,6 +108,7 @@ describe('RuntimeStore', () => {
       searchHistory: async () => ({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 0 }),
       getHistory: async () => null,
       deleteHistory: async () => false,
+      copyHistory: async () => undefined,
       exportHistory: async () => ({ ok: false, error: 'not implemented' }),
       exportDiagnostics: async () => ({ ok: false, error: 'not implemented' })
     }
@@ -154,6 +155,7 @@ describe('RuntimeStore', () => {
       searchHistory: async () => ({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 0 }),
       getHistory: async () => null,
       deleteHistory: async () => false,
+      copyHistory: async () => undefined,
       exportHistory: async () => ({ ok: false, error: 'not implemented' }),
       exportDiagnostics: async () => ({ ok: false, error: 'not implemented' })
     }

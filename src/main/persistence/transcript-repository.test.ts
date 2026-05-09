@@ -48,16 +48,35 @@ describe('InMemoryTranscriptRepository', () => {
     const repository = new InMemoryTranscriptRepository()
 
     await repository.save(createTranscript({ id: 'a', mode: 'ptt', startedAt: 1000 }))
-    await repository.save(createTranscript({ id: 'b', mode: 'meeting', startedAt: 3000 }))
+    await repository.save(
+      createTranscript({
+        id: 'b',
+        mode: 'meeting',
+        startedAt: 3000,
+        blocks: [
+          {
+            id: 'b-block-1',
+            source: 'system',
+            text: 'meeting audio',
+            startedAt: 3000,
+            endedAt: 3200
+          }
+        ]
+      })
+    )
     await repository.save(createTranscript({ id: 'c', mode: 'ptt', startedAt: 2000 }))
 
     const firstPage = await repository.list({ page: 1, pageSize: 2 })
     const pttOnly = await repository.list({ mode: 'ptt' })
+    const systemOnly = await repository.list({ source: 'system' })
+    const recentOnly = await repository.list({ startedAfter: 2500 })
 
     expect(firstPage.items.map((item) => item.id)).toEqual(['b', 'c'])
     expect(firstPage.total).toBe(3)
     expect(firstPage.totalPages).toBe(2)
     expect(pttOnly.items.map((item) => item.id)).toEqual(['c', 'a'])
+    expect(systemOnly.items.map((item) => item.id)).toEqual(['b'])
+    expect(recentOnly.items.map((item) => item.id)).toEqual(['b'])
   })
 
   it('searches across title, plain text, translated text, and block text', async () => {

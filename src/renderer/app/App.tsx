@@ -40,6 +40,8 @@ function WorkspaceApp() {
     activeSection,
     historyQuery,
     historyMode,
+    historySource,
+    historyTimeFilter,
     latestNotification,
     error,
     busyAction
@@ -237,6 +239,8 @@ function WorkspaceApp() {
           total={historyTotal}
           searchQuery={historyQuery}
           selectedMode={historyMode}
+          selectedSource={historySource}
+          selectedTimeFilter={historyTimeFilter}
           selectedTranscript={selectedHistory}
           exportMessage={exportMessage}
           busyAction={busyAction}
@@ -247,11 +251,20 @@ function WorkspaceApp() {
           onModeChange={(mode) => {
             void controller.setHistoryMode(mode)
           }}
+          onSourceChange={(source) => {
+            void controller.setHistorySource(source)
+          }}
+          onTimeFilterChange={(timeFilter) => {
+            void controller.setHistoryTimeFilter(timeFilter)
+          }}
           onOpen={(id) => {
             void controller.openHistoryItem(id)
           }}
           onDelete={(id) => {
             void controller.deleteHistoryItem(id)
+          }}
+          onCopy={(id, format) => {
+            void controller.copyHistoryItem(id, format)
           }}
           onExport={(id, format) => {
             void controller.exportHistoryItem(id, format)

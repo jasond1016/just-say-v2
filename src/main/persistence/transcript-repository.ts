@@ -19,7 +19,7 @@ export class InMemoryTranscriptRepository implements TranscriptRepository {
   async list(query: HistoryListQuery): Promise<PaginatedHistoryResult> {
     const normalized = normalizeListQuery(query)
     const items = Array.from(this.store.values())
-      .filter((transcript) => !normalized.mode || transcript.mode === normalized.mode)
+      .filter((transcript) => matchesListFilters(transcript, normalized))
       .sort(compareTranscriptByStartedAtDesc)
 
     return paginate(items, normalized.page, normalized.pageSize)
@@ -29,7 +29,7 @@ export class InMemoryTranscriptRepository implements TranscriptRepository {
     const normalized = normalizeSearchQuery(query)
     const keyword = normalized.query.trim().toLowerCase()
     const items = Array.from(this.store.values())
-      .filter((transcript) => !normalized.mode || transcript.mode === normalized.mode)
+      .filter((transcript) => matchesListFilters(transcript, normalized))
       .filter((transcript) => matchesKeyword(transcript, keyword))
       .sort(compareTranscriptByStartedAtDesc)
 
@@ -48,21 +48,59 @@ export class InMemoryTranscriptRepository implements TranscriptRepository {
 
 function normalizeListQuery(
   query: HistoryListQuery
-): { page: number; pageSize: number; mode?: HistoryListQuery['mode'] } {
+): {
+  page: number
+  pageSize: number
+  mode?: HistoryListQuery['mode']
+  startedAfter?: number
+  source?: HistoryListQuery['source']
+} {
   return {
     page: normalizePositiveInt(query.page, DEFAULT_PAGE),
     pageSize: normalizePositiveInt(query.pageSize, DEFAULT_PAGE_SIZE),
-    ...(query.mode ? { mode: query.mode } : {})
+    ...(query.mode ? { mode: query.mode } : {}),
+    ...(typeof query.startedAfter === 'number' ? { startedAfter: query.startedAfter } : {}),
+    ...(query.source ? { source: query.source } : {})
   }
 }
 
 function normalizeSearchQuery(
   query: HistorySearchQuery
-): { page: number; pageSize: number; mode?: HistoryListQuery['mode']; query: string } {
+): {
+  page: number
+  pageSize: number
+  mode?: HistoryListQuery['mode']
+  startedAfter?: number
+  source?: HistoryListQuery['source']
+  query: string
+} {
   return {
     ...normalizeListQuery(query),
     query: query.query
   }
+}
+
+function matchesListFilters(
+  transcript: SavedTranscript,
+  query: {
+    mode?: HistoryListQuery['mode']
+    startedAfter?: number
+    source?: HistoryListQuery['source']
+  }
+): boolean {
+  if (query.mode && transcript.mode !== query.mode) {
+    return false
+  }
+
+  if (query.startedAfter !== undefined && transcript.startedAt < query.startedAfter) {
+    return false
+  }
+
+  if (query.source && !transcript.blocks.some((block) => block.source === query.source)) {
+    return false
+  }
+
+  return true
 }
 
 function normalizePositiveInt(value: number | undefined, fallback: number): number {

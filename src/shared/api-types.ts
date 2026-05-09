@@ -249,6 +249,8 @@ export type HistoryListQuery = {
   page?: number
   pageSize?: number
   mode?: SessionMode
+  startedAfter?: number
+  source?: CaptureSource
 }
 
 export type HistorySearchQuery = HistoryListQuery & {

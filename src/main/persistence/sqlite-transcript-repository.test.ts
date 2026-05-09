@@ -48,7 +48,10 @@ describe('SqliteTranscriptRepository', () => {
 
       expect((await repository.list({})).items.map((item) => item.id)).toEqual(['c', 'b', 'a'])
       expect((await repository.list({ mode: 'meeting' })).items.map((item) => item.id)).toEqual(['b', 'a'])
+      expect((await repository.list({ source: 'system' })).items.map((item) => item.id)).toEqual(['b'])
+      expect((await repository.list({ startedAfter: 2500 })).items.map((item) => item.id)).toEqual(['c'])
       expect((await repository.search({ query: '你好' })).items.map((item) => item.id)).toEqual(['b'])
+      expect((await repository.search({ query: 'hello', source: 'system' })).items.map((item) => item.id)).toEqual(['b'])
       expect((await repository.search({ query: 'follow up', mode: 'ptt' })).items.map((item) => item.id)).toEqual(['c'])
       expect(await repository.getById('a')).toMatchObject({
         id: 'a',

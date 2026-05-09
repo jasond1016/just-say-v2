@@ -130,22 +130,21 @@ export class SqliteTranscriptRepository implements TranscriptRepository {
 
   async list(query: HistoryListQuery = {}): Promise<PaginatedHistoryResult> {
     const normalized = normalizeListQuery(query)
-    const filter = normalized.mode ? 'WHERE mode = ?' : ''
-    const params = normalized.mode ? [normalized.mode] : []
+    const filter = buildTranscriptFilter(normalized, 'transcripts')
     const rows = this.database
       .prepare(`
         SELECT id, mode, title, started_at, ended_at, language, target_language,
                plain_text, translated_plain_text, metadata_json
         FROM transcripts
-        ${filter}
+        ${filter.clause}
         ORDER BY started_at DESC, ended_at DESC
         LIMIT ? OFFSET ?
       `)
-      .all(...params, normalized.pageSize, (normalized.page - 1) * normalized.pageSize) as TranscriptRow[]
+      .all(...filter.params, normalized.pageSize, (normalized.page - 1) * normalized.pageSize) as TranscriptRow[]
 
     const totalRow = this.database
-      .prepare(`SELECT COUNT(*) AS count FROM transcripts ${filter}`)
-      .get(...params) as { count: number }
+      .prepare(`SELECT COUNT(*) AS count FROM transcripts ${filter.clause}`)
+      .get(...filter.params) as { count: number }
 
     return this.buildPaginatedResult(rows, totalRow.count, normalized.page, normalized.pageSize)
   }
@@ -169,7 +168,7 @@ export class SqliteTranscriptRepository implements TranscriptRepository {
       )
     }
 
-    const modeFilter = normalized.mode ? 'AND t.mode = ?' : ''
+    const filter = buildTranscriptFilter(normalized, 't')
     const rows = this.database
       .prepare(`
         SELECT
@@ -178,13 +177,13 @@ export class SqliteTranscriptRepository implements TranscriptRepository {
         FROM transcript_search s
         INNER JOIN transcripts t ON t.id = s.id
         WHERE transcript_search MATCH ?
-        ${modeFilter}
+        ${filter.andClause}
         ORDER BY t.started_at DESC, t.ended_at DESC
         LIMIT ? OFFSET ?
       `)
       .all(
         keyword,
-        ...(normalized.mode ? [normalized.mode] : []),
+        ...filter.params,
         normalized.pageSize,
         (normalized.page - 1) * normalized.pageSize
       ) as TranscriptRow[]
@@ -195,11 +194,11 @@ export class SqliteTranscriptRepository implements TranscriptRepository {
         FROM transcript_search s
         INNER JOIN transcripts t ON t.id = s.id
         WHERE transcript_search MATCH ?
-        ${modeFilter}
+        ${filter.andClause}
       `)
       .get(
         keyword,
-        ...(normalized.mode ? [normalized.mode] : [])
+        ...filter.params
       ) as { count: number }
 
     if (rows.length === 0 && normalized.query.trim()) {
@@ -289,7 +288,7 @@ export class SqliteTranscriptRepository implements TranscriptRepository {
     query: string
   }): PaginatedHistoryResult {
     const keyword = `%${query.query.trim().toLowerCase()}%`
-    const modeFilter = query.mode ? 'AND t.mode = ?' : ''
+    const filter = buildTranscriptFilter(query, 't')
     const rows = this.database
       .prepare(`
         SELECT DISTINCT
@@ -304,7 +303,7 @@ export class SqliteTranscriptRepository implements TranscriptRepository {
           OR LOWER(COALESCE(b.text, '')) LIKE ?
           OR LOWER(COALESCE(b.translated_text, '')) LIKE ?
         )
-        ${modeFilter}
+        ${filter.andClause}
         ORDER BY t.started_at DESC, t.ended_at DESC
         LIMIT ? OFFSET ?
       `)
@@ -314,7 +313,7 @@ export class SqliteTranscriptRepository implements TranscriptRepository {
         keyword,
         keyword,
         keyword,
-        ...(query.mode ? [query.mode] : []),
+        ...filter.params,
         query.pageSize,
         (query.page - 1) * query.pageSize
       ) as TranscriptRow[]
@@ -331,7 +330,7 @@ export class SqliteTranscriptRepository implements TranscriptRepository {
           OR LOWER(COALESCE(b.text, '')) LIKE ?
           OR LOWER(COALESCE(b.translated_text, '')) LIKE ?
         )
-        ${modeFilter}
+        ${filter.andClause}
       `)
       .get(
         keyword,
@@ -339,7 +338,7 @@ export class SqliteTranscriptRepository implements TranscriptRepository {
         keyword,
         keyword,
         keyword,
-        ...(query.mode ? [query.mode] : [])
+        ...filter.params
       ) as { count: number }
 
     return this.buildPaginatedResult(rows, totalRow.count, query.page, query.pageSize)
@@ -348,20 +347,75 @@ export class SqliteTranscriptRepository implements TranscriptRepository {
 
 function normalizeListQuery(
   query: HistoryListQuery
-): { page: number; pageSize: number; mode?: HistoryListQuery['mode'] } {
+): {
+  page: number
+  pageSize: number
+  mode?: HistoryListQuery['mode']
+  startedAfter?: number
+  source?: HistoryListQuery['source']
+} {
   return {
     page: normalizePositiveInt(query.page, DEFAULT_PAGE),
     pageSize: normalizePositiveInt(query.pageSize, DEFAULT_PAGE_SIZE),
-    ...(query.mode ? { mode: query.mode } : {})
+    ...(query.mode ? { mode: query.mode } : {}),
+    ...(typeof query.startedAfter === 'number' ? { startedAfter: query.startedAfter } : {}),
+    ...(query.source ? { source: query.source } : {})
   }
 }
 
 function normalizeSearchQuery(
   query: HistorySearchQuery
-): { page: number; pageSize: number; mode?: HistoryListQuery['mode']; query: string } {
+): {
+  page: number
+  pageSize: number
+  mode?: HistoryListQuery['mode']
+  startedAfter?: number
+  source?: HistoryListQuery['source']
+  query: string
+} {
   return {
     ...normalizeListQuery(query),
     query: query.query
+  }
+}
+
+function buildTranscriptFilter(
+  query: {
+    mode?: HistoryListQuery['mode']
+    startedAfter?: number
+    source?: HistoryListQuery['source']
+  },
+  transcriptAlias: string
+): { clause: string; andClause: string; params: Array<string | number> } {
+  const clauses: string[] = []
+  const params: Array<string | number> = []
+
+  if (query.mode) {
+    clauses.push(`${transcriptAlias}.mode = ?`)
+    params.push(query.mode)
+  }
+
+  if (query.startedAfter !== undefined) {
+    clauses.push(`${transcriptAlias}.started_at >= ?`)
+    params.push(query.startedAfter)
+  }
+
+  if (query.source) {
+    clauses.push(
+      `EXISTS (
+        SELECT 1
+        FROM transcript_blocks source_blocks
+        WHERE source_blocks.transcript_id = ${transcriptAlias}.id
+          AND source_blocks.source = ?
+      )`
+    )
+    params.push(query.source)
+  }
+
+  return {
+    clause: clauses.length === 0 ? '' : `WHERE ${clauses.join(' AND ')}`,
+    andClause: clauses.length === 0 ? '' : `AND ${clauses.join(' AND ')}`,
+    params
   }
 }
 

@@ -37,6 +37,7 @@ export type AppApi = {
   searchHistory: (query: HistorySearchQuery) => Promise<PaginatedHistoryResult>
   getHistory: (id: string) => Promise<SavedTranscript | null>
   deleteHistory: (id: string) => Promise<boolean>
+  copyHistory: (id: string, format: ExportFormat) => Promise<void>
   exportHistory: (id: string, format: ExportFormat) => Promise<ExportResult>
   exportDiagnostics: () => Promise<DiagnosticBundleResult>
 }
@@ -84,6 +85,7 @@ export function createAppApi(invoke: IpcInvoke, events?: IpcEventSource): AppApi
       invoke<PaginatedHistoryResult>(IPC_CHANNELS.historySearch, query),
     getHistory: async (id) => invoke<SavedTranscript | null>(IPC_CHANNELS.historyGet, id),
     deleteHistory: async (id) => invoke<boolean>(IPC_CHANNELS.historyDelete, id),
+    copyHistory: async (id, format) => invoke<void>(IPC_CHANNELS.historyCopy, id, format),
     exportHistory: async (id, format) =>
       invoke<ExportResult>(IPC_CHANNELS.historyExport, id, format),
     exportDiagnostics: async () =>

@@ -41,6 +41,7 @@ describe('createAppApi', () => {
     await api.searchHistory({ query: 'hello' })
     await api.getHistory('tx-1')
     await api.deleteHistory('tx-1')
+    await api.copyHistory('tx-1', 'plain_text')
     await api.exportHistory('tx-1', 'json')
     await api.exportDiagnostics()
     unsubscribe()
@@ -78,6 +79,7 @@ describe('createAppApi', () => {
       [IPC_CHANNELS.historySearch, { query: 'hello' }],
       [IPC_CHANNELS.historyGet, 'tx-1'],
       [IPC_CHANNELS.historyDelete, 'tx-1'],
+      [IPC_CHANNELS.historyCopy, 'tx-1', 'plain_text'],
       [IPC_CHANNELS.historyExport, 'tx-1', 'json'],
       [IPC_CHANNELS.diagnosticsExport]
     ])

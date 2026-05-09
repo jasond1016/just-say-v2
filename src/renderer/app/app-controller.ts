@@ -13,6 +13,7 @@ import type {
   ThemeSetting,
   TranslationProvider
 } from '../../shared/api-types'
+import type { CaptureSource } from '../../shared/primitive-types'
 import { createDefaultSettings } from '../../core/settings/settings-schema'
 import type { AppApi } from '../../preload/api'
 import type { AppSection } from './app-model'
@@ -25,6 +26,8 @@ type RuntimeStoreLike = {
 }
 
 export type HistoryModeFilter = 'all' | SavedTranscript['mode']
+export type HistorySourceFilter = 'all' | CaptureSource
+export type HistoryTimeFilter = 'all' | 'today' | 'last_7_days' | 'last_30_days'
 
 export type AppControllerState = {
   runtime: AppRuntimeSnapshot
@@ -40,6 +43,8 @@ export type AppControllerState = {
   activeSection: AppSection
   historyQuery: string
   historyMode: HistoryModeFilter
+  historySource: HistorySourceFilter
+  historyTimeFilter: HistoryTimeFilter
   latestNotification: RuntimeNotification | null
   error: string | null
   busyAction: string | null
@@ -68,6 +73,8 @@ export function createInitialAppControllerState(): AppControllerState {
     activeSection: 'quick-dictation',
     historyQuery: '',
     historyMode: 'all',
+    historySource: 'all',
+    historyTimeFilter: 'all',
     latestNotification: null,
     error: null,
     busyAction: null
@@ -82,13 +89,17 @@ export class AppController {
   private disposed = false
   private historyRequestId = 0
   private lifecycleToken = 0
+  private readonly now: () => number
 
   constructor(
     private readonly deps: {
       api: AppApi
       runtimeStore: RuntimeStoreLike
+      now?: () => number
     }
-  ) {}
+  ) {
+    this.now = deps.now ?? Date.now
+  }
 
   subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener)
@@ -160,6 +171,20 @@ export class AppController {
   async setHistoryMode(mode: HistoryModeFilter): Promise<void> {
     this.setState({
       historyMode: mode
+    })
+    await this.refreshHistory()
+  }
+
+  async setHistorySource(source: HistorySourceFilter): Promise<void> {
+    this.setState({
+      historySource: source
+    })
+    await this.refreshHistory()
+  }
+
+  async setHistoryTimeFilter(timeFilter: HistoryTimeFilter): Promise<void> {
+    this.setState({
+      historyTimeFilter: timeFilter
     })
     await this.refreshHistory()
   }
@@ -244,6 +269,20 @@ export class AppController {
       }
 
       await this.refreshAll()
+    })
+  }
+
+  async copyHistoryItem(id: string, format: ExportFormat): Promise<void> {
+    await this.runAction(`copy:${id}:${format}`, async () => {
+      await this.deps.api.copyHistory(id, format)
+      this.setState({
+        exportMessage:
+          format === 'bilingual_text'
+            ? 'Copied bilingual transcript to the clipboard.'
+            : format === 'json'
+              ? 'Copied transcript JSON to the clipboard.'
+              : 'Copied transcript text to the clipboard.'
+      })
     })
   }
 
@@ -473,10 +512,19 @@ export class AppController {
     const requestId = ++this.historyRequestId
     const historyQuery = this.state.historyQuery
     const historyMode = this.state.historyMode
+    const historySource = this.state.historySource
+    const historyTimeFilter = this.state.historyTimeFilter
     const selectedHistory = this.state.selectedHistory
 
     try {
-      const historyPage = await loadHistoryPage(this.deps.api, historyQuery, historyMode)
+      const historyPage = await loadHistoryPage(
+        this.deps.api,
+        historyQuery,
+        historyMode,
+        historySource,
+        historyTimeFilter,
+        this.now()
+      )
 
       if (!this.isLifecycleCurrent(lifecycleToken) || requestId !== this.historyRequestId) {
         return
@@ -588,17 +636,44 @@ function describeError(error: unknown, fallback: string): string {
 async function loadHistoryPage(
   api: AppApi,
   query: string,
-  mode: HistoryModeFilter
+  mode: HistoryModeFilter,
+  source: HistorySourceFilter,
+  timeFilter: HistoryTimeFilter,
+  now: number
 ): Promise<PaginatedHistoryResult> {
   const normalizedMode = mode === 'all' ? undefined : mode
+  const normalizedSource = source === 'all' ? undefined : source
+  const startedAfter = resolveStartedAfter(timeFilter, now)
   const keyword = query.trim()
 
   if (!keyword) {
-    return api.listHistory(normalizedMode ? { mode: normalizedMode } : {})
+    return api.listHistory({
+      ...(normalizedMode ? { mode: normalizedMode } : {}),
+      ...(normalizedSource ? { source: normalizedSource } : {}),
+      ...(startedAfter !== undefined ? { startedAfter } : {})
+    })
   }
 
   return api.searchHistory({
     query: keyword,
-    ...(normalizedMode ? { mode: normalizedMode } : {})
+    ...(normalizedMode ? { mode: normalizedMode } : {}),
+    ...(normalizedSource ? { source: normalizedSource } : {}),
+    ...(startedAfter !== undefined ? { startedAfter } : {})
   })
+}
+
+function resolveStartedAfter(timeFilter: HistoryTimeFilter, now: number): number | undefined {
+  const current = new Date(now)
+
+  switch (timeFilter) {
+    case 'today':
+      return new Date(current.getFullYear(), current.getMonth(), current.getDate()).getTime()
+    case 'last_7_days':
+      return now - 7 * 24 * 60 * 60 * 1000
+    case 'last_30_days':
+      return now - 30 * 24 * 60 * 60 * 1000
+    case 'all':
+    default:
+      return undefined
+  }
 }

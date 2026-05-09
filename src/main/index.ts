@@ -104,7 +104,7 @@ void wireAppLifecycle(app, {
     const hotkeyService = new HotkeyService({
       windowsHelperPath: path.join(resourcesPath, 'windows-hotkey-helper', 'JustSayHotkeyHelper.exe')
     })
-    const historyService = new HistoryService(transcriptRepository, transcriptExporter)
+    const historyService = new HistoryService(transcriptRepository, transcriptExporter, clipboardService)
     const diagnosticsService = new DiagnosticsService({
       exportDir: path.join(userDataPath, 'diagnostics'),
       appVersion: app.getVersion(),

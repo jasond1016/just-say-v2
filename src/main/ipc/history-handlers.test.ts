@@ -10,6 +10,7 @@ describe('createHistoryHandlers', () => {
       search: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 0 }),
       get: vi.fn().mockResolvedValue(null),
       delete: vi.fn().mockResolvedValue(true),
+      copy: vi.fn().mockResolvedValue(undefined),
       export: vi.fn().mockResolvedValue({ ok: false, error: 'not implemented' })
     }
 
@@ -19,12 +20,14 @@ describe('createHistoryHandlers', () => {
     await handlers[IPC_CHANNELS.historySearch]({ query: 'hello' })
     await handlers[IPC_CHANNELS.historyGet]('tx-1')
     await handlers[IPC_CHANNELS.historyDelete]('tx-1')
+    await handlers[IPC_CHANNELS.historyCopy]('tx-1', 'plain_text')
     await handlers[IPC_CHANNELS.historyExport]('tx-1', 'json')
 
     expect(historyService.list).toHaveBeenCalledWith({ page: 2, pageSize: 5 })
     expect(historyService.search).toHaveBeenCalledWith({ query: 'hello' })
     expect(historyService.get).toHaveBeenCalledWith('tx-1')
     expect(historyService.delete).toHaveBeenCalledWith('tx-1')
+    expect(historyService.copy).toHaveBeenCalledWith('tx-1', 'plain_text')
     expect(historyService.export).toHaveBeenCalledWith('tx-1', 'json')
   })
 
@@ -34,6 +37,7 @@ describe('createHistoryHandlers', () => {
       search: vi.fn(),
       get: vi.fn(),
       delete: vi.fn(),
+      copy: vi.fn(),
       export: vi.fn()
     }
 
