@@ -74,6 +74,7 @@ export class AppController {
   private started = false
   private disposed = false
   private historyRequestId = 0
+  private lifecycleToken = 0
 
   constructor(
     private readonly deps: {
@@ -92,13 +93,14 @@ export class AppController {
 
   getSnapshot = (): AppControllerState => this.state
 
-  async start(): Promise<() => void> {
+  start(): () => void {
     if (this.started) {
       return this.stop
     }
 
     this.started = true
     this.disposed = false
+    const lifecycleToken = ++this.lifecycleToken
 
     this.disconnectors = [
       this.deps.runtimeStore.connect((snapshot) => {
@@ -122,7 +124,7 @@ export class AppController {
       })
     ]
 
-    await this.bootstrap()
+    void this.bootstrap(lifecycleToken)
 
     return this.stop
   }
@@ -289,6 +291,7 @@ export class AppController {
 
     this.started = false
     this.disposed = true
+    this.lifecycleToken += 1
     this.historyRequestId += 1
 
     for (const disconnect of this.disconnectors.splice(0)) {
@@ -296,11 +299,11 @@ export class AppController {
     }
   }
 
-  private async bootstrap(): Promise<void> {
+  private async bootstrap(lifecycleToken: number): Promise<void> {
     try {
-      await this.refreshAll()
+      await this.refreshAll(lifecycleToken)
 
-      if (this.disposed) {
+      if (!this.isLifecycleCurrent(lifecycleToken)) {
         return
       }
 
@@ -312,7 +315,7 @@ export class AppController {
             : current.activeSection
       }))
     } catch (error) {
-      if (this.disposed) {
+      if (!this.isLifecycleCurrent(lifecycleToken)) {
         return
       }
 
@@ -322,14 +325,14 @@ export class AppController {
     }
   }
 
-  private async refreshAll(): Promise<void> {
+  private async refreshAll(lifecycleToken: number = this.lifecycleToken): Promise<void> {
     const [runtimeSnapshot, appSettings, speechProfiles] = await Promise.all([
       this.deps.runtimeStore.refresh(this.deps.api),
       this.deps.api.getSettings(),
       this.deps.api.listSpeechProfiles()
     ])
 
-    if (this.disposed) {
+    if (!this.isLifecycleCurrent(lifecycleToken)) {
       return
     }
 
@@ -339,13 +342,13 @@ export class AppController {
       profiles: speechProfiles
     })
 
-    await this.refreshHistory()
+    await this.refreshHistory(lifecycleToken)
   }
 
-  private async refreshRuntimeOnly(): Promise<void> {
+  private async refreshRuntimeOnly(lifecycleToken: number = this.lifecycleToken): Promise<void> {
     const runtimeSnapshot = await this.deps.runtimeStore.refresh(this.deps.api)
 
-    if (this.disposed) {
+    if (!this.isLifecycleCurrent(lifecycleToken)) {
       return
     }
 
@@ -354,7 +357,7 @@ export class AppController {
     })
   }
 
-  private async refreshHistory(): Promise<void> {
+  private async refreshHistory(lifecycleToken: number = this.lifecycleToken): Promise<void> {
     const requestId = ++this.historyRequestId
     const historyQuery = this.state.historyQuery
     const historyMode = this.state.historyMode
@@ -363,13 +366,13 @@ export class AppController {
     try {
       const historyPage = await loadHistoryPage(this.deps.api, historyQuery, historyMode)
 
-      if (this.disposed || requestId !== this.historyRequestId) {
+      if (!this.isLifecycleCurrent(lifecycleToken) || requestId !== this.historyRequestId) {
         return
       }
 
       const nextSelectedHistory = await this.resolveSelectedHistory(selectedHistory, historyPage)
 
-      if (this.disposed || requestId !== this.historyRequestId) {
+      if (!this.isLifecycleCurrent(lifecycleToken) || requestId !== this.historyRequestId) {
         return
       }
 
@@ -379,7 +382,7 @@ export class AppController {
         selectedHistory: nextSelectedHistory
       })
     } catch (error) {
-      if (this.disposed || requestId !== this.historyRequestId) {
+      if (!this.isLifecycleCurrent(lifecycleToken) || requestId !== this.historyRequestId) {
         return
       }
 
@@ -387,6 +390,10 @@ export class AppController {
         error: describeError(error, 'Unknown history error')
       })
     }
+  }
+
+  private isLifecycleCurrent(lifecycleToken: number): boolean {
+    return !this.disposed && lifecycleToken === this.lifecycleToken
   }
 
   private async resolveSelectedHistory(

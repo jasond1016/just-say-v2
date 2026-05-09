@@ -25,7 +25,8 @@ describe('AppController', () => {
       runtimeStore: new RuntimeStore()
     })
 
-    const dispose = await controller.start()
+    const dispose = controller.start()
+    await flushPromises()
     const state = controller.getSnapshot()
 
     expect(state.runtime).toEqual(runtime)
@@ -52,7 +53,8 @@ describe('AppController', () => {
       runtimeStore: new RuntimeStore()
     })
 
-    const dispose = await controller.start()
+    const dispose = controller.start()
+    await flushPromises()
 
     runtimeListener?.(createLiveRuntimeSnapshot())
 
@@ -77,7 +79,8 @@ describe('AppController', () => {
       runtimeStore: new RuntimeStore()
     })
 
-    const dispose = await controller.start()
+    const dispose = controller.start()
+    await flushPromises()
 
     await controller.setHistoryQuery('  meeting  ')
 
@@ -111,10 +114,12 @@ describe('AppController', () => {
       runtimeStore: new RuntimeStore()
     })
 
-    const dispose = await controller.start()
+    const dispose = controller.start()
+    await flushPromises()
     runtime = createLiveRuntimeSnapshot()
 
     await controller.startMeeting()
+    await flushPromises()
 
     expect(startMeeting).toHaveBeenCalledWith({
       includeMicrophone: true,
@@ -125,6 +130,69 @@ describe('AppController', () => {
     expect(controller.getSnapshot().busyAction).toBeNull()
 
     dispose()
+  })
+
+  it('cancels pending bootstrap work when stopped before startup completes', async () => {
+    const firstRuntime = createDeferred<AppRuntimeSnapshot>()
+    const firstSettings = createDeferred<AppSettings>()
+    const firstProfiles = createDeferred<ReturnType<typeof createProfile>[]>()
+    const firstHistory = createDeferred<{
+      items: SavedTranscript[]
+      total: number
+      page: number
+      pageSize: number
+      totalPages: number
+    }>()
+
+    const api = createApi({
+      getSettings: vi.fn().mockImplementationOnce(async () => firstSettings.promise),
+      listSpeechProfiles: vi.fn().mockImplementationOnce(async () => firstProfiles.promise),
+      listHistory: vi.fn().mockImplementationOnce(async () => firstHistory.promise)
+    })
+    const runtimeStore = createRuntimeStoreMock({
+      refresh: vi.fn().mockImplementationOnce(async () => firstRuntime.promise)
+    })
+    const controller = new AppController({
+      api,
+      runtimeStore
+    })
+
+    const stopFirst = controller.start()
+    stopFirst()
+
+    firstRuntime.resolve(createIdleRuntimeSnapshot())
+    firstSettings.resolve({
+      ...createSettings(),
+      general: {
+        ...createSettings().general,
+        theme: 'dark'
+      }
+    })
+    firstProfiles.resolve([])
+    firstHistory.resolve({
+      items: [createHistoryItem('stale', 'ptt')],
+      total: 1,
+      page: 1,
+      pageSize: 20,
+      totalPages: 1
+    })
+    await flushPromises()
+
+    expect(controller.getSnapshot()).toMatchObject({
+      activeSection: 'quick-dictation',
+      history: [],
+      runtime: {
+        liveSession: null,
+        services: {
+          localService: 'stopped'
+        }
+      },
+      settings: {
+        general: {
+          theme: 'system'
+        }
+      }
+    })
   })
 })
 
@@ -159,6 +227,22 @@ function createApi(overrides: Partial<AppApi> & {
     exportHistory: overrides.exportHistory ?? vi.fn(async () => ({ ok: false, error: 'not implemented' })),
     exportDiagnostics: overrides.exportDiagnostics ?? vi.fn(async () => ({ ok: false, error: 'not implemented' }))
   }
+}
+
+function createRuntimeStoreMock(overrides: {
+  refresh?: RuntimeStore['refresh']
+} = {}): RuntimeStore {
+  const store = new RuntimeStore()
+
+  if (overrides.refresh) {
+    store.refresh = (async (api) => {
+      const snapshot = await overrides.refresh!(api)
+      store.setSnapshot(snapshot)
+      return snapshot
+    }) as RuntimeStore['refresh']
+  }
+
+  return store
 }
 
 function createIdleRuntimeSnapshot(): AppRuntimeSnapshot {
@@ -262,4 +346,22 @@ function createProfile() {
       requiresLocalService: true
     }
   }
+}
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve
+  })
+
+  return {
+    promise,
+    resolve
+  }
+}
+
+async function flushPromises(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  await new Promise((resolve) => setTimeout(resolve, 0))
 }

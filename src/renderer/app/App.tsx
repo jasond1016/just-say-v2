@@ -71,22 +71,7 @@ function WorkspaceApp() {
         }
 
   useEffect(() => {
-    let cancelled = false
-    let dispose = () => {}
-
-    void controller.start().then((stop) => {
-      if (cancelled) {
-        stop()
-        return
-      }
-
-      dispose = stop
-    })
-
-    return () => {
-      cancelled = true
-      dispose()
-    }
+    return controller.start()
   }, [controller])
 
   const liveSession = runtime.liveSession
