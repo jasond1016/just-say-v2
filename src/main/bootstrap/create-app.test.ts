@@ -3,21 +3,56 @@ import { describe, expect, it, vi } from 'vitest'
 import { createApp } from './create-app'
 
 describe('createApp', () => {
-  it('registers session/history handlers and creates the app windows', async () => {
+  it('registers IPC handlers and forwards runtime events to the main window', async () => {
     const registrations: string[] = []
     const mainWindowEvents: Array<{ channel: string; payload: unknown }> = []
+    const runtimeNotification = {
+      level: 'warning' as const,
+      message: 'Recovered after a brief engine stall'
+    }
+    const changedSettings = {
+      general: {
+        language: 'zh-CN' as const,
+        theme: 'system' as const,
+        launchAtLogin: false,
+        minimizeToTray: true
+      },
+      speech: {
+        selectedProfileId: 'local-fast',
+        language: 'auto' as const
+      },
+      input: {
+        pttHotkey: 'RCtrl' as const,
+        includeMicrophoneInMeeting: false,
+        microphoneDeviceId: 'default' as const
+      },
+      output: {
+        method: 'simulate_input' as const
+      },
+      translation: {
+        enabledForPtt: false,
+        enabledForMeeting: false,
+        targetLanguage: 'en',
+        provider: 'openai-compatible' as const
+      },
+      advanced: {
+        diagnosticsEnabled: true,
+        experimentalFlags: []
+      }
+    }
+    const runtimeSnapshot = {
+      ptt: { status: 'idle' as const },
+      liveSession: null,
+      services: { localService: 'stopped' as const }
+    }
     const sessionCoordinator = {
-      getRuntimeSnapshot: vi.fn().mockReturnValue({
-        ptt: { status: 'idle' },
-        liveSession: null,
-        services: { localService: 'stopped' }
-      }),
+      getRuntimeSnapshot: vi.fn().mockReturnValue(runtimeSnapshot),
       onSnapshot: vi.fn().mockImplementation((listener) => {
-        listener({
-          ptt: { status: 'idle' },
-          liveSession: null,
-          services: { localService: 'stopped' }
-        })
+        listener(runtimeSnapshot)
+        return () => {}
+      }),
+      onNotification: vi.fn().mockImplementation((listener) => {
+        listener(runtimeNotification)
         return () => {}
       }),
       prewarm: vi.fn().mockResolvedValue(undefined),
@@ -38,37 +73,15 @@ describe('createApp', () => {
       testProfile: vi.fn().mockResolvedValue({ ok: true, profileId: 'local-fast' })
     }
     const settingsService = {
-      getSettings: vi.fn().mockResolvedValue({
-        general: {
-          language: 'zh-CN',
-          theme: 'system',
-          launchAtLogin: false,
-          minimizeToTray: true
-        },
-        speech: {
-          selectedProfileId: 'local-fast',
-          language: 'auto'
-        },
-        input: {
-          pttHotkey: 'RCtrl',
-          includeMicrophoneInMeeting: false,
-          microphoneDeviceId: 'default'
-        },
-        output: {
-          method: 'simulate_input'
-        },
-        translation: {
-          enabledForPtt: false,
-          enabledForMeeting: false,
-          targetLanguage: 'en',
-          provider: 'openai-compatible'
-        },
-        advanced: {
-          diagnosticsEnabled: true,
-          experimentalFlags: []
-        }
-      }),
-      updateSettings: vi.fn().mockResolvedValue(undefined)
+      getSettings: vi.fn().mockResolvedValue(changedSettings),
+      updateSettings: vi.fn().mockResolvedValue(undefined),
+      onChanged: vi.fn().mockImplementation((listener) => {
+        listener(changedSettings)
+        return () => {}
+      })
+    }
+    const diagnosticsService = {
+      exportDiagnostics: vi.fn().mockResolvedValue({ ok: true, path: 'C:/tmp/diag.json' })
     }
 
     const app = await createApp({
@@ -81,7 +94,8 @@ describe('createApp', () => {
         sessionCoordinator,
         speechService,
         historyService,
-        settingsService
+        settingsService,
+        diagnosticsService
       },
       windows: {
         browserWindowFactory: ({ title }) => ({
@@ -118,26 +132,27 @@ describe('createApp', () => {
       'history.delete',
       'history.export',
       'settings.get',
-      'settings.update'
+      'settings.update',
+      'diagnostics.export'
     ])
     expect(app.windows.mainWindow).toBeDefined()
     expect(app.windows.captureWindow).toBeDefined()
     expect(mainWindowEvents).toEqual([
       {
         channel: 'runtime.snapshot',
-        payload: {
-          ptt: { status: 'idle' },
-          liveSession: null,
-          services: { localService: 'stopped' }
-        }
+        payload: runtimeSnapshot
       },
       {
         channel: 'runtime.snapshot',
-        payload: {
-          ptt: { status: 'idle' },
-          liveSession: null,
-          services: { localService: 'stopped' }
-        }
+        payload: runtimeSnapshot
+      },
+      {
+        channel: 'runtime.notification',
+        payload: runtimeNotification
+      },
+      {
+        channel: 'settings.changed',
+        payload: changedSettings
       }
     ])
   })

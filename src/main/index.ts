@@ -12,6 +12,7 @@ import { openSqliteDatabase } from './persistence/sqlite'
 import { SqliteTranscriptRepository } from './persistence/sqlite-transcript-repository'
 import { CaptureWindowService } from './platform/capture-window-service'
 import { ElectronCaptureWindowTransport } from './platform/electron-capture-window-transport'
+import { DiagnosticsService } from './services/diagnostics-service'
 import { EngineRegistry } from './services/engine-registry'
 import { HistoryService } from './services/history-service'
 import { LocalServiceSupervisor } from './services/local-service-supervisor'
@@ -62,13 +63,20 @@ void wireAppLifecycle(app, {
         const updated = await baseSettingsService.updateSettings(patch)
         await refreshSettingsCache()
         return updated
-      }
+      },
+      onChanged: (listener: (settings: Awaited<ReturnType<typeof baseSettingsService.getSettings>>) => void) =>
+        baseSettingsService.onChanged(listener)
     }
     const engineRegistry = new EngineRegistry(profileCatalog, createDemoRecognitionEngine)
     const localServiceSupervisor = new LocalServiceSupervisor(createDemoLocalServiceController())
     const captureTransport = new ElectronCaptureWindowTransport(ipcMain)
     const captureWindowService = new CaptureWindowService(captureTransport)
     const historyService = new HistoryService(transcriptRepository, transcriptExporter)
+    const diagnosticsService = new DiagnosticsService({
+      exportDir: path.join(userDataPath, 'diagnostics'),
+      appVersion: app.getVersion(),
+      selectedProfileProvider: () => cachedSettings.speech.selectedProfileId
+    })
     const speechService = new SpeechService(engineRegistry, localServiceSupervisor, {
       resolveProfileRuntimeConfig: (profileId, mode) =>
         baseSettingsService.resolveProfileRuntimeConfig(profileId, mode)
@@ -80,24 +88,39 @@ void wireAppLifecycle(app, {
       transcriptRepository,
       outputDispatcher: {
         async deliver() {}
-      }
+      },
+      diagnostics: diagnosticsService
     })
     const meetingCoordinator = new MeetingCoordinator({
       settingsProvider,
       engineFactory: (config) => engineRegistry.createForRuntimeConfig(config),
       captureWindowService,
-      transcriptRepository
+      transcriptRepository,
+      diagnostics: diagnosticsService
     })
     const sessionCoordinator = new SessionCoordinator(pttCoordinator, meetingCoordinator)
     sessionCoordinator.setLocalServiceStatus(localServiceSupervisor.getStatus())
+    diagnosticsService.setLocalServiceStatus(localServiceSupervisor.getStatus())
     localServiceSupervisor.onStatusChange((status) => {
       sessionCoordinator.setLocalServiceStatus(status)
+      diagnosticsService.setLocalServiceStatus(status)
+    })
+    sessionCoordinator.onSnapshot((snapshot) => {
+      if (snapshot.liveSession?.status === 'stopped_unexpectedly' || snapshot.ptt.error) {
+        diagnosticsService.setLatestFailedSession(snapshot)
+        return
+      }
+
+      if (snapshot.liveSession === null && !snapshot.ptt.error) {
+        diagnosticsService.clearLatestFailedSession()
+      }
     })
 
     const appBootstrap = await createApp({
       registrar: createElectronIpcRegistrar(ipcMain),
       services: {
         sessionCoordinator,
+        diagnosticsService,
         speechService,
         historyService,
         settingsService

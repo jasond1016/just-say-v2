@@ -1,7 +1,9 @@
 import type {
   AppErrorPayload,
+  DiagnosticEvent,
   MeetingStatus,
   ResolvedRuntimeConfig,
+  RuntimeNotification,
   StartMeetingCommand,
   TranscriptState
 } from '../../shared/api-types'
@@ -28,6 +30,9 @@ export type MeetingCoordinatorDependencies = {
   engineFactory: (config: ResolvedRuntimeConfig) => RecognitionEngine
   captureWindowService: CaptureWindowService
   transcriptRepository: TranscriptRepositoryLike
+  diagnostics?: {
+    record(event: DiagnosticEvent): void
+  }
   now?: () => number
   createSessionId?: () => string
 }
@@ -53,6 +58,8 @@ export class MeetingCoordinator {
   private status: MeetingStatus = 'idle'
   private error: AppErrorPayload | undefined
   private readonly listeners = new Set<(snapshot: MeetingRuntimeSnapshot | null) => void>()
+  private readonly notificationListeners = new Set<(notification: RuntimeNotification) => void>()
+  private terminalSnapshot: MeetingRuntimeSnapshot | null = null
 
   constructor(private readonly dependencies: MeetingCoordinatorDependencies) {
     this.now = dependencies.now ?? Date.now
@@ -64,7 +71,7 @@ export class MeetingCoordinator {
 
   getSnapshot(): MeetingRuntimeSnapshot | null {
     if (!this.activeSession) {
-      return null
+      return this.terminalSnapshot ? cloneMeetingSnapshot(this.terminalSnapshot) : null
     }
 
     return {
@@ -87,12 +94,21 @@ export class MeetingCoordinator {
     }
   }
 
+  onNotification(listener: (notification: RuntimeNotification) => void): () => void {
+    this.notificationListeners.add(listener)
+
+    return () => {
+      this.notificationListeners.delete(listener)
+    }
+  }
+
   async start(input: StartMeetingCommand = {}): Promise<void> {
     if (this.activeSession || this.status !== 'idle') {
       throw new Error('Meeting session is already active')
     }
 
     this.transition({ type: 'START_REQUESTED' })
+    this.terminalSnapshot = null
 
     const settings = this.dependencies.settingsProvider.getSettings()
     const runtimeConfig = applyMeetingOverrides(
@@ -114,12 +130,22 @@ export class MeetingCoordinator {
       transcript: INITIAL_TRANSCRIPT_STATE,
       completion: createCompletionSignal()
     }
+    this.dependencies.diagnostics?.record({
+      type: 'session-started',
+      timestamp: startedAt,
+      sessionId,
+      mode: 'meeting'
+    })
 
     this.activeEngineUnsubscribe = engine.onEvent((event) => {
       void this.handleEngineEvent(event)
     })
 
     try {
+      await engine.warmup({
+        mode: 'meeting',
+        language: String(runtimeConfig.engineConfig.language)
+      })
       await engine.startSession({
         sessionId,
         mode: 'meeting',
@@ -171,14 +197,29 @@ export class MeetingCoordinator {
     try {
       switch (event.type) {
         case 'session-ready':
+          this.dependencies.diagnostics?.record({
+            type: 'engine-ready',
+            timestamp: this.now(),
+            sessionId: session.sessionId,
+            profileId: session.runtimeConfig.engineProfile.id
+          })
+          this.recoverIfNeeded()
           if (this.status === 'preparing') {
             this.transition({ type: 'SESSION_READY' })
           }
           return
         case 'draft-updated':
+          this.recoverIfNeeded()
           session.transcript = reduceTranscript(session.transcript, {
             type: 'draft-updated',
             payload: event.payload
+          })
+          this.dependencies.diagnostics?.record({
+            type: 'draft-received',
+            timestamp: this.now(),
+            sessionId: session.sessionId,
+            source: event.payload.source,
+            chars: `${event.payload.stableText}${event.payload.previewText}`.trim().length
           })
           if (this.status === 'streaming') {
             this.transition({ type: 'DRAFT_UPDATED' })
@@ -187,9 +228,17 @@ export class MeetingCoordinator {
           }
           return
         case 'block-committed':
+          this.recoverIfNeeded()
           session.transcript = reduceTranscript(session.transcript, {
             type: 'block-committed',
             payload: event.payload
+          })
+          this.dependencies.diagnostics?.record({
+            type: 'block-committed',
+            timestamp: this.now(),
+            sessionId: session.sessionId,
+            blockId: event.payload.block.id,
+            chars: event.payload.block.text.length
           })
           if (this.status === 'streaming') {
             this.transition({ type: 'BLOCK_COMMITTED' })
@@ -198,6 +247,7 @@ export class MeetingCoordinator {
           }
           return
         case 'translation-updated':
+          this.recoverIfNeeded()
           session.transcript = reduceTranscript(session.transcript, {
             type: 'translation-updated',
             payload: event.payload
@@ -211,6 +261,18 @@ export class MeetingCoordinator {
           }
           return
         case 'warning':
+          this.notify({
+            level: event.payload.recoverable ? 'warning' : 'error',
+            message: event.payload.message
+          })
+          if (this.status === 'streaming') {
+            this.transition({
+              type: 'ENGINE_WARNING',
+              recoverable: event.payload.recoverable
+            })
+          } else {
+            this.emitSnapshot()
+          }
           return
         case 'error':
           await this.fail(event.payload)
@@ -240,6 +302,13 @@ export class MeetingCoordinator {
         await this.fail(event.error)
         return
       case 'capture-started':
+        this.dependencies.diagnostics?.record({
+          type: 'capture-started',
+          timestamp: this.now(),
+          sessionId: session.sessionId,
+          sources: [...event.sources]
+        })
+        return
       case 'capture-stopped':
         return
       default:
@@ -256,26 +325,37 @@ export class MeetingCoordinator {
       .filter((value): value is string => Boolean(value))
       .join('\n')
 
-    await this.dependencies.transcriptRepository.save({
-      id: session.sessionId,
-      mode: 'meeting',
-      title: `Live Session ${new Date(session.startedAt).toISOString()}`,
-      startedAt: session.startedAt,
-      endedAt,
-      language: String(session.runtimeConfig.engineConfig.language),
-      plainText,
-      blocks: session.transcript.committedBlocks.map((block) => ({ ...block })),
-      metadata: {
-        engineProfileId: session.runtimeConfig.engineProfile.id,
-        includeMicrophone: session.includeMicrophone,
-        translationEnabled: Boolean(session.runtimeConfig.translationConfig)
-      },
-      ...(session.runtimeConfig.translationConfig
-        ? {
-            targetLanguage: String(session.runtimeConfig.translationConfig.targetLanguage),
-            ...(translatedPlainText ? { translatedPlainText } : {})
-          }
-        : {})
+    try {
+      await this.dependencies.transcriptRepository.save({
+        id: session.sessionId,
+        mode: 'meeting',
+        title: `Live Session ${new Date(session.startedAt).toISOString()}`,
+        startedAt: session.startedAt,
+        endedAt,
+        language: String(session.runtimeConfig.engineConfig.language),
+        plainText,
+        blocks: session.transcript.committedBlocks.map((block) => ({ ...block })),
+        metadata: {
+          engineProfileId: session.runtimeConfig.engineProfile.id,
+          includeMicrophone: session.includeMicrophone,
+          translationEnabled: Boolean(session.runtimeConfig.translationConfig)
+        },
+        ...(session.runtimeConfig.translationConfig
+          ? {
+              targetLanguage: String(session.runtimeConfig.translationConfig.targetLanguage),
+              ...(translatedPlainText ? { translatedPlainText } : {})
+            }
+          : {})
+      })
+    } catch (error) {
+      throw normalizeStorageErrorPayload(error)
+    }
+
+    this.dependencies.diagnostics?.record({
+      type: 'session-persisted',
+      timestamp: endedAt,
+      sessionId: session.sessionId,
+      blockCount: session.transcript.committedBlocks.length
     })
 
     this.transition({ type: 'PERSIST_SUCCEEDED' })
@@ -297,6 +377,14 @@ export class MeetingCoordinator {
     }
 
     this.error = error
+    if (session) {
+      this.dependencies.diagnostics?.record({
+        type: 'session-failed',
+        timestamp: this.now(),
+        sessionId: session.sessionId,
+        errorCode: error.code
+      })
+    }
 
     try {
       await session?.engine.abortSession()
@@ -310,6 +398,7 @@ export class MeetingCoordinator {
       // best effort cleanup
     }
 
+    this.terminalSnapshot = session ? this.createSnapshotForSession(session) : this.terminalSnapshot
     session?.completion.settle()
     this.resetAfterTerminalState(false)
   }
@@ -323,6 +412,7 @@ export class MeetingCoordinator {
 
     if (clearError) {
       this.error = undefined
+      this.terminalSnapshot = null
     }
 
     this.emitSnapshot()
@@ -345,6 +435,31 @@ export class MeetingCoordinator {
 
     for (const listener of this.listeners) {
       listener(snapshot)
+    }
+  }
+
+  private notify(notification: RuntimeNotification): void {
+    for (const listener of this.notificationListeners) {
+      listener(notification)
+    }
+  }
+
+  private recoverIfNeeded(): void {
+    if (this.status === 'recovering') {
+      this.transition({ type: 'RECOVERY_SUCCEEDED' })
+    }
+  }
+
+  private createSnapshotForSession(session: MeetingSessionContext): MeetingRuntimeSnapshot {
+    return {
+      sessionId: session.sessionId,
+      status: this.status,
+      startedAt: session.startedAt,
+      durationSec: Math.max(0, Math.floor((this.now() - session.startedAt) / 1000)),
+      transcript: cloneTranscriptState(session.transcript),
+      engineProfileId: session.runtimeConfig.engineProfile.id,
+      translationEnabled: Boolean(session.runtimeConfig.translationConfig),
+      ...(this.error ? { error: { ...this.error } } : {})
     }
   }
 
@@ -416,6 +531,14 @@ function cloneTranscriptState(transcript: TranscriptState): TranscriptState {
   }
 }
 
+function cloneMeetingSnapshot(snapshot: MeetingRuntimeSnapshot): MeetingRuntimeSnapshot {
+  return {
+    ...snapshot,
+    transcript: cloneTranscriptState(snapshot.transcript),
+    ...(snapshot.error ? { error: { ...snapshot.error } } : {})
+  }
+}
+
 function normalizeErrorPayload(errorLike: unknown): AppErrorPayload {
   if (isAppErrorPayload(errorLike)) {
     return errorLike
@@ -438,6 +561,14 @@ function normalizeErrorPayload(errorLike: unknown): AppErrorPayload {
   return {
     code: 'E_ENGINE_PROTOCOL',
     message: 'Unknown meeting error',
+    retryable: true
+  }
+}
+
+function normalizeStorageErrorPayload(errorLike: unknown): AppErrorPayload {
+  return {
+    code: 'E_STORAGE_WRITE',
+    message: errorLike instanceof Error ? errorLike.message : 'Failed to persist meeting transcript',
     retryable: true
   }
 }

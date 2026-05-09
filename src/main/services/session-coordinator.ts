@@ -1,4 +1,9 @@
-import type { AppRuntimeSnapshot, LocalServiceStatus, StartMeetingCommand } from '../../shared/api-types'
+import type {
+  AppRuntimeSnapshot,
+  LocalServiceStatus,
+  RuntimeNotification,
+  StartMeetingCommand
+} from '../../shared/api-types'
 import type { SessionMode } from '../../shared/primitive-types'
 import { INITIAL_RUNTIME_SNAPSHOT } from '../../shared/runtime-snapshot'
 import type { MeetingCoordinator } from './meeting-coordinator'
@@ -9,6 +14,7 @@ export class SessionCoordinator {
   private readonly unsubscribePtt: () => void
   private readonly unsubscribeMeeting: () => void
   private readonly listeners = new Set<(snapshot: AppRuntimeSnapshot) => void>()
+  private readonly notificationListeners = new Set<(notification: RuntimeNotification) => void>()
 
   constructor(
     private readonly pttCoordinator: PttCoordinator,
@@ -27,6 +33,12 @@ export class SessionCoordinator {
         liveSession: meetingSnapshot
       }
       this.emitSnapshot()
+    })
+    this.pttCoordinator.onNotification?.((notification) => {
+      this.emitNotification(notification)
+    })
+    this.meetingCoordinator.onNotification?.((notification) => {
+      this.emitNotification(notification)
     })
   }
 
@@ -81,6 +93,14 @@ export class SessionCoordinator {
     }
   }
 
+  onNotification(listener: (notification: RuntimeNotification) => void): () => void {
+    this.notificationListeners.add(listener)
+
+    return () => {
+      this.notificationListeners.delete(listener)
+    }
+  }
+
   async prewarm(mode: SessionMode): Promise<void> {
     if (mode === 'ptt') {
       await this.pttCoordinator.prewarm()
@@ -126,6 +146,12 @@ export class SessionCoordinator {
 
     for (const listener of this.listeners) {
       listener(snapshot)
+    }
+  }
+
+  private emitNotification(notification: RuntimeNotification): void {
+    for (const listener of this.notificationListeners) {
+      listener(notification)
     }
   }
 }

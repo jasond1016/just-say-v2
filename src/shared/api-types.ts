@@ -289,6 +289,7 @@ export type AppRuntimeSnapshot = {
       deliveredAt: number
       deliveryMethod: 'simulate_input' | 'clipboard' | 'popup'
     }
+    error?: AppErrorPayload
   }
   liveSession: {
     sessionId: string
@@ -302,4 +303,71 @@ export type AppRuntimeSnapshot = {
   services: {
     localService: LocalServiceStatus
   }
+}
+
+export type DiagnosticEvent =
+  | {
+      type: 'session-started'
+      timestamp: number
+      sessionId: string
+      mode: SessionMode
+    }
+  | {
+      type: 'capture-started'
+      timestamp: number
+      sessionId: string
+      sources: CaptureSource[]
+    }
+  | {
+      type: 'engine-ready'
+      timestamp: number
+      sessionId: string
+      profileId: string
+    }
+  | {
+      type: 'draft-received'
+      timestamp: number
+      sessionId: string
+      source: CaptureSource
+      chars: number
+    }
+  | {
+      type: 'block-committed'
+      timestamp: number
+      sessionId: string
+      blockId: string
+      chars: number
+    }
+  | {
+      type: 'translation-failed'
+      timestamp: number
+      sessionId: string
+      reason: string
+    }
+  | {
+      type: 'session-persisted'
+      timestamp: number
+      sessionId: string
+      blockCount: number
+    }
+  | {
+      type: 'session-failed'
+      timestamp: number
+      sessionId: string
+      errorCode: AppErrorCode
+    }
+
+export type DiagnosticBundle = {
+  appVersion: string
+  generatedAt: number
+  selectedProfileId: string
+  localService: LocalServiceStatus
+  recentEvents: DiagnosticEvent[]
+  latestFailedSession?: AppRuntimeSnapshot
+}
+
+export type DiagnosticBundleResult = {
+  ok: boolean
+  path?: string
+  error?: string
 }

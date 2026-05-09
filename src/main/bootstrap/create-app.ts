@@ -1,3 +1,5 @@
+import type { AppSettings, RuntimeNotification } from '../../shared/api-types'
+import { createDiagnosticsHandlers } from '../ipc/diagnostics-handlers'
 import { createHistoryHandlers } from '../ipc/history-handlers'
 import { IPC_CHANNELS } from '../ipc/channels'
 import { registerIpcHandlers, type IpcRegistrar } from '../ipc/register-ipc'
@@ -5,6 +7,7 @@ import { createSessionHandlers } from '../ipc/session-handlers'
 import { createSettingsHandlers } from '../ipc/settings-handlers'
 import { createSpeechHandlers } from '../ipc/speech-handlers'
 import { createWindows, type AppWindows, type CreateWindowsOptions } from './create-windows'
+import type { DiagnosticsHandlerService } from '../ipc/diagnostics-handlers'
 import type { HistoryHandlerService } from '../ipc/history-handlers'
 import type { SessionHandlerService } from '../ipc/session-handlers'
 import type { SettingsHandlerService } from '../ipc/settings-handlers'
@@ -13,10 +16,14 @@ import type { SpeechHandlerService } from '../ipc/speech-handlers'
 export type CreateAppServices = {
   sessionCoordinator: SessionHandlerService & {
     onSnapshot(listener: (snapshot: ReturnType<SessionHandlerService['getRuntimeSnapshot']>) => void): () => void
+    onNotification?(listener: (notification: RuntimeNotification) => void): () => void
   }
   speechService: SpeechHandlerService
   historyService: HistoryHandlerService
-  settingsService: SettingsHandlerService
+  settingsService: SettingsHandlerService & {
+    onChanged?(listener: (settings: AppSettings) => void): () => void
+  }
+  diagnosticsService: DiagnosticsHandlerService
 }
 
 export type CreateAppOptions = {
@@ -35,7 +42,8 @@ export async function createApp(options: CreateAppOptions): Promise<AppBootstrap
     createSessionHandlers(options.services.sessionCoordinator),
     createSpeechHandlers(options.services.speechService),
     createHistoryHandlers(options.services.historyService),
-    createSettingsHandlers(options.services.settingsService)
+    createSettingsHandlers(options.services.settingsService),
+    createDiagnosticsHandlers(options.services.diagnosticsService)
   )
 
   const windows = await createWindows(options.windows)
@@ -43,6 +51,12 @@ export async function createApp(options: CreateAppOptions): Promise<AppBootstrap
   windows.mainWindow.webContents?.send?.(IPC_CHANNELS.runtimeSnapshot, initialSnapshot)
   options.services.sessionCoordinator.onSnapshot((snapshot) => {
     windows.mainWindow.webContents?.send?.(IPC_CHANNELS.runtimeSnapshot, snapshot)
+  })
+  options.services.sessionCoordinator.onNotification?.((notification) => {
+    windows.mainWindow.webContents?.send?.(IPC_CHANNELS.runtimeNotification, notification)
+  })
+  options.services.settingsService.onChanged?.((settings) => {
+    windows.mainWindow.webContents?.send?.(IPC_CHANNELS.settingsChanged, settings)
   })
 
   return {

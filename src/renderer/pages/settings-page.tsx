@@ -13,11 +13,13 @@ export function SettingsPage(props: {
   settings: AppSettings
   profiles: EngineProfile[]
   profileTests: Record<string, ProfileTestResult | undefined>
+  diagnosticsMessage: string | null
   busyAction: string | null
   palette: Palette
   onToggleTheme: () => void
   onSelectProfile: (profileId: string) => void
   onTestProfile: (profileId: string) => void
+  onExportDiagnostics: () => void
 }) {
   return (
     <section
@@ -87,6 +89,19 @@ export function SettingsPage(props: {
         <SettingRow label="Translate PTT" value={props.settings.translation.enabledForPtt ? 'on' : 'off'} />
         <SettingRow label="Translate Meeting" value={props.settings.translation.enabledForMeeting ? 'on' : 'off'} />
         <SettingRow label="Target Language" value={props.settings.translation.targetLanguage} />
+      </SettingsCard>
+
+      <SettingsCard title="Diagnostics" palette={props.palette}>
+        <SettingRow
+          label="Diagnostics"
+          value={props.settings.advanced.diagnosticsEnabled ? 'enabled' : 'disabled'}
+        />
+        <button type="button" onClick={props.onExportDiagnostics} style={buttonStyle()}>
+          {props.busyAction === 'diagnostics-export' ? 'Exporting...' : 'Export Diagnostics'}
+        </button>
+        {props.diagnosticsMessage ? (
+          <div style={{ marginTop: 12, color: props.palette.muted }}>{props.diagnosticsMessage}</div>
+        ) : null}
       </SettingsCard>
     </section>
   )

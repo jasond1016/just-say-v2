@@ -401,11 +401,176 @@ describe('SessionCoordinator + PTTCoordinator', () => {
     expect(harness.settings.translation.enabledForMeeting).toBe(true)
     expect(harness.settings.translation.targetLanguage).toBe('en')
   })
+
+  it('falls back to the original PTT transcript when translation never arrives', async () => {
+    const harness = createHarness({
+      settings: {
+        ...DEFAULT_SETTINGS,
+        translation: {
+          ...DEFAULT_SETTINGS.translation,
+          enabledForPtt: true,
+          targetLanguage: 'ja'
+        }
+      }
+    })
+
+    await harness.sessionCoordinator.startPtt()
+    harness.captureTransport.emit({
+      type: 'capture-started',
+      requestId: 'ptt-1',
+      sources: ['microphone']
+    })
+
+    const stopPromise = harness.sessionCoordinator.stopPtt()
+    harness.engine.emit({
+      type: 'block-committed',
+      payload: {
+        block: {
+          id: 'block-1',
+          source: 'microphone',
+          text: 'hello world',
+          startedAt: 1000,
+          endedAt: 1200
+        }
+      }
+    })
+    harness.engine.emit({
+      type: 'session-ended'
+    })
+    await stopPromise
+
+    expect(harness.outputDispatcher.deliveries).toEqual([
+      {
+        text: 'hello world',
+        method: 'simulate_input'
+      }
+    ])
+    expect(harness.sessionCoordinator.getRuntimeSnapshot().ptt.lastResult).toEqual({
+      text: 'hello world',
+      deliveredAt: 2000,
+      deliveryMethod: 'simulate_input'
+    })
+  })
+
+  it('moves the live session into recovering and back to streaming after a recoverable warning', async () => {
+    const harness = createHarness()
+    const notifications: Array<{ level: string; message: string }> = []
+    const unsubscribe = harness.sessionCoordinator.onNotification((notification) => {
+      notifications.push(notification)
+    })
+
+    await harness.sessionCoordinator.startMeeting()
+    harness.meetingEngine.emit({
+      type: 'session-ready'
+    })
+    harness.meetingEngine.emit({
+      type: 'warning',
+      payload: {
+        code: 'W_ENGINE_STALL',
+        message: 'Engine stalled briefly',
+        recoverable: true
+      }
+    })
+
+    expect(harness.sessionCoordinator.getRuntimeSnapshot().liveSession).toMatchObject({
+      status: 'recovering'
+    })
+
+    harness.meetingEngine.emit({
+      type: 'draft-updated',
+      payload: {
+        blockId: 'draft-1',
+        source: 'system',
+        stableText: 'hello',
+        previewText: 'hello again',
+        startedAt: 1000,
+        updatedAt: 1200
+      }
+    })
+
+    expect(harness.sessionCoordinator.getRuntimeSnapshot().liveSession).toMatchObject({
+      status: 'streaming'
+    })
+    expect(notifications).toEqual([
+      {
+        level: 'warning',
+        message: 'Engine stalled briefly'
+      }
+    ])
+    unsubscribe()
+  })
+
+  it('retains a stopped_unexpectedly live session snapshot when meeting recognition fails', async () => {
+    const harness = createHarness()
+
+    await harness.sessionCoordinator.startMeeting()
+    harness.meetingEngine.emit({
+      type: 'session-ready'
+    })
+    harness.meetingEngine.emit({
+      type: 'error',
+      payload: {
+        code: 'E_ENGINE_TIMEOUT',
+        message: 'Engine timed out',
+        retryable: true
+      }
+    })
+    await flushAsyncWork()
+
+    expect(harness.sessionCoordinator.getRuntimeSnapshot().liveSession).toMatchObject({
+      sessionId: 'meeting-1',
+      status: 'stopped_unexpectedly',
+      error: {
+        code: 'E_ENGINE_TIMEOUT',
+        message: 'Engine timed out',
+        retryable: true
+      }
+    })
+  })
+
+  it('surfaces storage write failures as product-level errors', async () => {
+    const harness = createHarness({
+      transcriptSaveFailure: new Error('Disk full')
+    })
+
+    await harness.sessionCoordinator.startPtt()
+    harness.captureTransport.emit({
+      type: 'capture-started',
+      requestId: 'ptt-1',
+      sources: ['microphone']
+    })
+
+    const stopPromise = harness.sessionCoordinator.stopPtt()
+    harness.engine.emit({
+      type: 'block-committed',
+      payload: {
+        block: {
+          id: 'block-1',
+          source: 'microphone',
+          text: 'hello world',
+          startedAt: 1000,
+          endedAt: 1200
+        }
+      }
+    })
+    await stopPromise
+    await flushAsyncWork()
+
+    expect(harness.sessionCoordinator.getRuntimeSnapshot().ptt).toMatchObject({
+      status: 'idle',
+      error: {
+        code: 'E_STORAGE_WRITE',
+        message: 'Disk full',
+        retryable: true
+      }
+    })
+  })
 })
 
 type HarnessOptions = {
   settings?: AppSettings
   outputFailure?: Error
+  transcriptSaveFailure?: Error
 }
 
 function createHarness(options: HarnessOptions = {}) {
@@ -444,7 +609,7 @@ function createHarness(options: HarnessOptions = {}) {
     createRequestId: () => 'meeting-1',
     now: () => 3100
   })
-  const transcriptRepository = new FakeTranscriptRepository()
+  const transcriptRepository = new FakeTranscriptRepository(options.transcriptSaveFailure)
   const outputDispatcher = new FakeOutputDispatcher(options.outputFailure)
 
   const pttCoordinator = new PttCoordinator({
@@ -540,7 +705,13 @@ class FakeRecognitionEngine implements RecognitionEngine {
 class FakeTranscriptRepository {
   readonly savedTranscripts: SavedTranscript[] = []
 
+  constructor(private readonly failure?: Error) {}
+
   async save(transcript: SavedTranscript): Promise<void> {
+    if (this.failure) {
+      throw this.failure
+    }
+
     this.savedTranscripts.push(transcript)
   }
 }
@@ -581,4 +752,9 @@ function createFakeCaptureTransport() {
       }
     }
   }
+}
+
+async function flushAsyncWork(): Promise<void> {
+  await Promise.resolve()
+  await Promise.resolve()
 }

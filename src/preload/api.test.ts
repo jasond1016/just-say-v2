@@ -16,7 +16,9 @@ describe('createAppApi', () => {
 
     await api.getRuntime()
     const unsubscribe = api.onRuntimeSnapshot(() => {})
+    const unsubscribeNotification = api.onRuntimeNotification(() => {})
     await api.getSettings()
+    const unsubscribeSettings = api.onSettingsChanged(() => {})
     await api.updateSettings({
       general: {
         theme: 'light'
@@ -38,7 +40,10 @@ describe('createAppApi', () => {
     await api.getHistory('tx-1')
     await api.deleteHistory('tx-1')
     await api.exportHistory('tx-1', 'json')
+    await api.exportDiagnostics()
     unsubscribe()
+    unsubscribeNotification()
+    unsubscribeSettings()
 
     expect(invokeMock.mock.calls).toEqual([
       [IPC_CHANNELS.sessionGetRuntime],
@@ -69,9 +74,14 @@ describe('createAppApi', () => {
       [IPC_CHANNELS.historySearch, { query: 'hello' }],
       [IPC_CHANNELS.historyGet, 'tx-1'],
       [IPC_CHANNELS.historyDelete, 'tx-1'],
-      [IPC_CHANNELS.historyExport, 'tx-1', 'json']
+      [IPC_CHANNELS.historyExport, 'tx-1', 'json'],
+      [IPC_CHANNELS.diagnosticsExport]
     ])
     expect(events.on).toHaveBeenCalledWith(IPC_CHANNELS.runtimeSnapshot, expect.any(Function))
     expect(events.off).toHaveBeenCalledWith(IPC_CHANNELS.runtimeSnapshot, expect.any(Function))
+    expect(events.on).toHaveBeenCalledWith(IPC_CHANNELS.runtimeNotification, expect.any(Function))
+    expect(events.off).toHaveBeenCalledWith(IPC_CHANNELS.runtimeNotification, expect.any(Function))
+    expect(events.on).toHaveBeenCalledWith(IPC_CHANNELS.settingsChanged, expect.any(Function))
+    expect(events.off).toHaveBeenCalledWith(IPC_CHANNELS.settingsChanged, expect.any(Function))
   })
 })

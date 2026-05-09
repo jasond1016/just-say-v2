@@ -30,6 +30,7 @@ describe('RuntimeStore', () => {
     const api: AppApi = {
       getRuntime: async () => nextSnapshot,
       onRuntimeSnapshot: () => () => {},
+      onRuntimeNotification: () => () => {},
       getSettings: async () => ({
         general: {
           language: 'zh-CN',
@@ -60,6 +61,7 @@ describe('RuntimeStore', () => {
           experimentalFlags: []
         }
       }),
+      onSettingsChanged: () => () => {},
       updateSettings: async () => ({
         general: {
           language: 'zh-CN',
@@ -104,7 +106,8 @@ describe('RuntimeStore', () => {
       searchHistory: async () => ({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 0 }),
       getHistory: async () => null,
       deleteHistory: async () => false,
-      exportHistory: async () => ({ ok: false, error: 'not implemented' })
+      exportHistory: async () => ({ ok: false, error: 'not implemented' }),
+      exportDiagnostics: async () => ({ ok: false, error: 'not implemented' })
     }
 
     await expect(store.hydrate(api)).resolves.toEqual(nextSnapshot)
@@ -132,7 +135,9 @@ describe('RuntimeStore', () => {
           runtimeListener = undefined
         }
       },
+      onRuntimeNotification: () => () => {},
       getSettings: async () => createSettings(),
+      onSettingsChanged: () => () => {},
       updateSettings: async () => createSettings(),
       listSpeechProfiles: async () => [],
       testSpeechProfile: async () => ({ ok: true, profileId: 'local-fast' }),
@@ -145,7 +150,8 @@ describe('RuntimeStore', () => {
       searchHistory: async () => ({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 0 }),
       getHistory: async () => null,
       deleteHistory: async () => false,
-      exportHistory: async () => ({ ok: false, error: 'not implemented' })
+      exportHistory: async () => ({ ok: false, error: 'not implemented' }),
+      exportDiagnostics: async () => ({ ok: false, error: 'not implemented' })
     }
 
     const seen: Array<typeof nextSnapshot> = []

@@ -1,8 +1,10 @@
 import type {
   AppErrorPayload,
   AppSettings,
+  DiagnosticEvent,
   OutputMethod,
   ResolvedRuntimeConfig,
+  RuntimeNotification,
   SavedTranscript
 } from '../../shared/api-types'
 import type { SessionMode } from '../../shared/primitive-types'
@@ -52,6 +54,9 @@ export type PttCoordinatorDependencies = {
   captureWindowService: CaptureWindowService
   transcriptRepository: TranscriptRepositoryLike
   outputDispatcher: OutputDispatcherLike
+  diagnostics?: {
+    record(event: DiagnosticEvent): void
+  }
   now?: () => number
   createSessionId?: () => string
 }
@@ -80,6 +85,7 @@ export class PttCoordinator {
   private activeSession: PttSessionContext | null = null
   private activeEngineUnsubscribe: (() => void) | null = null
   private readonly listeners = new Set<(snapshot: PttRuntimeSnapshot) => void>()
+  private readonly notificationListeners = new Set<(notification: RuntimeNotification) => void>()
 
   constructor(private readonly dependencies: PttCoordinatorDependencies) {
     this.now = dependencies.now ?? Date.now
@@ -102,6 +108,14 @@ export class PttCoordinator {
 
     return () => {
       this.listeners.delete(listener)
+    }
+  }
+
+  onNotification(listener: (notification: RuntimeNotification) => void): () => void {
+    this.notificationListeners.add(listener)
+
+    return () => {
+      this.notificationListeners.delete(listener)
     }
   }
 
@@ -138,6 +152,12 @@ export class PttCoordinator {
       translatedText: null,
       completion: createCompletionSignal()
     }
+    this.dependencies.diagnostics?.record({
+      type: 'session-started',
+      timestamp: startedAt,
+      sessionId,
+      mode: 'ptt'
+    })
 
     this.activeEngineUnsubscribe = engine.onEvent((event) => {
       void this.handleEngineEvent(event)
@@ -199,13 +219,35 @@ export class PttCoordinator {
         case 'session-ready':
         case 'draft-updated':
         case 'warning':
+          return
         case 'session-ended':
+          if (this.status === 'post_processing' && session.finalText) {
+            this.dependencies.diagnostics?.record({
+              type: 'translation-failed',
+              timestamp: this.now(),
+              sessionId: session.sessionId,
+              reason: 'Translation did not complete before the session ended'
+            })
+            this.notify({
+              level: 'warning',
+              message: 'Translation did not complete. Delivered the original transcript instead.'
+            })
+            this.transition({ type: 'SKIP_TRANSLATION' })
+            await this.finalizeAndDeliver()
+          }
           return
         case 'error':
           await this.fail(event.payload)
           return
         case 'block-committed':
           session.finalText = event.payload.block.text
+          this.dependencies.diagnostics?.record({
+            type: 'block-committed',
+            timestamp: this.now(),
+            sessionId: session.sessionId,
+            blockId: event.payload.block.id,
+            chars: event.payload.block.text.length
+          })
           if (this.status === 'recognizing') {
             this.transition({ type: 'BLOCK_COMMITTED' })
           }
@@ -249,6 +291,13 @@ export class PttCoordinator {
         await this.fail(event.error)
         return
       case 'capture-started':
+        this.dependencies.diagnostics?.record({
+          type: 'capture-started',
+          timestamp: this.now(),
+          sessionId: session.sessionId,
+          sources: [...event.sources]
+        })
+        return
       case 'capture-stopped':
         return
       default:
@@ -280,8 +329,6 @@ export class PttCoordinator {
       method: session.runtimeConfig.outputConfig.method
     })
 
-    this.transition({ type: 'DELIVERY_SUCCEEDED' })
-
     const deliveredAt = this.now()
     this.lastResult = {
       text,
@@ -290,36 +337,49 @@ export class PttCoordinator {
     }
     this.error = undefined
 
-    await this.dependencies.transcriptRepository.save({
-      id: session.sessionId,
-      mode: 'ptt',
-      title: text.slice(0, 48) || 'PTT Transcript',
-      startedAt: session.startedAt,
-      endedAt: deliveredAt,
-      language: String(session.runtimeConfig.engineConfig.language),
-      plainText: session.finalText ?? text,
-      blocks: [
-        {
-          id: `${session.sessionId}-block-1`,
-          source: 'microphone',
-          text: session.finalText ?? text,
-          ...(session.translatedText ? { translatedText: session.translatedText } : {}),
-          startedAt: session.startedAt,
-          endedAt: deliveredAt
-        }
-      ],
-      metadata: {
-        engineProfileId: session.runtimeConfig.engineProfile.id,
-        includeMicrophone: true,
-        translationEnabled: Boolean(session.runtimeConfig.translationConfig)
-      },
-      ...(session.runtimeConfig.translationConfig
-        ? {
-            targetLanguage: String(session.runtimeConfig.translationConfig.targetLanguage),
-            ...(session.translatedText ? { translatedPlainText: session.translatedText } : {})
+    try {
+      await this.dependencies.transcriptRepository.save({
+        id: session.sessionId,
+        mode: 'ptt',
+        title: text.slice(0, 48) || 'PTT Transcript',
+        startedAt: session.startedAt,
+        endedAt: deliveredAt,
+        language: String(session.runtimeConfig.engineConfig.language),
+        plainText: session.finalText ?? text,
+        blocks: [
+          {
+            id: `${session.sessionId}-block-1`,
+            source: 'microphone',
+            text: session.finalText ?? text,
+            ...(session.translatedText ? { translatedText: session.translatedText } : {}),
+            startedAt: session.startedAt,
+            endedAt: deliveredAt
           }
-        : {})
+        ],
+        metadata: {
+          engineProfileId: session.runtimeConfig.engineProfile.id,
+          includeMicrophone: true,
+          translationEnabled: Boolean(session.runtimeConfig.translationConfig)
+        },
+        ...(session.runtimeConfig.translationConfig
+          ? {
+              targetLanguage: String(session.runtimeConfig.translationConfig.targetLanguage),
+              ...(session.translatedText ? { translatedPlainText: session.translatedText } : {})
+            }
+          : {})
+      })
+    } catch (error) {
+      throw normalizeStorageErrorPayload(error)
+    }
+
+    this.dependencies.diagnostics?.record({
+      type: 'session-persisted',
+      timestamp: deliveredAt,
+      sessionId: session.sessionId,
+      blockCount: 1
     })
+
+    this.transition({ type: 'DELIVERY_SUCCEEDED' })
 
     session.completion.settle()
     this.resetAfterTerminalState()
@@ -334,6 +394,14 @@ export class PttCoordinator {
     }
 
     this.error = error
+    if (session) {
+      this.dependencies.diagnostics?.record({
+        type: 'session-failed',
+        timestamp: this.now(),
+        sessionId: session.sessionId,
+        errorCode: error.code
+      })
+    }
 
     try {
       await session?.engine.abortSession()
@@ -385,6 +453,12 @@ export class PttCoordinator {
     }
   }
 
+  private notify(notification: RuntimeNotification): void {
+    for (const listener of this.notificationListeners) {
+      listener(notification)
+    }
+  }
+
   private requireActiveSession(): PttSessionContext {
     if (!this.activeSession) {
       throw new Error('No active PTT session')
@@ -416,6 +490,14 @@ function normalizeErrorPayload(errorLike: unknown): AppErrorPayload {
   return {
     code: 'E_ENGINE_PROTOCOL',
     message: 'Unknown PTT error',
+    retryable: true
+  }
+}
+
+function normalizeStorageErrorPayload(errorLike: unknown): AppErrorPayload {
+  return {
+    code: 'E_STORAGE_WRITE',
+    message: errorLike instanceof Error ? errorLike.message : 'Failed to persist PTT transcript',
     retryable: true
   }
 }

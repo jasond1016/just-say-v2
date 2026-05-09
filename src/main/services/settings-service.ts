@@ -18,6 +18,8 @@ export type SettingsServiceOptions = {
 }
 
 export class SettingsService {
+  private readonly listeners = new Set<(settings: AppSettings) => void>()
+
   constructor(
     private readonly repository: SettingsRepository,
     private readonly options: SettingsServiceOptions = {}
@@ -32,7 +34,16 @@ export class SettingsService {
     const current = await this.getSettings()
     const next = applySettingsPatch(current, patch)
     await this.repository.save(next)
+    this.emitChanged(next)
     return next
+  }
+
+  onChanged(listener: (settings: AppSettings) => void): () => void {
+    this.listeners.add(listener)
+
+    return () => {
+      this.listeners.delete(listener)
+    }
   }
 
   async resolveRuntimeConfig(mode: SessionMode): Promise<ResolvedRuntimeConfig> {
@@ -71,5 +82,11 @@ export class SettingsService {
       ...(credentials ? { credentials } : {}),
       ...(platform ? { platform } : {})
     })
+  }
+
+  private emitChanged(settings: AppSettings): void {
+    for (const listener of this.listeners) {
+      listener(settings)
+    }
   }
 }

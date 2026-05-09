@@ -1,6 +1,7 @@
 import type {
   AppSettings,
   AppRuntimeSnapshot,
+  DiagnosticBundleResult,
   EngineProfile,
   ExportFormat,
   ExportResult,
@@ -10,7 +11,8 @@ import type {
   ProfileTestResult,
   SavedTranscript,
   StartMeetingCommand,
-  SettingsPatch
+  SettingsPatch,
+  RuntimeNotification
 } from '../shared/api-types'
 import type { SessionMode } from '../shared/primitive-types'
 import { IPC_CHANNELS } from '../main/ipc/channels'
@@ -18,7 +20,9 @@ import { IPC_CHANNELS } from '../main/ipc/channels'
 export type AppApi = {
   getRuntime: () => Promise<AppRuntimeSnapshot>
   onRuntimeSnapshot: (listener: (snapshot: AppRuntimeSnapshot) => void) => () => void
+  onRuntimeNotification: (listener: (notification: RuntimeNotification) => void) => () => void
   getSettings: () => Promise<AppSettings>
+  onSettingsChanged: (listener: (settings: AppSettings) => void) => () => void
   updateSettings: (patch: SettingsPatch) => Promise<AppSettings>
   listSpeechProfiles: () => Promise<EngineProfile[]>
   testSpeechProfile: (profileId: string) => Promise<ProfileTestResult>
@@ -32,6 +36,7 @@ export type AppApi = {
   getHistory: (id: string) => Promise<SavedTranscript | null>
   deleteHistory: (id: string) => Promise<boolean>
   exportHistory: (id: string, format: ExportFormat) => Promise<ExportResult>
+  exportDiagnostics: () => Promise<DiagnosticBundleResult>
 }
 
 export type IpcInvoke = <TResult>(channel: string, ...args: unknown[]) => Promise<TResult>
@@ -44,21 +49,21 @@ export function createAppApi(invoke: IpcInvoke, events?: IpcEventSource): AppApi
   return {
     getRuntime: async () => invoke<AppRuntimeSnapshot>(IPC_CHANNELS.sessionGetRuntime),
     onRuntimeSnapshot(listener) {
-      if (!events) {
-        return () => {}
-      }
-
-      const handler = (_event: unknown, payload: unknown) => {
+      return subscribeToEvent(events, IPC_CHANNELS.runtimeSnapshot, (payload) => {
         listener(payload as AppRuntimeSnapshot)
-      }
-
-      events.on(IPC_CHANNELS.runtimeSnapshot, handler)
-
-      return () => {
-        events.off(IPC_CHANNELS.runtimeSnapshot, handler)
-      }
+      })
+    },
+    onRuntimeNotification(listener) {
+      return subscribeToEvent(events, IPC_CHANNELS.runtimeNotification, (payload) => {
+        listener(payload as RuntimeNotification)
+      })
     },
     getSettings: async () => invoke<AppSettings>(IPC_CHANNELS.settingsGet),
+    onSettingsChanged(listener) {
+      return subscribeToEvent(events, IPC_CHANNELS.settingsChanged, (payload) => {
+        listener(payload as AppSettings)
+      })
+    },
     updateSettings: async (patch) => invoke<AppSettings>(IPC_CHANNELS.settingsUpdate, patch),
     listSpeechProfiles: async () => invoke<EngineProfile[]>(IPC_CHANNELS.speechListProfiles),
     testSpeechProfile: async (profileId) =>
@@ -75,7 +80,29 @@ export function createAppApi(invoke: IpcInvoke, events?: IpcEventSource): AppApi
     getHistory: async (id) => invoke<SavedTranscript | null>(IPC_CHANNELS.historyGet, id),
     deleteHistory: async (id) => invoke<boolean>(IPC_CHANNELS.historyDelete, id),
     exportHistory: async (id, format) =>
-      invoke<ExportResult>(IPC_CHANNELS.historyExport, id, format)
+      invoke<ExportResult>(IPC_CHANNELS.historyExport, id, format),
+    exportDiagnostics: async () =>
+      invoke<DiagnosticBundleResult>(IPC_CHANNELS.diagnosticsExport)
+  }
+}
+
+function subscribeToEvent(
+  events: IpcEventSource | undefined,
+  channel: string,
+  listener: (payload: unknown) => void
+): () => void {
+  if (!events) {
+    return () => {}
+  }
+
+  const handler = (_event: unknown, payload: unknown) => {
+    listener(payload)
+  }
+
+  events.on(channel, handler)
+
+  return () => {
+    events.off(channel, handler)
   }
 }
 

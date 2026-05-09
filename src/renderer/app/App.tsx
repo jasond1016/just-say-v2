@@ -6,6 +6,7 @@ import type {
   EngineProfile,
   PaginatedHistoryResult,
   ProfileTestResult,
+  RuntimeNotification,
   SavedTranscript
 } from '../../shared/api-types'
 import { createDefaultSettings } from '../../core/settings/settings-schema'
@@ -33,9 +34,11 @@ export function App() {
   const [historyTotal, setHistoryTotal] = useState(0)
   const [selectedHistory, setSelectedHistory] = useState<SavedTranscript | null>(null)
   const [exportMessage, setExportMessage] = useState<string | null>(null)
+  const [diagnosticsMessage, setDiagnosticsMessage] = useState<string | null>(null)
   const [activeSection, setActiveSection] = useState<AppSection>('quick-dictation')
   const [historyQuery, setHistoryQuery] = useState('')
   const [historyMode, setHistoryMode] = useState<'all' | SavedTranscript['mode']>('all')
+  const [latestNotification, setLatestNotification] = useState<RuntimeNotification | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busyAction, setBusyAction] = useState<string | null>(null)
 
@@ -117,12 +120,20 @@ export function App() {
 
   useEffect(() => {
     const api = requireApi()
-    const disconnect = runtimeStore.connect((snapshot) => {
+    const disconnectRuntime = runtimeStore.connect((snapshot) => {
       setRuntime(snapshot)
     }, api)
+    const disconnectNotification = api.onRuntimeNotification((notification) => {
+      setLatestNotification(notification)
+    })
+    const disconnectSettings = api.onSettingsChanged((nextSettings) => {
+      setSettings(nextSettings)
+    })
 
     return () => {
-      disconnect()
+      disconnectRuntime()
+      disconnectNotification()
+      disconnectSettings()
     }
   }, [])
 
@@ -332,6 +343,19 @@ export function App() {
         </section>
       ) : null}
 
+      {latestNotification ? (
+        <section
+          style={{
+            border: `1px solid ${palette.border}`,
+            background: palette.panelSoft,
+            borderRadius: 18,
+            padding: 16
+          }}
+        >
+          <strong>{latestNotification.level.toUpperCase()}:</strong> {latestNotification.message}
+        </section>
+      ) : null}
+
       {activeSection === 'quick-dictation' ? (
         <QuickDictationPage
           runtime={runtime}
@@ -431,6 +455,7 @@ export function App() {
           settings={settings}
           profiles={profiles}
           profileTests={profileTests}
+          diagnosticsMessage={diagnosticsMessage}
           busyAction={busyAction}
           palette={palette}
           onToggleTheme={() => {
@@ -462,6 +487,14 @@ export function App() {
                 [profileId]: result
               }))
               await refreshRuntimeOnly()
+            })
+          }}
+          onExportDiagnostics={() => {
+            void runAction('diagnostics-export', async () => {
+              const result = await requireApi().exportDiagnostics()
+              setDiagnosticsMessage(
+                result.ok ? `Diagnostics exported to ${result.path}` : result.error ?? 'Diagnostics export failed'
+              )
             })
           }}
         />
