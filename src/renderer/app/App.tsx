@@ -1,46 +1,48 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useSyncExternalStore } from 'react'
 
-import type {
-  AppRuntimeSnapshot,
-  AppSettings,
-  EngineProfile,
-  PaginatedHistoryResult,
-  ProfileTestResult,
-  RuntimeNotification,
-  SavedTranscript
-} from '../../shared/api-types'
-import { createDefaultSettings } from '../../core/settings/settings-schema'
 import { createBrowserCaptureSourceManager } from '../capture/browser-capture-source'
 import { CaptureRuntime } from '../capture/capture-runtime'
-import {
-  APP_SECTIONS,
-  type AppSection,
-  getPreferredSection
-} from './app-model'
-import { INITIAL_RUNTIME_SNAPSHOT, RuntimeStore } from '../features/runtime/runtime-store'
+import { APP_SECTIONS } from './app-model'
+import { RuntimeStore } from '../features/runtime/runtime-store'
 import { HistoryPage } from '../pages/history-page'
 import { LiveSessionPage } from '../pages/live-session-page'
 import { QuickDictationPage } from '../pages/quick-dictation-page'
 import { SettingsPage } from '../pages/settings-page'
-
-const runtimeStore = new RuntimeStore()
+import { AppController } from './app-controller'
 
 export function App() {
-  const [runtime, setRuntime] = useState<AppRuntimeSnapshot>(INITIAL_RUNTIME_SNAPSHOT)
-  const [settings, setSettings] = useState<AppSettings>(createDefaultSettings())
-  const [profiles, setProfiles] = useState<EngineProfile[]>([])
-  const [profileTests, setProfileTests] = useState<Record<string, ProfileTestResult | undefined>>({})
-  const [history, setHistory] = useState<SavedTranscript[]>([])
-  const [historyTotal, setHistoryTotal] = useState(0)
-  const [selectedHistory, setSelectedHistory] = useState<SavedTranscript | null>(null)
-  const [exportMessage, setExportMessage] = useState<string | null>(null)
-  const [diagnosticsMessage, setDiagnosticsMessage] = useState<string | null>(null)
-  const [activeSection, setActiveSection] = useState<AppSection>('quick-dictation')
-  const [historyQuery, setHistoryQuery] = useState('')
-  const [historyMode, setHistoryMode] = useState<'all' | SavedTranscript['mode']>('all')
-  const [latestNotification, setLatestNotification] = useState<RuntimeNotification | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [busyAction, setBusyAction] = useState<string | null>(null)
+  if (window.location.hash === '#capture') {
+    return <CaptureWindowApp />
+  }
+
+  return <WorkspaceApp />
+}
+
+function WorkspaceApp() {
+  const controller = useMemo(() => {
+    return new AppController({
+      api: requireApi(),
+      runtimeStore: new RuntimeStore()
+    })
+  }, [])
+  const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot)
+  const {
+    runtime,
+    settings,
+    profiles,
+    profileTests,
+    history,
+    historyTotal,
+    selectedHistory,
+    exportMessage,
+    diagnosticsMessage,
+    activeSection,
+    historyQuery,
+    historyMode,
+    latestNotification,
+    error,
+    busyAction
+  } = state
 
   const theme = settings.general.theme === 'light' ? 'light' : 'dark'
   const palette =
@@ -68,185 +70,25 @@ export function App() {
           dangerBg: 'rgba(128, 20, 20, 0.22)'
         }
 
-  async function refreshHistory(): Promise<void> {
-    const historyPage = await loadHistoryPage(requireApi(), historyQuery, historyMode)
-    setHistory(historyPage.items)
-    setHistoryTotal(historyPage.total)
-
-    if (selectedHistory) {
-      const freshSelection = historyPage.items.find((item) => item.id === selectedHistory.id)
-
-      if (freshSelection) {
-        const transcript = await requireApi().getHistory(selectedHistory.id)
-        setSelectedHistory(transcript)
-      } else {
-        setSelectedHistory(null)
-      }
-    }
-  }
-
-  async function refreshAll(): Promise<void> {
-    const api = requireApi()
-    const [runtimeSnapshot, appSettings, speechProfiles] = await Promise.all([
-      runtimeStore.refresh(api),
-      api.getSettings(),
-      api.listSpeechProfiles()
-    ])
-
-    setRuntime(runtimeSnapshot)
-    setSettings(appSettings)
-    setProfiles(speechProfiles)
-    await refreshHistory()
-  }
-
-  async function refreshRuntimeOnly(): Promise<void> {
-    const runtimeSnapshot = await runtimeStore.refresh(requireApi())
-    setRuntime(runtimeSnapshot)
-  }
-
-  async function runAction(label: string, action: () => Promise<void>): Promise<void> {
-    setBusyAction(label)
-    setError(null)
-
-    try {
-      setExportMessage(null)
-      await action()
-    } catch (actionError) {
-      setError(actionError instanceof Error ? actionError.message : 'Unknown action error')
-    } finally {
-      setBusyAction(null)
-    }
-  }
-
   useEffect(() => {
-    const api = requireApi()
-    const disconnectRuntime = runtimeStore.connect((snapshot) => {
-      setRuntime(snapshot)
-    }, api)
-    const disconnectNotification = api.onRuntimeNotification((notification) => {
-      setLatestNotification(notification)
-    })
-    const disconnectSettings = api.onSettingsChanged((nextSettings) => {
-      setSettings(nextSettings)
+    let cancelled = false
+    let dispose = () => {}
+
+    void controller.start().then((stop) => {
+      if (cancelled) {
+        stop()
+        return
+      }
+
+      dispose = stop
     })
 
     return () => {
-      disconnectRuntime()
-      disconnectNotification()
-      disconnectSettings()
-    }
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-
-    async function bootstrap(): Promise<void> {
-      try {
-        await refreshAll()
-
-        if (cancelled) {
-          return
-        }
-
-        setActiveSection((current) => (current === 'quick-dictation' ? getPreferredSection(runtimeStore.getSnapshot()) : current))
-      } catch (bootstrapError) {
-        if (cancelled) {
-          return
-        }
-
-        setError(bootstrapError instanceof Error ? bootstrapError.message : 'Unknown bootstrap error')
-      }
-    }
-
-    void bootstrap()
-
-    return () => {
       cancelled = true
+      dispose()
     }
-  }, [])
+  }, [controller])
 
-  useEffect(() => {
-    if (window.location.hash !== '#capture' || !window.justSayCapture) {
-      return
-    }
-
-    const captureRuntime = new CaptureRuntime(window.justSayCapture, createBrowserCaptureSourceManager())
-    captureRuntime.start()
-
-    return () => {
-      captureRuntime.dispose()
-    }
-  }, [])
-
-  useEffect(() => {
-    if (runtime.liveSession && activeSection === 'quick-dictation') {
-      setActiveSection('live-session')
-    }
-  }, [activeSection, runtime.liveSession])
-
-  useEffect(() => {
-    let cancelled = false
-
-    async function refreshHistoryEffect(): Promise<void> {
-      try {
-        const historyPage = await loadHistoryPage(requireApi(), historyQuery, historyMode)
-
-        if (cancelled) {
-          return
-        }
-
-        setHistory(historyPage.items)
-        setHistoryTotal(historyPage.total)
-      } catch (historyError) {
-        if (cancelled) {
-          return
-        }
-
-        setError(historyError instanceof Error ? historyError.message : 'Unknown history error')
-      }
-    }
-
-    void refreshHistoryEffect()
-
-    return () => {
-      cancelled = true
-    }
-  }, [historyMode, historyQuery])
-
-  if (window.location.hash === '#capture') {
-    return (
-      <main
-        style={{
-          minHeight: '100vh',
-          display: 'grid',
-          placeItems: 'center',
-          padding: 24,
-          background: 'radial-gradient(circle at top, rgba(94, 234, 212, 0.12), transparent 42%), #071018',
-          color: '#d9e7f5'
-        }}
-      >
-        <section
-          style={{
-            width: 'min(560px, 100%)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            borderRadius: 24,
-            padding: 24,
-            background: 'rgba(8, 14, 22, 0.76)'
-          }}
-        >
-          <div style={{ fontSize: 12, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#8aa2bf' }}>
-            Capture Window
-          </div>
-          <h1 style={{ margin: '10px 0 0', fontSize: 28 }}>Capture runtime ready</h1>
-          <p style={{ margin: '12px 0 0', color: '#b7c8db' }}>
-            The hidden capture surface is subscribed to commands and can forward audio chunks back to main.
-          </p>
-        </section>
-      </main>
-    )
-  }
-
-  const nextTheme = settings.general.theme === 'light' ? 'dark' : 'light'
   const liveSession = runtime.liveSession
   const meetingActive = Boolean(liveSession)
   const pttStartDisabled = Boolean(busyAction) || runtime.ptt.status !== 'idle'
@@ -293,7 +135,7 @@ export function App() {
         <button
           type="button"
           onClick={() => {
-            void runAction('refresh', refreshAll)
+            void controller.refresh()
           }}
           disabled={Boolean(busyAction)}
           style={toolbarButtonStyle(Boolean(busyAction))}
@@ -314,7 +156,7 @@ export function App() {
             key={section.id}
             type="button"
             onClick={() => {
-              setActiveSection(section.id)
+              controller.setActiveSection(section.id)
             }}
             style={{
               border: `1px solid ${palette.border}`,
@@ -365,19 +207,13 @@ export function App() {
           pttStopDisabled={pttStopDisabled}
           palette={palette}
           onStartPtt={() => {
-            void runAction('ptt-start', async () => {
-              await requireApi().startPtt()
-              await refreshRuntimeOnly()
-            })
+            void controller.startPtt()
           }}
           onStopPtt={() => {
-            void runAction('ptt-stop', async () => {
-              await requireApi().stopPtt()
-              await refreshAll()
-            })
+            void controller.stopPtt()
           }}
           onOpenLiveSession={() => {
-            setActiveSection('live-session')
+            controller.openLiveSessionSection()
           }}
         />
       ) : null}
@@ -391,25 +227,13 @@ export function App() {
           meetingStopDisabled={meetingStopDisabled}
           palette={palette}
           onStartMeeting={() => {
-            void runAction('meeting-start', async () => {
-              await requireApi().startMeeting({
-                includeMicrophone: settings.input.includeMicrophoneInMeeting,
-                translationEnabled: settings.translation.enabledForMeeting,
-                ...(settings.translation.enabledForMeeting
-                  ? { targetLanguage: settings.translation.targetLanguage }
-                  : {})
-              })
-              await refreshRuntimeOnly()
-            })
+            void controller.startMeeting()
           }}
           onStopMeeting={() => {
-            void runAction('meeting-stop', async () => {
-              await requireApi().stopMeeting()
-              await refreshAll()
-            })
+            void controller.stopMeeting()
           }}
           onOpenHistory={() => {
-            setActiveSection('history')
+            controller.openHistorySection()
           }}
         />
       ) : null}
@@ -424,28 +248,20 @@ export function App() {
           exportMessage={exportMessage}
           busyAction={busyAction}
           palette={palette}
-          onSearchQueryChange={setHistoryQuery}
-          onModeChange={setHistoryMode}
+          onSearchQueryChange={(query) => {
+            void controller.setHistoryQuery(query)
+          }}
+          onModeChange={(mode) => {
+            void controller.setHistoryMode(mode)
+          }}
           onOpen={(id) => {
-            void runAction(`open:${id}`, async () => {
-              const transcript = await requireApi().getHistory(id)
-              setSelectedHistory(transcript)
-            })
+            void controller.openHistoryItem(id)
           }}
           onDelete={(id) => {
-            void runAction(`delete:${id}`, async () => {
-              await requireApi().deleteHistory(id)
-              if (selectedHistory?.id === id) {
-                setSelectedHistory(null)
-              }
-              await refreshAll()
-            })
+            void controller.deleteHistoryItem(id)
           }}
           onExport={(id, format) => {
-            void runAction(`export:${id}:${format}`, async () => {
-              const result = await requireApi().exportHistory(id, format)
-              setExportMessage(result.ok ? `Exported to ${result.path}` : result.error ?? 'Export failed')
-            })
+            void controller.exportHistoryItem(id, format)
           }}
         />
       ) : null}
@@ -459,46 +275,65 @@ export function App() {
           busyAction={busyAction}
           palette={palette}
           onToggleTheme={() => {
-            void runAction('theme', async () => {
-              const updated = await requireApi().updateSettings({
-                general: {
-                  theme: nextTheme
-                }
-              })
-
-              setSettings(updated)
-            })
+            void controller.toggleTheme()
           }}
           onSelectProfile={(profileId) => {
-            void runAction(`profile-select:${profileId}`, async () => {
-              const updated = await requireApi().updateSettings({
-                speech: {
-                  selectedProfileId: profileId
-                }
-              })
-              setSettings(updated)
-            })
+            void controller.selectProfile(profileId)
           }}
           onTestProfile={(profileId) => {
-            void runAction(`profile-test:${profileId}`, async () => {
-              const result = await requireApi().testSpeechProfile(profileId)
-              setProfileTests((current) => ({
-                ...current,
-                [profileId]: result
-              }))
-              await refreshRuntimeOnly()
-            })
+            void controller.testProfile(profileId)
           }}
           onExportDiagnostics={() => {
-            void runAction('diagnostics-export', async () => {
-              const result = await requireApi().exportDiagnostics()
-              setDiagnosticsMessage(
-                result.ok ? `Diagnostics exported to ${result.path}` : result.error ?? 'Diagnostics export failed'
-              )
-            })
+            void controller.exportDiagnostics()
           }}
         />
       ) : null}
+    </main>
+  )
+}
+
+function CaptureWindowApp() {
+  useEffect(() => {
+    if (!window.justSayCapture) {
+      return
+    }
+
+    const captureRuntime = new CaptureRuntime(window.justSayCapture, createBrowserCaptureSourceManager())
+    captureRuntime.start()
+
+    return () => {
+      captureRuntime.dispose()
+    }
+  }, [])
+
+  return (
+    <main
+      style={{
+        minHeight: '100vh',
+        display: 'grid',
+        placeItems: 'center',
+        padding: 24,
+        background: 'radial-gradient(circle at top, rgba(94, 234, 212, 0.12), transparent 42%), #071018',
+        color: '#d9e7f5'
+      }}
+    >
+      <section
+        style={{
+          width: 'min(560px, 100%)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: 24,
+          padding: 24,
+          background: 'rgba(8, 14, 22, 0.76)'
+        }}
+      >
+        <div style={{ fontSize: 12, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#8aa2bf' }}>
+          Capture Window
+        </div>
+        <h1 style={{ margin: '10px 0 0', fontSize: 28 }}>Capture runtime ready</h1>
+        <p style={{ margin: '12px 0 0', color: '#b7c8db' }}>
+          The hidden capture surface is subscribed to commands and can forward audio chunks back to main.
+        </p>
+      </section>
     </main>
   )
 }
@@ -510,25 +345,6 @@ function requireApi() {
 
   return window.justSay
 }
-
-async function loadHistoryPage(
-  api: ReturnType<typeof requireApi>,
-  query: string,
-  mode: 'all' | SavedTranscript['mode']
-): Promise<PaginatedHistoryResult> {
-  const normalizedMode = mode === 'all' ? undefined : mode
-  const keyword = query.trim()
-
-  if (!keyword) {
-    return api.listHistory(normalizedMode ? { mode: normalizedMode } : {})
-  }
-
-  return api.searchHistory({
-    query: keyword,
-    ...(normalizedMode ? { mode: normalizedMode } : {})
-  })
-}
-
 function toolbarButtonStyle(disabled: boolean) {
   return {
     border: '1px solid rgba(255, 255, 255, 0.12)',
