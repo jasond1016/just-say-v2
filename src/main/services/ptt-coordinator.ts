@@ -45,7 +45,7 @@ export interface TranscriptRepositoryLike {
 }
 
 export interface OutputDispatcherLike {
-  deliver(input: { text: string; method: OutputMethod }): Promise<void>
+  deliver(input: { text: string; method: OutputMethod }): Promise<{ methodUsed: OutputMethod }>
 }
 
 export type PttCoordinatorDependencies = {
@@ -324,7 +324,7 @@ export class PttCoordinator {
       throw new Error('PTT session finished without final text')
     }
 
-    await this.dependencies.outputDispatcher.deliver({
+    const delivery = await this.dependencies.outputDispatcher.deliver({
       text,
       method: session.runtimeConfig.outputConfig.method
     })
@@ -333,7 +333,7 @@ export class PttCoordinator {
     this.lastResult = {
       text,
       deliveredAt,
-      deliveryMethod: session.runtimeConfig.outputConfig.method
+      deliveryMethod: delivery.methodUsed
     }
     this.error = undefined
 

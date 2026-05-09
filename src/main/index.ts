@@ -10,13 +10,16 @@ import { FileTranscriptExporter } from './persistence/file-transcript-exporter'
 import { InMemorySettingsRepository } from './persistence/settings-repository'
 import { openSqliteDatabase } from './persistence/sqlite'
 import { SqliteTranscriptRepository } from './persistence/sqlite-transcript-repository'
+import { ElectronClipboardService } from './platform/clipboard-service'
 import { CaptureWindowService } from './platform/capture-window-service'
 import { ElectronCaptureWindowTransport } from './platform/electron-capture-window-transport'
+import { OutputWindowService } from './platform/output-window-service'
 import { DiagnosticsService } from './services/diagnostics-service'
 import { EngineRegistry } from './services/engine-registry'
 import { HistoryService } from './services/history-service'
 import { LocalServiceSupervisor } from './services/local-service-supervisor'
 import { MeetingCoordinator } from './services/meeting-coordinator'
+import { OutputDispatcher } from './services/output-dispatcher'
 import { PttCoordinator } from './services/ptt-coordinator'
 import { SessionCoordinator } from './services/session-coordinator'
 import { SettingsService } from './services/settings-service'
@@ -71,6 +74,12 @@ void wireAppLifecycle(app, {
     const localServiceSupervisor = new LocalServiceSupervisor(createDemoLocalServiceController())
     const captureTransport = new ElectronCaptureWindowTransport(ipcMain)
     const captureWindowService = new CaptureWindowService(captureTransport)
+    const clipboardService = new ElectronClipboardService()
+    const outputWindowService = new OutputWindowService()
+    const outputDispatcher = new OutputDispatcher({
+      clipboard: clipboardService,
+      popup: outputWindowService
+    })
     const historyService = new HistoryService(transcriptRepository, transcriptExporter)
     const diagnosticsService = new DiagnosticsService({
       exportDir: path.join(userDataPath, 'diagnostics'),
@@ -86,9 +95,7 @@ void wireAppLifecycle(app, {
       engineFactory: (config) => engineRegistry.createForRuntimeConfig(config),
       captureWindowService,
       transcriptRepository,
-      outputDispatcher: {
-        async deliver() {}
-      },
+      outputDispatcher,
       diagnostics: diagnosticsService
     })
     const meetingCoordinator = new MeetingCoordinator({

@@ -721,12 +721,16 @@ class FakeOutputDispatcher {
 
   constructor(private readonly failure: Error | undefined) {}
 
-  async deliver(input: { text: string; method: OutputMethod }): Promise<void> {
+  async deliver(input: { text: string; method: OutputMethod }): Promise<{ methodUsed: OutputMethod }> {
     if (this.failure) {
       throw this.failure
     }
 
     this.deliveries.push(input)
+
+    return {
+      methodUsed: input.method
+    }
   }
 }
 
