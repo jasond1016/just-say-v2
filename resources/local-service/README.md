@@ -21,5 +21,5 @@ Default model: `iic/SenseVoiceSmall`
 
 ## Notes
 
-- Meeting mode currently emits placeholder draft text (`Listening...`) and real committed blocks after silence-based segmentation.
+- Meeting mode now emits incremental draft text while speech is active, then commits finalized blocks after silence-based segmentation.
 - Translation remains optional and non-blocking. When translation is requested, the service warns that local cloud translation is not wired yet.

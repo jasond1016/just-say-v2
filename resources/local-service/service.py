@@ -29,6 +29,9 @@ CAPABILITIES = {
     "requiresLocalService": True,
 }
 
+MIN_DRAFT_CHUNKS = 4
+DRAFT_REFRESH_CHUNKS = 3
+
 
 class SenseVoiceRuntime:
     def __init__(self, model_name: str, device: str) -> None:
@@ -90,6 +93,8 @@ class SourceState:
     started_at: int | None = None
     samples: list[np.ndarray] = field(default_factory=list)
     last_updated_at: int = 0
+    last_draft_text: str = ""
+    last_draft_chunk_count: int = 0
 
     def append(self, chunk: np.ndarray, timestamp: int) -> None:
         self.samples.append(chunk)
@@ -102,12 +107,18 @@ class SourceState:
         self.silence_chunks = 0
         self.started_at = None
         self.samples.clear()
+        self.last_draft_text = ""
+        self.last_draft_chunk_count = 0
 
     def combine(self) -> np.ndarray:
         if not self.samples:
             return np.array([], dtype=np.float32)
 
         return np.concatenate(self.samples)
+
+    @property
+    def chunk_count(self) -> int:
+        return len(self.samples)
 
 
 @dataclass
@@ -241,7 +252,30 @@ class JustSayLocalService:
     async def emit_draft(
         self, websocket: Any, session: SessionState, source: str, source_state: SourceState
     ) -> None:
-        block_id = self.next_block_id(session, source, source_state, draft=True)
+        if source_state.chunk_count < MIN_DRAFT_CHUNKS:
+            return
+
+        if (
+            source_state.last_draft_chunk_count > 0
+            and source_state.chunk_count - source_state.last_draft_chunk_count
+            < DRAFT_REFRESH_CHUNKS
+        ):
+            return
+
+        text = await asyncio.to_thread(
+            self.runtime.transcribe,
+            source_state.combine(),
+            16000,
+            session.language,
+        )
+        text = text.strip()
+
+        if not text or text == source_state.last_draft_text:
+            return
+
+        source_state.last_draft_text = text
+        source_state.last_draft_chunk_count = source_state.chunk_count
+        block_id = self.next_block_id(session, source, source_state)
         await websocket.send(
             json.dumps(
                 {
@@ -251,7 +285,7 @@ class JustSayLocalService:
                         "blockId": block_id,
                         "source": source,
                         "stableText": "",
-                        "previewText": "Listening...",
+                        "previewText": text,
                         "startedAt": source_state.started_at or source_state.last_updated_at,
                         "updatedAt": source_state.last_updated_at,
                     },
@@ -268,7 +302,7 @@ class JustSayLocalService:
             16000,
             session.language,
         )
-        block_id = self.next_block_id(session, source, source_state, draft=False)
+        block_id = self.next_block_id(session, source, source_state)
 
         if text:
             await websocket.send(
@@ -303,10 +337,8 @@ class JustSayLocalService:
         session: SessionState,
         source: str,
         source_state: SourceState,
-        draft: bool,
     ) -> str:
-        suffix = "draft" if draft else "commit"
-        return f"{session.session_id}:{source}:{source_state.block_index}:{suffix}"
+        return f"{session.session_id}:{source}:{source_state.block_index}"
 
 
 def decode_chunk(data_base64: str) -> np.ndarray:

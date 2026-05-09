@@ -339,6 +339,7 @@ describe('SessionCoordinator + PTTCoordinator', () => {
       }
     ])
     expect(streamingSnapshot.liveSession?.transcript).toMatchObject({
+      activeDrafts: {},
       committedBlocks: [
         {
           id: 'draft-1',
