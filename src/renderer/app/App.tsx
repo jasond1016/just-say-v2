@@ -259,14 +259,47 @@ function WorkspaceApp() {
           diagnosticsMessage={diagnosticsMessage}
           busyAction={busyAction}
           palette={palette}
-          onToggleTheme={() => {
-            void controller.toggleTheme()
+          onGeneralLanguageChange={(language) => {
+            void controller.setGeneralLanguage(language)
+          }}
+          onThemeChange={(theme) => {
+            void controller.setTheme(theme)
           }}
           onSelectProfile={(profileId) => {
             void controller.selectProfile(profileId)
           }}
           onTestProfile={(profileId) => {
             void controller.testProfile(profileId)
+          }}
+          onSpeechLanguageChange={(language) => {
+            void controller.setSpeechLanguage(language)
+          }}
+          onPttHotkeyChange={(hotkey) => {
+            void controller.setPttHotkey(hotkey)
+          }}
+          onOutputMethodChange={(method) => {
+            void controller.setOutputMethod(method)
+          }}
+          onIncludeMicrophoneChange={(enabled) => {
+            void controller.setIncludeMicrophoneInMeeting(enabled)
+          }}
+          onTranslatePttChange={(enabled) => {
+            void controller.setTranslationEnabledForPtt(enabled)
+          }}
+          onTranslateMeetingChange={(enabled) => {
+            void controller.setTranslationEnabledForMeeting(enabled)
+          }}
+          onTranslationTargetLanguageChange={(targetLanguage) => {
+            void controller.setTranslationTargetLanguage(targetLanguage)
+          }}
+          onTranslationProviderChange={(provider) => {
+            void controller.setTranslationProvider(provider)
+          }}
+          onLocalServiceHostChange={(host) => {
+            void controller.setLocalServiceHost(host)
+          }}
+          onLocalServicePortChange={(port) => {
+            void controller.setLocalServicePort(port)
           }}
           onExportDiagnostics={() => {
             void controller.exportDiagnostics()

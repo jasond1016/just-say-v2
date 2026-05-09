@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import type { AppApi } from '../../preload/api'
-import type { AppRuntimeSnapshot, AppSettings, SavedTranscript } from '../../shared/api-types'
+import type { AppRuntimeSnapshot, AppSettings, SavedTranscript, SettingsPatch } from '../../shared/api-types'
 import { RuntimeStore } from '../features/runtime/runtime-store'
 import { AppController } from './app-controller'
 
@@ -128,6 +128,79 @@ describe('AppController', () => {
     })
     expect(controller.getSnapshot().runtime).toEqual(runtime)
     expect(controller.getSnapshot().busyAction).toBeNull()
+
+    dispose()
+  })
+
+  it('updates editable settings fields through the API and refreshes local state', async () => {
+    let settings = createSettings()
+    const updateSettings = vi.fn(async (patch: SettingsPatch) => {
+      settings = mergeSettings(settings, patch)
+      return settings
+    })
+    const api = createApi({
+      getSettings: vi.fn(async () => settings),
+      updateSettings
+    })
+    const controller = new AppController({
+      api,
+      runtimeStore: new RuntimeStore()
+    })
+
+    const dispose = controller.start()
+    await flushPromises()
+
+    await controller.setGeneralLanguage('en-US')
+    await controller.setTheme('dark')
+    await controller.setSpeechLanguage('ja')
+    await controller.setPttHotkey('RAlt')
+    await controller.setOutputMethod('clipboard')
+    await controller.setIncludeMicrophoneInMeeting(true)
+    await controller.setTranslationEnabledForPtt(true)
+    await controller.setTranslationEnabledForMeeting(true)
+    await controller.setTranslationTargetLanguage('fr')
+    await controller.setTranslationProvider('openai-compatible')
+    await controller.setLocalServiceHost('10.0.0.8')
+    await controller.setLocalServicePort(9001)
+
+    expect(updateSettings).toHaveBeenCalledWith({ general: { language: 'en-US' } })
+    expect(updateSettings).toHaveBeenCalledWith({ general: { theme: 'dark' } })
+    expect(updateSettings).toHaveBeenCalledWith({ speech: { language: 'ja' } })
+    expect(updateSettings).toHaveBeenCalledWith({ input: { pttHotkey: 'RAlt' } })
+    expect(updateSettings).toHaveBeenCalledWith({ output: { method: 'clipboard' } })
+    expect(updateSettings).toHaveBeenCalledWith({ input: { includeMicrophoneInMeeting: true } })
+    expect(updateSettings).toHaveBeenCalledWith({ translation: { enabledForPtt: true } })
+    expect(updateSettings).toHaveBeenCalledWith({ translation: { enabledForMeeting: true } })
+    expect(updateSettings).toHaveBeenCalledWith({ translation: { targetLanguage: 'fr' } })
+    expect(updateSettings).toHaveBeenCalledWith({ translation: { provider: 'openai-compatible' } })
+    expect(updateSettings).toHaveBeenCalledWith({ advanced: { localServiceHost: '10.0.0.8' } })
+    expect(updateSettings).toHaveBeenCalledWith({ advanced: { localServicePort: 9001 } })
+    expect(controller.getSnapshot().settings).toMatchObject({
+      general: {
+        language: 'en-US',
+        theme: 'dark'
+      },
+      speech: {
+        language: 'ja'
+      },
+      input: {
+        pttHotkey: 'RAlt',
+        includeMicrophoneInMeeting: true
+      },
+      output: {
+        method: 'clipboard'
+      },
+      translation: {
+        enabledForPtt: true,
+        enabledForMeeting: true,
+        targetLanguage: 'fr',
+        provider: 'openai-compatible'
+      },
+      advanced: {
+        localServiceHost: '10.0.0.8',
+        localServicePort: 9001
+      }
+    })
 
     dispose()
   })
@@ -357,6 +430,38 @@ function createDeferred<T>() {
   return {
     promise,
     resolve
+  }
+}
+
+function mergeSettings(settings: AppSettings, patch: SettingsPatch): AppSettings {
+  return {
+    general: {
+      ...settings.general,
+      ...patch.general
+    },
+    speech: {
+      ...settings.speech,
+      ...patch.speech
+    },
+    input: {
+      ...settings.input,
+      ...patch.input
+    },
+    output: {
+      ...settings.output,
+      ...patch.output
+    },
+    translation: {
+      ...settings.translation,
+      ...patch.translation
+    },
+    advanced: {
+      ...settings.advanced,
+      ...patch.advanced,
+      experimentalFlags: patch.advanced?.experimentalFlags
+        ? [...patch.advanced.experimentalFlags]
+        : [...settings.advanced.experimentalFlags]
+    }
   }
 }
 

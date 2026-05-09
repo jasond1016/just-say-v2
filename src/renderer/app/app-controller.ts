@@ -3,10 +3,15 @@ import type {
   AppSettings,
   EngineProfile,
   ExportFormat,
+  OutputMethod,
   PaginatedHistoryResult,
+  PttHotkey,
   ProfileTestResult,
   RuntimeNotification,
-  SavedTranscript
+  SavedTranscript,
+  SpeechLanguage,
+  ThemeSetting,
+  TranslationProvider
 } from '../../shared/api-types'
 import { createDefaultSettings } from '../../core/settings/settings-schema'
 import type { AppApi } from '../../preload/api'
@@ -231,33 +236,110 @@ export class AppController {
     })
   }
 
-  async toggleTheme(): Promise<void> {
-    const nextTheme = this.state.settings.general.theme === 'light' ? 'dark' : 'light'
+  async setGeneralLanguage(language: AppSettings['general']['language']): Promise<void> {
+    await this.updateSettings('settings:general-language', {
+      general: {
+        language
+      }
+    })
+  }
 
-    await this.runAction('theme', async () => {
-      const updated = await this.deps.api.updateSettings({
-        general: {
-          theme: nextTheme
-        }
-      })
-
-      this.setState({
-        settings: updated
-      })
+  async setTheme(theme: ThemeSetting): Promise<void> {
+    await this.updateSettings('settings:theme', {
+      general: {
+        theme
+      }
     })
   }
 
   async selectProfile(profileId: string): Promise<void> {
-    await this.runAction(`profile-select:${profileId}`, async () => {
-      const updated = await this.deps.api.updateSettings({
-        speech: {
-          selectedProfileId: profileId
-        }
-      })
+    await this.updateSettings(`profile-select:${profileId}`, {
+      speech: {
+        selectedProfileId: profileId
+      }
+    })
+  }
 
-      this.setState({
-        settings: updated
-      })
+  async setSpeechLanguage(language: SpeechLanguage): Promise<void> {
+    await this.updateSettings('settings:speech-language', {
+      speech: {
+        language
+      }
+    })
+  }
+
+  async setPttHotkey(pttHotkey: PttHotkey): Promise<void> {
+    await this.updateSettings('settings:ptt-hotkey', {
+      input: {
+        pttHotkey
+      }
+    })
+  }
+
+  async setIncludeMicrophoneInMeeting(includeMicrophoneInMeeting: boolean): Promise<void> {
+    await this.updateSettings('settings:meeting-microphone', {
+      input: {
+        includeMicrophoneInMeeting
+      }
+    })
+  }
+
+  async setOutputMethod(method: OutputMethod): Promise<void> {
+    await this.updateSettings('settings:output-method', {
+      output: {
+        method
+      }
+    })
+  }
+
+  async setTranslationEnabledForPtt(enabledForPtt: boolean): Promise<void> {
+    await this.updateSettings('settings:translation-ptt', {
+      translation: {
+        enabledForPtt
+      }
+    })
+  }
+
+  async setTranslationEnabledForMeeting(enabledForMeeting: boolean): Promise<void> {
+    await this.updateSettings('settings:translation-meeting', {
+      translation: {
+        enabledForMeeting
+      }
+    })
+  }
+
+  async setTranslationTargetLanguage(targetLanguage: string): Promise<void> {
+    await this.updateSettings('settings:translation-target', {
+      translation: {
+        targetLanguage
+      }
+    })
+  }
+
+  async setTranslationProvider(provider: TranslationProvider): Promise<void> {
+    await this.updateSettings('settings:translation-provider', {
+      translation: {
+        provider
+      }
+    })
+  }
+
+  async setLocalServiceHost(localServiceHost: string): Promise<void> {
+    await this.updateSettings('settings:local-service-host', {
+      advanced: {
+        localServiceHost
+      }
+    })
+  }
+
+  async setLocalServicePort(localServicePort: number | undefined): Promise<void> {
+    await this.updateSettings('settings:local-service-port', {
+      advanced:
+        localServicePort === undefined
+          ? {}
+          : {
+              localServicePort
+            }
     })
   }
 
@@ -280,6 +362,16 @@ export class AppController {
       const result = await this.deps.api.exportDiagnostics()
       this.setState({
         diagnosticsMessage: result.ok ? `Diagnostics exported to ${result.path}` : result.error ?? 'Diagnostics export failed'
+      })
+    })
+  }
+
+  private async updateSettings(label: string, patch: Parameters<AppApi['updateSettings']>[0]): Promise<void> {
+    await this.runAction(label, async () => {
+      const updated = await this.deps.api.updateSettings(patch)
+
+      this.setState({
+        settings: updated
       })
     })
   }
