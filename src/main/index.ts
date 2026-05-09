@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, desktopCapturer, ipcMain, session } from 'electron'
 import path from 'node:path'
 import { profileCatalog } from '../core/settings/profile-catalog'
 import type { SettingsPatch } from '../shared/api-types'
@@ -12,6 +12,7 @@ import { openSqliteDatabase } from './persistence/sqlite'
 import { SqliteTranscriptRepository } from './persistence/sqlite-transcript-repository'
 import { ElectronClipboardService } from './platform/clipboard-service'
 import { CaptureWindowService } from './platform/capture-window-service'
+import { registerElectronDisplayMediaHandler } from './platform/electron-display-media-handler'
 import { ElectronCaptureWindowTransport } from './platform/electron-capture-window-transport'
 import { HotkeyService } from './platform/hotkey-service'
 import { OutputWindowService } from './platform/output-window-service'
@@ -33,6 +34,8 @@ import { TranslationPipeline } from './services/translation-pipeline'
 
 void wireAppLifecycle(app, {
   onReady: async () => {
+    registerElectronDisplayMediaHandler(session.defaultSession, desktopCapturer)
+
     const preloadPath = path.join(__dirname, '../preload/index.js')
     const resourcesPath = path.join(__dirname, '../resources')
     const userDataPath = app.getPath('userData')
