@@ -10,6 +10,7 @@ export const IPC_CHANNELS = {
   sessionPrewarm: 'session.prewarm',
   sessionStartPtt: 'session.startPtt',
   sessionStopPtt: 'session.stopPtt',
+  sessionCopyLatestPttText: 'session.copyLatestPttText',
   sessionStartMeeting: 'session.startMeeting',
   sessionStopMeeting: 'session.stopMeeting',
   sessionCopyLiveSession: 'session.copyLiveSession',

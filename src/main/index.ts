@@ -148,6 +148,7 @@ void wireAppLifecycle(app, {
       prewarm: (mode: 'ptt' | 'meeting') => sessionCoordinator.prewarm(mode),
       startPtt: () => sessionCoordinator.startPtt(),
       stopPtt: () => sessionCoordinator.stopPtt(),
+      copyLatestPttText: () => sessionCoordinator.copyLatestPttText(),
       startMeeting: (input?: Parameters<typeof sessionCoordinator.startMeeting>[0]) =>
         sessionCoordinator.startMeeting(input),
       stopMeeting: () => sessionCoordinator.stopMeeting(),

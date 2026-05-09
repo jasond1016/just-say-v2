@@ -200,6 +200,9 @@ function WorkspaceApp() {
           onStopPtt={() => {
             void controller.stopPtt()
           }}
+          onCopyLatestText={() => {
+            void controller.copyLatestPttText()
+          }}
           onOpenLiveSession={() => {
             controller.openLiveSessionSection()
           }}

@@ -362,6 +362,14 @@ export type DiagnosticEvent =
       blockCount: number
     }
   | {
+      type: 'output-delivered'
+      timestamp: number
+      sessionId: string
+      requestedMethod: OutputMethod
+      methodUsed: OutputMethod
+      fallback: boolean
+    }
+  | {
       type: 'session-failed'
       timestamp: number
       sessionId: string

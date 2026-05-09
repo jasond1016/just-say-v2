@@ -5,6 +5,7 @@ import type {
   AppSettings,
   CaptureCommand,
   CaptureEvent,
+  DiagnosticEvent,
   EngineCapabilities,
   OutputMethod,
   ResolvedRuntimeConfig,
@@ -225,6 +226,10 @@ describe('SessionCoordinator + PTTCoordinator', () => {
     const harness = createHarness({
       outputFailure: new Error('Clipboard unavailable')
     })
+    const notifications: Array<{ level: string; message: string }> = []
+    const unsubscribe = harness.sessionCoordinator.onNotification((notification) => {
+      notifications.push(notification)
+    })
 
     await harness.sessionCoordinator.startPtt()
     harness.captureTransport.emit({
@@ -251,12 +256,91 @@ describe('SessionCoordinator + PTTCoordinator', () => {
     expect(harness.sessionCoordinator.getRuntimeSnapshot().ptt).toMatchObject({
       status: 'idle',
       error: {
-        code: 'E_ENGINE_PROTOCOL',
+        code: 'E_OUTPUT_DELIVERY',
         message: 'Clipboard unavailable',
-        retryable: true
+        retryable: true,
+        detail: {
+          requestedMethod: 'simulate_input',
+          transcriptText: 'hello world'
+        }
       }
     })
+    expect(notifications).toContainEqual({
+      level: 'error',
+      message: 'Transcript delivery failed. Use Copy Latest Text to recover the result.'
+    })
     expect(harness.transcriptRepository.savedTranscripts).toHaveLength(0)
+
+    await harness.sessionCoordinator.copyLatestPttText()
+
+    expect(harness.sessionCoordinator.getRuntimeSnapshot().ptt).toMatchObject({
+      status: 'idle',
+      lastResult: {
+        text: 'hello world',
+        deliveryMethod: 'clipboard'
+      }
+    })
+    expect(harness.outputDispatcher.deliveries).toEqual([
+      {
+        text: 'hello world',
+        method: 'simulate_input'
+      },
+      {
+        text: 'hello world',
+        method: 'clipboard'
+      }
+    ])
+    unsubscribe()
+  })
+
+  it('notifies when simulate-input delivery falls back to the clipboard', async () => {
+    const harness = createHarness({
+      outputFallbackReason: 'Simulated input is unavailable.'
+    })
+    const notifications: Array<{ level: string; message: string }> = []
+    const unsubscribe = harness.sessionCoordinator.onNotification((notification) => {
+      notifications.push(notification)
+    })
+
+    await harness.sessionCoordinator.startPtt()
+    harness.captureTransport.emit({
+      type: 'capture-started',
+      requestId: 'ptt-1',
+      sources: ['microphone']
+    })
+
+    const stopPromise = harness.sessionCoordinator.stopPtt()
+    harness.engine.emit({
+      type: 'block-committed',
+      payload: {
+        block: {
+          id: 'block-1',
+          source: 'microphone',
+          text: 'hello world',
+          startedAt: 1000,
+          endedAt: 1200
+        }
+      }
+    })
+    await stopPromise
+
+    expect(harness.sessionCoordinator.getRuntimeSnapshot().ptt.lastResult).toMatchObject({
+      text: 'hello world',
+      deliveryMethod: 'clipboard'
+    })
+    expect(notifications).toContainEqual({
+      level: 'warning',
+      message: 'Simulated input is unavailable. Copied the transcript to the clipboard instead.'
+    })
+    expect(harness.diagnostics.events).toContainEqual({
+      type: 'output-delivered',
+      timestamp: 2000,
+      sessionId: 'ptt-1',
+      requestedMethod: 'simulate_input',
+      methodUsed: 'clipboard',
+      fallback: true
+    })
+    unsubscribe()
   })
 
   it('runs the minimal meeting happy path and persists the live transcript', async () => {
@@ -674,6 +758,7 @@ describe('SessionCoordinator + PTTCoordinator', () => {
 type HarnessOptions = {
   settings?: AppSettings
   outputFailure?: Error
+  outputFallbackReason?: string
   transcriptSaveFailure?: Error
   translationFailure?: Error
   translationResults?: Record<string, string>
@@ -724,7 +809,8 @@ function createHarness(options: HarnessOptions = {}) {
     now: () => 3100
   })
   const transcriptRepository = new FakeTranscriptRepository(options.transcriptSaveFailure)
-  const outputDispatcher = new FakeOutputDispatcher(options.outputFailure)
+  const outputDispatcher = new FakeOutputDispatcher(options.outputFailure, options.outputFallbackReason)
+  const diagnostics = new FakeDiagnostics()
 
   const pttCoordinator = new PttCoordinator({
     settingsProvider: {
@@ -736,6 +822,7 @@ function createHarness(options: HarnessOptions = {}) {
     transcriptRepository,
     outputDispatcher,
     ...(translationPipeline ? { translationPipeline } : {}),
+    diagnostics,
     now: () => 2000,
     createSessionId: () => 'ptt-1'
   })
@@ -770,6 +857,7 @@ function createHarness(options: HarnessOptions = {}) {
     meetingCaptureWindowService,
     transcriptRepository,
     outputDispatcher,
+    diagnostics,
     translationPipeline,
     pttCoordinator,
     meetingCoordinator,
@@ -853,19 +941,62 @@ class FakeTranscriptRepository {
 
 class FakeOutputDispatcher {
   readonly deliveries: Array<{ text: string; method: OutputMethod }> = []
+  private failedOnce = false
 
-  constructor(private readonly failure: Error | undefined) {}
+  constructor(
+    private readonly failure: Error | undefined,
+    private readonly fallbackReason?: string
+  ) {}
 
-  async deliver(input: { text: string; method: OutputMethod }): Promise<{ methodUsed: OutputMethod }> {
-    if (this.failure) {
-      throw this.failure
-    }
-
+  async deliver(input: {
+    text: string
+    method: OutputMethod
+  }): Promise<{ requestedMethod: OutputMethod; methodUsed: OutputMethod; fallbackReason?: string }> {
     this.deliveries.push(input)
 
-    return {
-      methodUsed: input.method
+    if (this.failure && !this.failedOnce) {
+      this.failedOnce = true
+      const error = new Error(this.failure.message)
+      ;(error as Error & {
+        payload?: {
+          code: 'E_OUTPUT_DELIVERY'
+          message: string
+          retryable: true
+          detail: {
+            requestedMethod: OutputMethod
+            transcriptText: string
+          }
+        }
+      }).payload = {
+        code: 'E_OUTPUT_DELIVERY',
+        message: this.failure.message,
+        retryable: true,
+        detail: {
+          requestedMethod: input.method,
+          transcriptText: input.text
+        }
+      }
+      throw error
     }
+
+    return this.fallbackReason && input.method === 'simulate_input'
+      ? {
+          requestedMethod: input.method,
+          methodUsed: 'clipboard',
+          fallbackReason: this.fallbackReason
+        }
+      : {
+          requestedMethod: input.method,
+          methodUsed: input.method
+        }
+  }
+}
+
+class FakeDiagnostics {
+  readonly events: DiagnosticEvent[] = []
+
+  record(event: DiagnosticEvent): void {
+    this.events.push(event)
   }
 }
 

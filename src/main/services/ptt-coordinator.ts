@@ -46,7 +46,10 @@ export interface TranscriptRepositoryLike {
 }
 
 export interface OutputDispatcherLike {
-  deliver(input: { text: string; method: OutputMethod }): Promise<{ methodUsed: OutputMethod }>
+  deliver(input: {
+    text: string
+    method: OutputMethod
+  }): Promise<{ requestedMethod: OutputMethod; methodUsed: OutputMethod; fallbackReason?: string }>
 }
 
 export type PttCoordinatorDependencies = {
@@ -84,6 +87,7 @@ export class PttCoordinator {
   private status: PttRuntimeSnapshot['status'] = 'idle'
   private lastResult: PttRuntimeSnapshot['lastResult']
   private error: AppErrorPayload | undefined
+  private lastFailedText: string | null = null
   private activeSession: PttSessionContext | null = null
   private activeEngineUnsubscribe: (() => void) | null = null
   private readonly listeners = new Set<(snapshot: PttRuntimeSnapshot) => void>()
@@ -207,6 +211,32 @@ export class PttCoordinator {
     session.stopCapturePromise = this.dependencies.captureWindowService.stopCapture(session.sessionId)
     await session.engine.stopSession()
     await session.completion.promise
+  }
+
+  async copyLatestText(): Promise<void> {
+    const text = this.lastResult?.text ?? this.lastFailedText
+
+    if (!text) {
+      throw new Error('No recent transcript is available to copy')
+    }
+
+    const delivery = await this.dependencies.outputDispatcher.deliver({
+      text,
+      method: 'clipboard'
+    })
+
+    this.lastResult = {
+      text,
+      deliveredAt: this.now(),
+      deliveryMethod: delivery.methodUsed
+    }
+    this.lastFailedText = null
+    this.error = undefined
+    this.notify({
+      level: 'info',
+      message: 'Copied the latest transcript to the clipboard.'
+    })
+    this.emitSnapshot()
   }
 
   private async handleEngineEvent(event: RecognitionEvent): Promise<void> {
@@ -396,7 +426,27 @@ export class PttCoordinator {
       deliveredAt,
       deliveryMethod: delivery.methodUsed
     }
+    this.lastFailedText = null
     this.error = undefined
+
+    this.dependencies.diagnostics?.record({
+      type: 'output-delivered',
+      timestamp: deliveredAt,
+      sessionId: session.sessionId,
+      requestedMethod: delivery.requestedMethod,
+      methodUsed: delivery.methodUsed,
+      fallback: delivery.requestedMethod !== delivery.methodUsed
+    })
+
+    if (delivery.requestedMethod !== delivery.methodUsed) {
+      this.notify({
+        level: 'warning',
+        message:
+          delivery.fallbackReason
+            ? `${delivery.fallbackReason} Copied the transcript to the clipboard instead.`
+            : 'Preferred output failed. Copied the transcript to the clipboard instead.'
+      })
+    }
 
     try {
       await this.dependencies.transcriptRepository.save({
@@ -455,12 +505,23 @@ export class PttCoordinator {
     }
 
     this.error = error
+    this.lastFailedText =
+      error.code === 'E_OUTPUT_DELIVERY' && typeof error.detail?.transcriptText === 'string'
+        ? error.detail.transcriptText
+        : this.lastFailedText
     if (session) {
       this.dependencies.diagnostics?.record({
         type: 'session-failed',
         timestamp: this.now(),
         sessionId: session.sessionId,
         errorCode: error.code
+      })
+    }
+
+    if (error.code === 'E_OUTPUT_DELIVERY' && this.lastFailedText) {
+      this.notify({
+        level: 'error',
+        message: 'Transcript delivery failed. Use Copy Latest Text to recover the result.'
       })
     }
 
@@ -489,6 +550,7 @@ export class PttCoordinator {
 
     if (clearError) {
       this.error = undefined
+      this.lastFailedText = null
     }
 
     this.emitSnapshot()

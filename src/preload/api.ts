@@ -29,6 +29,7 @@ export type AppApi = {
   prewarmSession: (mode: SessionMode) => Promise<void>
   startPtt: () => Promise<void>
   stopPtt: () => Promise<void>
+  copyLatestPttText: () => Promise<void>
   startMeeting: (input?: StartMeetingCommand) => Promise<void>
   stopMeeting: () => Promise<void>
   copyLiveSession: () => Promise<void>
@@ -74,6 +75,7 @@ export function createAppApi(invoke: IpcInvoke, events?: IpcEventSource): AppApi
     prewarmSession: async (mode) => invoke<void>(IPC_CHANNELS.sessionPrewarm, mode),
     startPtt: async () => invoke<void>(IPC_CHANNELS.sessionStartPtt),
     stopPtt: async () => invoke<void>(IPC_CHANNELS.sessionStopPtt),
+    copyLatestPttText: async () => invoke<void>(IPC_CHANNELS.sessionCopyLatestPttText),
     startMeeting: async (input = {}) => invoke<void>(IPC_CHANNELS.sessionStartMeeting, input),
     stopMeeting: async () => invoke<void>(IPC_CHANNELS.sessionStopMeeting),
     copyLiveSession: async () => invoke<void>(IPC_CHANNELS.sessionCopyLiveSession),

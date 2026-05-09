@@ -192,6 +192,24 @@ describe('AppController', () => {
     dispose()
   })
 
+  it('copies the latest ptt text through the API', async () => {
+    const copyLatestPttText = vi.fn(async () => undefined)
+    const controller = new AppController({
+      api: createApi({
+        copyLatestPttText
+      }),
+      runtimeStore: new RuntimeStore()
+    })
+
+    const dispose = controller.start()
+    await flushPromises()
+
+    await controller.copyLatestPttText()
+
+    expect(copyLatestPttText).toHaveBeenCalled()
+    dispose()
+  })
+
   it('updates editable settings fields through the API and refreshes local state', async () => {
     let settings = createSettings()
     const updateSettings = vi.fn(async (patch: SettingsPatch) => {
@@ -370,6 +388,7 @@ function createApi(overrides: Partial<AppApi> & {
     prewarmSession: overrides.prewarmSession ?? vi.fn(async () => undefined),
     startPtt: overrides.startPtt ?? vi.fn(async () => undefined),
     stopPtt: overrides.stopPtt ?? vi.fn(async () => undefined),
+    copyLatestPttText: overrides.copyLatestPttText ?? vi.fn(async () => undefined),
     startMeeting: overrides.startMeeting ?? vi.fn(async () => undefined),
     stopMeeting: overrides.stopMeeting ?? vi.fn(async () => undefined),
     copyLiveSession: overrides.copyLiveSession ?? vi.fn(async () => undefined),

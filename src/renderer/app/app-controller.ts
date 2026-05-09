@@ -209,6 +209,13 @@ export class AppController {
     })
   }
 
+  async copyLatestPttText(): Promise<void> {
+    await this.runAction('ptt-copy-latest', async () => {
+      await this.deps.api.copyLatestPttText()
+      await this.refreshRuntimeOnly()
+    })
+  }
+
   async startMeeting(): Promise<void> {
     const settings = this.state.settings
 

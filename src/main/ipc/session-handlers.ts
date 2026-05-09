@@ -7,6 +7,7 @@ export type SessionHandlerService = {
   prewarm(mode: SessionMode): Promise<void>
   startPtt(): Promise<void>
   stopPtt(): Promise<void>
+  copyLatestPttText(): Promise<void>
   startMeeting(input?: StartMeetingCommand): Promise<void>
   stopMeeting(): Promise<void>
   copyLiveSession(): Promise<void>
@@ -18,6 +19,7 @@ export type SessionHandlers = {
   [IPC_CHANNELS.sessionPrewarm]: (mode: SessionMode) => Promise<void>
   [IPC_CHANNELS.sessionStartPtt]: () => Promise<void>
   [IPC_CHANNELS.sessionStopPtt]: () => Promise<void>
+  [IPC_CHANNELS.sessionCopyLatestPttText]: () => Promise<void>
   [IPC_CHANNELS.sessionStartMeeting]: (input?: StartMeetingCommand) => Promise<void>
   [IPC_CHANNELS.sessionStopMeeting]: () => Promise<void>
   [IPC_CHANNELS.sessionCopyLiveSession]: () => Promise<void>
@@ -30,6 +32,7 @@ export function createSessionHandlers(sessionService: SessionHandlerService): Se
     [IPC_CHANNELS.sessionPrewarm]: async (mode) => sessionService.prewarm(mode),
     [IPC_CHANNELS.sessionStartPtt]: async () => sessionService.startPtt(),
     [IPC_CHANNELS.sessionStopPtt]: async () => sessionService.stopPtt(),
+    [IPC_CHANNELS.sessionCopyLatestPttText]: async () => sessionService.copyLatestPttText(),
     [IPC_CHANNELS.sessionStartMeeting]: async (input) => sessionService.startMeeting(input),
     [IPC_CHANNELS.sessionStopMeeting]: async () => sessionService.stopMeeting(),
     [IPC_CHANNELS.sessionCopyLiveSession]: async () => sessionService.copyLiveSession(),

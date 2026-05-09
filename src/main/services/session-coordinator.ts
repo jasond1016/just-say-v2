@@ -122,6 +122,10 @@ export class SessionCoordinator {
     await this.pttCoordinator.stop()
   }
 
+  async copyLatestPttText(): Promise<void> {
+    await this.pttCoordinator.copyLatestText()
+  }
+
   async startMeeting(input?: StartMeetingCommand): Promise<void> {
     await this.meetingCoordinator.start(input)
   }

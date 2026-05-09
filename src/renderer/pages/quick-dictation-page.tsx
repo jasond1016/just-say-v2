@@ -18,8 +18,11 @@ export function QuickDictationPage(props: {
   palette: Palette
   onStartPtt: () => void
   onStopPtt: () => void
+  onCopyLatestText: () => void
   onOpenLiveSession: () => void
 }) {
+  const latestText = props.runtime.ptt.lastResult?.text ?? getFailedTranscriptText(props.runtime)
+
   return (
     <section
       style={{
@@ -68,6 +71,11 @@ export function QuickDictationPage(props: {
             disabled={props.pttStopDisabled}
             onClick={props.onStopPtt}
           />
+          <GhostButton
+            label={props.busyAction === 'ptt-copy-latest' ? 'Copying...' : 'Copy Latest Text'}
+            disabled={Boolean(props.busyAction) || !latestText}
+            onClick={props.onCopyLatestText}
+          />
           <GhostButton label="Open Live Session" onClick={props.onOpenLiveSession} />
         </div>
       </article>
@@ -84,14 +92,24 @@ export function QuickDictationPage(props: {
           Latest Result
         </div>
         <div style={{ marginTop: 14, fontSize: 22, lineHeight: 1.35 }}>
-          {props.runtime.ptt.lastResult?.text ?? 'No delivered result yet.'}
+          {latestText ?? 'No delivered result yet.'}
         </div>
         <div style={{ marginTop: 14, color: props.palette.muted }}>
           Delivery method: {props.runtime.ptt.lastResult?.deliveryMethod ?? props.settings.output.method}
         </div>
+        {props.runtime.ptt.error?.code === 'E_OUTPUT_DELIVERY' && latestText ? (
+          <div style={{ marginTop: 14, color: props.palette.muted }}>
+            Delivery failed, but the transcript is preserved here so you can copy it.
+          </div>
+        ) : null}
       </article>
     </section>
   )
+}
+
+function getFailedTranscriptText(runtime: AppRuntimeSnapshot): string | null {
+  const transcriptText = runtime.ptt.error?.detail?.transcriptText
+  return typeof transcriptText === 'string' ? transcriptText : null
 }
 
 function StatTile(props: { label: string; value: string; palette: Palette }) {
@@ -132,18 +150,20 @@ function ActionButton(props: { label: string; disabled?: boolean; onClick: () =>
   )
 }
 
-function GhostButton(props: { label: string; onClick: () => void }) {
+function GhostButton(props: { label: string; disabled?: boolean; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={props.onClick}
+      disabled={props.disabled}
       style={{
         border: '1px solid rgba(255, 255, 255, 0.12)',
         borderRadius: 999,
         padding: '12px 16px',
         background: 'transparent',
         color: 'inherit',
-        cursor: 'pointer'
+        cursor: props.disabled ? 'not-allowed' : 'pointer',
+        opacity: props.disabled ? 0.6 : 1
       }}
     >
       {props.label}
