@@ -59,6 +59,12 @@ export const profileCatalog = [
   }
 ] satisfies EngineProfile[]
 
+export const exposedProfileCatalog = profileCatalog.filter((profile) => profile.kind === 'local')
+
 export function getProfileById(profileId: string): EngineProfile | undefined {
   return profileCatalog.find((profile) => profile.id === profileId)
+}
+
+export function getExposedProfileById(profileId: string): EngineProfile | undefined {
+  return exposedProfileCatalog.find((profile) => profile.id === profileId)
 }

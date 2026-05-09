@@ -7,7 +7,7 @@ import type {
   ThemeSetting,
   TranslationProvider
 } from '../../shared/api-types'
-import { getProfileById, profileCatalog } from './profile-catalog'
+import { getProfileById } from './profile-catalog'
 
 export const DEFAULT_SETTINGS: AppSettings = {
   general: {

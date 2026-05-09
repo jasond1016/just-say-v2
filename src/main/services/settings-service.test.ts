@@ -38,6 +38,47 @@ describe('SettingsService', () => {
     await expect(repository.get()).resolves.toEqual(updated)
   })
 
+  it('normalizes hidden cloud profile selections back to the default local profile', async () => {
+    const repository = new InMemorySettingsRepository()
+    await repository.save({
+      general: {
+        language: 'zh-CN',
+        theme: 'system',
+        launchAtLogin: false,
+        minimizeToTray: true
+      },
+      speech: {
+        selectedProfileId: 'cloud-low-cost',
+        language: 'auto'
+      },
+      input: {
+        pttHotkey: 'RCtrl',
+        includeMicrophoneInMeeting: false,
+        microphoneDeviceId: 'default'
+      },
+      output: {
+        method: 'simulate_input'
+      },
+      translation: {
+        enabledForPtt: false,
+        enabledForMeeting: false,
+        targetLanguage: 'en',
+        provider: 'openai-compatible'
+      },
+      advanced: {
+        diagnosticsEnabled: true,
+        experimentalFlags: []
+      }
+    })
+    const service = new SettingsService(repository)
+
+    await expect(service.getSettings()).resolves.toMatchObject({
+      speech: {
+        selectedProfileId: 'local-fast'
+      }
+    })
+  })
+
   it('resolves runtime config using stored settings and provider hooks', async () => {
     const repository = new InMemorySettingsRepository()
     const service = new SettingsService(repository, {

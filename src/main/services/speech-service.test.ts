@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { profileCatalog } from '../../core/settings/profile-catalog'
+import { exposedProfileCatalog, profileCatalog } from '../../core/settings/profile-catalog'
 import type { RecognitionEngine } from '../../core/contracts/engine'
 import type { ResolvedRuntimeConfig } from '../../shared/api-types'
 import { EngineRegistry } from './engine-registry'
@@ -11,7 +11,13 @@ describe('SpeechService', () => {
   it('lists profiles from the registry', async () => {
     const service = createSpeechService()
 
-    await expect(service.listProfiles()).resolves.toHaveLength(profileCatalog.length)
+    await expect(service.listProfiles()).resolves.toEqual(
+      expect.arrayContaining(exposedProfileCatalog.map((profile) => expect.objectContaining({ id: profile.id })))
+    )
+    await expect(service.listProfiles()).resolves.toHaveLength(exposedProfileCatalog.length)
+    await expect(service.listProfiles()).resolves.not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: 'cloud-low-cost' })])
+    )
   })
 
   it('tests a local profile and reports capabilities plus local service status', async () => {

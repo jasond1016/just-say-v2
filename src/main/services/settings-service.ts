@@ -6,6 +6,7 @@ import {
   createDefaultSettings,
   normalizeSettings
 } from '../../core/settings/settings-schema'
+import { getExposedProfileById } from '../../core/settings/profile-catalog'
 import {
   resolveRuntimeConfig,
   type PlatformCapabilities,
@@ -27,12 +28,13 @@ export class SettingsService {
 
   async getSettings(): Promise<AppSettings> {
     const stored = await this.repository.get()
-    return stored ? normalizeSettings(stored) : createDefaultSettings()
+    const normalized = stored ? normalizeSettings(stored) : createDefaultSettings()
+    return normalizeExposedSettings(normalized)
   }
 
   async updateSettings(patch: SettingsPatch): Promise<AppSettings> {
     const current = await this.getSettings()
-    const next = applySettingsPatch(current, patch)
+    const next = normalizeExposedSettings(applySettingsPatch(current, patch))
     await this.repository.save(next)
     this.emitChanged(next)
     return next
@@ -87,6 +89,20 @@ export class SettingsService {
   private emitChanged(settings: AppSettings): void {
     for (const listener of this.listeners) {
       listener(settings)
+    }
+  }
+}
+
+function normalizeExposedSettings(settings: AppSettings): AppSettings {
+  if (getExposedProfileById(settings.speech.selectedProfileId)) {
+    return settings
+  }
+
+  return {
+    ...settings,
+    speech: {
+      ...settings.speech,
+      selectedProfileId: createDefaultSettings().speech.selectedProfileId
     }
   }
 }

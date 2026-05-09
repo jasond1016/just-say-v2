@@ -15,7 +15,7 @@ export class SpeechService {
   ) {}
 
   async listProfiles(): Promise<EngineProfile[]> {
-    return this.registry.getProfileCatalog()
+    return this.registry.getProfileCatalog().filter((profile) => profile.kind === 'local')
   }
 
   async testProfile(profileId: string): Promise<ProfileTestResult> {
