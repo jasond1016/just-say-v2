@@ -212,6 +212,7 @@ describe('AppController', () => {
 
     await controller.setGeneralLanguage('en-US')
     await controller.setTheme('dark')
+    await controller.setMinimizeToTray(false)
     await controller.setSpeechLanguage('ja')
     await controller.setPttHotkey('RAlt')
     await controller.setOutputMethod('clipboard')
@@ -225,6 +226,7 @@ describe('AppController', () => {
 
     expect(updateSettings).toHaveBeenCalledWith({ general: { language: 'en-US' } })
     expect(updateSettings).toHaveBeenCalledWith({ general: { theme: 'dark' } })
+    expect(updateSettings).toHaveBeenCalledWith({ general: { minimizeToTray: false } })
     expect(updateSettings).toHaveBeenCalledWith({ speech: { language: 'ja' } })
     expect(updateSettings).toHaveBeenCalledWith({ input: { pttHotkey: 'RAlt' } })
     expect(updateSettings).toHaveBeenCalledWith({ output: { method: 'clipboard' } })
@@ -238,7 +240,8 @@ describe('AppController', () => {
     expect(controller.getSnapshot().settings).toMatchObject({
       general: {
         language: 'en-US',
-        theme: 'dark'
+        theme: 'dark',
+        minimizeToTray: false
       },
       speech: {
         language: 'ja'

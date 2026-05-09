@@ -311,6 +311,14 @@ export class AppController {
     })
   }
 
+  async setMinimizeToTray(minimizeToTray: boolean): Promise<void> {
+    await this.updateSettings('settings:minimize-to-tray', {
+      general: {
+        minimizeToTray
+      }
+    })
+  }
+
   async selectProfile(profileId: string): Promise<void> {
     await this.updateSettings(`profile-select:${profileId}`, {
       speech: {

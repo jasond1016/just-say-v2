@@ -286,6 +286,9 @@ function WorkspaceApp() {
           onThemeChange={(theme) => {
             void controller.setTheme(theme)
           }}
+          onMinimizeToTrayChange={(minimizeToTray) => {
+            void controller.setMinimizeToTray(minimizeToTray)
+          }}
           onSelectProfile={(profileId) => {
             void controller.selectProfile(profileId)
           }}

@@ -27,6 +27,7 @@ export function SettingsPage(props: {
   palette: Palette
   onGeneralLanguageChange: (language: AppSettings['general']['language']) => void
   onThemeChange: (theme: ThemeSetting) => void
+  onMinimizeToTrayChange: (enabled: boolean) => void
   onSelectProfile: (profileId: string) => void
   onTestProfile: (profileId: string) => void
   onSpeechLanguageChange: (language: SpeechLanguage) => void
@@ -77,6 +78,14 @@ export function SettingsPage(props: {
             <option value="dark">Dark</option>
           </SelectField>
         </FieldLabel>
+        <CheckboxField
+          label="Minimize main window to tray"
+          checked={props.settings.general.minimizeToTray}
+          disabled={controlsDisabled}
+          onChange={(event) => {
+            props.onMinimizeToTrayChange(event.target.checked)
+          }}
+        />
       </SettingsCard>
 
       <SettingsCard title="Speech Engine" palette={props.palette}>

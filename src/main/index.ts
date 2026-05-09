@@ -1,4 +1,4 @@
-import { app, BrowserWindow, desktopCapturer, ipcMain, session } from 'electron'
+import { app, BrowserWindow, desktopCapturer, ipcMain, Menu, session, Tray } from 'electron'
 import path from 'node:path'
 import { profileCatalog } from '../core/settings/profile-catalog'
 import type { SettingsPatch } from '../shared/api-types'
@@ -16,6 +16,7 @@ import { registerElectronDisplayMediaHandler } from './platform/electron-display
 import { ElectronCaptureWindowTransport } from './platform/electron-capture-window-transport'
 import { HotkeyService } from './platform/hotkey-service'
 import { OutputWindowService } from './platform/output-window-service'
+import { TrayController } from './platform/tray-controller'
 import { WindowsInputService } from './platform/windows-input-service'
 import { DiagnosticsService } from './services/diagnostics-service'
 import { EngineRegistry } from './services/engine-registry'
@@ -198,9 +199,20 @@ void wireAppLifecycle(app, {
         preloadPath
       }
     })
+    const trayController = new TrayController({
+      mainWindow: appBootstrap.windows.mainWindow as BrowserWindow,
+      getSettings: () => cachedSettings,
+      createTray: (iconPath) => new Tray(iconPath),
+      buildMenu: (template) => Menu.buildFromTemplate(template),
+      iconPath: path.join(__dirname, '../icon.png'),
+      quitApp: () => app.quit()
+    })
+    trayController.start()
 
     captureTransport.attachWindow(appBootstrap.windows.captureWindow)
     app.on('before-quit', () => {
+      trayController.prepareForQuit()
+      trayController.dispose()
       pttHotkeyController.dispose()
       void localServiceSupervisor.stop()
       transcriptDatabase.close()
