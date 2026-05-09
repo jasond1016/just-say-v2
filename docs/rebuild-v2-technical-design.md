@@ -315,7 +315,6 @@ export type TranscriptBlockDraft = {
   speakerLabel?: string
   stableText: string
   previewText: string
-  translatedPreviewText?: string
   startedAt: number
   updatedAt: number
   words?: WordTiming[]
@@ -433,7 +432,7 @@ export type SavedTranscript = {
 原则：
 
 1. Translation 是独立流水线，不依赖 ASR profile 是否原生支持翻译
-2. V2 首先保证 committed-block translation；draft translation 为可选增强
+2. V2 只保证 committed-block translation
 3. 允许“本地转录 + 云翻译”这种交叉组合
 
 ### 7.7 `LocalServiceSupervisor`
@@ -529,7 +528,6 @@ export type DraftUpdatePayload = {
   speakerLabel?: string
   stableText: string
   previewText: string
-  translatedPreviewText?: string
   words?: WordTiming[]
   startedAt: number
   updatedAt: number
