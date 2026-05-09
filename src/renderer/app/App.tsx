@@ -11,6 +11,7 @@ import { SettingsPage } from '../pages/settings-page'
 import { AppController } from './app-controller'
 import type { LocalServiceStatus } from '../../shared/api-types'
 import { Button } from '../ui/controls'
+import { describeLocalServiceStatus } from '../ui/copy'
 
 export function App() {
   if (window.location.hash === '#capture') {
@@ -83,11 +84,11 @@ function WorkspaceApp() {
   const meetingStartDisabled = Boolean(busyAction) || meetingActive
   const meetingStopDisabled = Boolean(busyAction) || !liveSession || liveSession.status !== 'streaming'
   const serviceStatus = runtime.services.localService
-  const serviceLabel = serviceStatus === 'healthy' ? 'Service connected' : `Service ${serviceStatus}`
+  const serviceLabel = describeLocalServiceStatus(serviceStatus)
 
   return (
     <div className="app-shell">
-      <nav className="app-sidebar">
+      <nav className="app-sidebar" aria-label="Workspace sections">
         <div className="app-sidebar__brand">JustSay</div>
 
         {APP_SECTIONS.map((section) => {
@@ -99,6 +100,7 @@ function WorkspaceApp() {
               data-active={isActive ? '' : undefined}
               onClick={() => controller.setActiveSection(section.id)}
               className="app-nav-button"
+              aria-current={isActive ? 'page' : undefined}
             >
               {section.label}
             </button>
@@ -107,7 +109,7 @@ function WorkspaceApp() {
 
         <div className="app-sidebar__spacer" />
 
-        <div className="app-sidebar__status">
+        <div className="app-sidebar__status" role="status" aria-live="polite">
           <span className="app-sidebar__status-dot" style={{ background: serviceColor(serviceStatus) }} />
           {serviceLabel}
         </div>
@@ -124,14 +126,18 @@ function WorkspaceApp() {
 
       <main className="app-main">
         {error ? (
-          <div className="app-banner app-banner--error">
-            <strong>Error:</strong> {error}
+          <div className="app-banner app-banner--error" role="alert">
+            <strong>Action needed:</strong> {error}
           </div>
         ) : null}
 
         {latestNotification ? (
-          <div className="app-banner">
-            <strong>{latestNotification.level}:</strong> {latestNotification.message}
+          <div
+            className="app-banner"
+            role={latestNotification.level === 'error' ? 'alert' : 'status'}
+            aria-live={latestNotification.level === 'error' ? 'assertive' : 'polite'}
+          >
+            <strong>{formatNotificationLevel(latestNotification.level)}:</strong> {latestNotification.message}
           </div>
         ) : null}
 
@@ -244,4 +250,17 @@ function requireApi() {
     throw new Error('window.justSay is not available')
   }
   return window.justSay
+}
+
+function formatNotificationLevel(level: 'info' | 'warning' | 'error') {
+  switch (level) {
+    case 'info':
+      return 'Note'
+    case 'warning':
+      return 'Warning'
+    case 'error':
+      return 'Action needed'
+    default:
+      return level
+  }
 }

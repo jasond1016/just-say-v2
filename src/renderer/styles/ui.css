@@ -63,6 +63,56 @@
   gap: 8px;
 }
 
+.action-block {
+  display: grid;
+  gap: 12px;
+}
+
+.action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.action-disclosure {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 12px;
+}
+
+.action-disclosure__summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.action-disclosure__summary::-webkit-details-marker {
+  display: none;
+}
+
+.action-disclosure__title {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.action-disclosure__meta {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-align: right;
+}
+
+.action-disclosure__body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 10px;
+}
+
 .section-label {
   margin: 0 0 10px;
   font-size: 12px;
@@ -296,9 +346,23 @@
   background: var(--bg-surface);
 }
 
+.record-detail__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
 .list-row {
+  display: block;
+  width: 100%;
   padding: 12px 16px;
+  border: none;
   border-bottom: 1px solid var(--border-subtle);
+  background: transparent;
+  text-align: left;
+  color: inherit;
+  font: inherit;
 }
 
 .list-row--interactive {
@@ -352,6 +416,30 @@
   color: var(--text-tertiary);
 }
 
+.detail-toolbar {
+  display: grid;
+  gap: 12px;
+}
+
+.danger-confirm {
+  display: grid;
+  gap: 10px;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.danger-confirm__copy {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.danger-confirm__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .timeline {
   display: grid;
   gap: 2px;
@@ -403,6 +491,61 @@
   color: var(--text-tertiary);
 }
 
+.settings-section__description {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.settings-disclosure {
+  margin-top: 28px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.settings-disclosure[open] {
+  padding-bottom: 4px;
+}
+
+.settings-disclosure__summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 14px 0 0;
+  cursor: pointer;
+  list-style: none;
+}
+
+.settings-disclosure__summary::-webkit-details-marker {
+  display: none;
+}
+
+.settings-disclosure__title {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.settings-disclosure__meta {
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-align: right;
+}
+
+.settings-disclosure__body {
+  padding-top: 12px;
+}
+
+.settings-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+}
+
 .settings-row {
   display: flex;
   justify-content: space-between;
@@ -415,6 +558,7 @@
 
 .settings-row__label {
   color: var(--text-secondary);
+  cursor: pointer;
 }
 
 .settings-row__value {
@@ -430,8 +574,12 @@
 .settings-engine-item__head {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
+}
+
+.settings-engine-item__copy {
+  min-width: 0;
 }
 
 .settings-engine-item__name {
@@ -442,17 +590,18 @@
   font-weight: 600;
 }
 
-.settings-engine-item__preset {
-  margin-left: 8px;
-  font-size: 12px;
-  color: var(--text-tertiary);
-}
-
 .settings-engine-item__active {
   margin-left: 8px;
   font-size: 11px;
   font-weight: 500;
   color: var(--accent-text);
+}
+
+.settings-engine-item__summary {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
 }
 
 .settings-engine-item__actions {
@@ -500,5 +649,16 @@
 
   .two-pane {
     grid-template-columns: 1fr !important;
+  }
+
+  .action-disclosure__summary,
+  .settings-disclosure__summary {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .action-disclosure__meta,
+  .settings-disclosure__meta {
+    text-align: left;
   }
 }

@@ -242,7 +242,7 @@ export class AppController {
     await this.runAction('live-session-copy', async () => {
       await this.deps.api.copyLiveSession()
       this.setState({
-        liveSessionMessage: 'Copied the live session transcript to the clipboard.'
+        liveSessionMessage: 'Copied the live transcript to the clipboard.'
       })
     })
   }
@@ -251,7 +251,7 @@ export class AppController {
     await this.runAction(`live-session-export:${format}`, async () => {
       const result = await this.deps.api.exportLiveSession(format)
       this.setState({
-        liveSessionMessage: result.ok ? `Exported live session to ${result.path}` : result.error ?? 'Live session export failed'
+        liveSessionMessage: result.ok ? `Saved the live transcript to ${result.path}` : result.error ?? 'Could not export the live transcript.'
       })
     })
   }
@@ -285,10 +285,10 @@ export class AppController {
       this.setState({
         exportMessage:
           format === 'bilingual_text'
-            ? 'Copied bilingual transcript to the clipboard.'
+            ? 'Copied the bilingual transcript to the clipboard.'
             : format === 'json'
-              ? 'Copied transcript JSON to the clipboard.'
-              : 'Copied transcript text to the clipboard.'
+              ? 'Copied the transcript as JSON to the clipboard.'
+              : 'Copied the transcript text to the clipboard.'
       })
     })
   }
@@ -297,7 +297,7 @@ export class AppController {
     await this.runAction(`export:${id}:${format}`, async () => {
       const result = await this.deps.api.exportHistory(id, format)
       this.setState({
-        exportMessage: result.ok ? `Exported to ${result.path}` : result.error ?? 'Export failed'
+        exportMessage: result.ok ? `Saved the export to ${result.path}` : result.error ?? 'Could not export this transcript.'
       })
     })
   }
@@ -435,7 +435,7 @@ export class AppController {
     await this.runAction('diagnostics-export', async () => {
       const result = await this.deps.api.exportDiagnostics()
       this.setState({
-        diagnosticsMessage: result.ok ? `Diagnostics exported to ${result.path}` : result.error ?? 'Diagnostics export failed'
+        diagnosticsMessage: result.ok ? `Saved the diagnostic bundle to ${result.path}` : result.error ?? 'Could not export diagnostics.'
       })
     })
   }
@@ -486,7 +486,7 @@ export class AppController {
       }
 
       this.setState({
-        error: describeError(error, 'Unknown bootstrap error')
+        error: describeError(error, 'JustSay could not finish loading.')
       })
     }
   }
@@ -562,7 +562,7 @@ export class AppController {
       }
 
       this.setState({
-        error: describeError(error, 'Unknown history error')
+        error: describeError(error, 'JustSay could not load your transcript history.')
       })
     }
   }
@@ -604,7 +604,7 @@ export class AppController {
       }
 
       this.setState({
-        error: describeError(error, 'Unknown action error')
+      error: describeError(error, 'That action could not be completed.')
       })
     } finally {
       if (this.disposed) {

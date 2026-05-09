@@ -9,6 +9,10 @@ export function Button(props: {
   disabled?: boolean | undefined
   danger?: boolean | undefined
   className?: string | undefined
+  ariaLabel?: string | undefined
+  ariaControls?: string | undefined
+  ariaExpanded?: boolean | undefined
+  ariaPressed?: boolean | undefined
   onClick: () => void
 }) {
   const variant = props.variant ?? 'secondary'
@@ -24,13 +28,25 @@ export function Button(props: {
     .join(' ')
 
   return (
-    <button type="button" onClick={props.onClick} disabled={props.disabled} className={className}>
+    <button
+      type="button"
+      onClick={props.onClick}
+      disabled={props.disabled}
+      className={className}
+      aria-label={props.ariaLabel}
+      aria-controls={props.ariaControls}
+      aria-expanded={props.ariaExpanded}
+      aria-pressed={props.ariaPressed}
+    >
       {props.label}
     </button>
   )
 }
 
 export function TextInput(props: {
+  id?: string | undefined
+  ariaLabel?: string | undefined
+  ariaDescribedBy?: string | undefined
   value: string
   disabled?: boolean | undefined
   placeholder?: string | undefined
@@ -40,6 +56,9 @@ export function TextInput(props: {
 }) {
   return (
     <input
+      id={props.id}
+      aria-label={props.ariaLabel}
+      aria-describedby={props.ariaDescribedBy}
       value={props.value}
       disabled={props.disabled}
       placeholder={props.placeholder}
@@ -51,6 +70,9 @@ export function TextInput(props: {
 }
 
 export function SelectField(props: {
+  id?: string | undefined
+  ariaLabel?: string | undefined
+  ariaDescribedBy?: string | undefined
   value: string
   disabled?: boolean | undefined
   className?: string | undefined
@@ -59,6 +81,9 @@ export function SelectField(props: {
 }) {
   return (
     <select
+      id={props.id}
+      aria-label={props.ariaLabel}
+      aria-describedby={props.ariaDescribedBy}
       value={props.value}
       disabled={props.disabled}
       onChange={props.onChange}

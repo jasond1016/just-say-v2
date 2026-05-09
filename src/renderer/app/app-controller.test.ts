@@ -186,7 +186,7 @@ describe('AppController', () => {
     expect(copyLiveSession).toHaveBeenCalled()
     expect(exportLiveSession).toHaveBeenCalledWith('plain_text')
     expect(controller.getSnapshot().liveSessionMessage).toBe(
-      'Exported live session to C:\\exports\\live-session-meeting-1.txt'
+      'Saved the live transcript to C:\\exports\\live-session-meeting-1.txt'
     )
 
     dispose()
@@ -301,7 +301,7 @@ describe('AppController', () => {
     await controller.copyHistoryItem('tx-1', 'plain_text')
 
     expect(copyHistory).toHaveBeenCalledWith('tx-1', 'plain_text')
-    expect(controller.getSnapshot().exportMessage).toBe('Copied transcript text to the clipboard.')
+    expect(controller.getSnapshot().exportMessage).toBe('Copied the transcript text to the clipboard.')
 
     dispose()
   })

@@ -1,4 +1,4 @@
-import type { ChangeEvent, ReactNode } from 'react'
+import { useId, type ChangeEvent, type ReactNode } from 'react'
 import type {
   AppSettings,
   EngineProfile,
@@ -10,6 +10,13 @@ import type {
   TranslationProvider
 } from '../../shared/api-types'
 import { Button, SelectField, TextInput } from '../ui/controls'
+import {
+  describeLocalServiceStatus,
+  describeOutputMethod,
+  describeProfileLabel,
+  describeProfileSummary,
+  describePttHotkey
+} from '../ui/copy'
 
 export function SettingsPage(props: {
   settings: AppSettings
@@ -35,14 +42,19 @@ export function SettingsPage(props: {
   onExportDiagnostics: () => void
 }) {
   const disabled = Boolean(props.busyAction)
+  const translationEnabled = props.settings.translation.enabledForPtt || props.settings.translation.enabledForMeeting
+  const baseId = useId()
+  const fieldId = (name: string) => `${baseId}-${name}`
+  const selectedProfile = props.profiles.find((profile) => profile.id === props.settings.speech.selectedProfileId) ?? null
 
   return (
     <div className="page page--narrow">
       <h1 className="page-title">Settings</h1>
 
-      <Section title="General">
-        <Row label="Language">
+      <Section title="Workspace" description="Appearance and basic app behavior.">
+        <Row label="App language" htmlFor={fieldId('language')}>
           <Select
+            id={fieldId('language')}
             value={props.settings.general.language}
             disabled={disabled}
             onChange={(e) => props.onGeneralLanguageChange(e.target.value as AppSettings['general']['language'])}
@@ -51,19 +63,21 @@ export function SettingsPage(props: {
             <option value="en-US">English (US)</option>
           </Select>
         </Row>
-        <Row label="Theme">
+        <Row label="Theme" htmlFor={fieldId('theme')}>
           <Select
+            id={fieldId('theme')}
             value={props.settings.general.theme}
             disabled={disabled}
             onChange={(e) => props.onThemeChange(e.target.value as ThemeSetting)}
           >
-            <option value="system">System</option>
+            <option value="system">Match system</option>
             <option value="light">Light</option>
             <option value="dark">Dark</option>
           </Select>
         </Row>
-        <Row label="Minimize to tray">
+        <Row label="Keep JustSay in the tray" htmlFor={fieldId('tray')}>
           <input
+            id={fieldId('tray')}
             type="checkbox"
             checked={props.settings.general.minimizeToTray}
             disabled={disabled}
@@ -72,75 +86,50 @@ export function SettingsPage(props: {
         </Row>
       </Section>
 
-      <Section title="Speech Engine">
-        {props.profiles.map((profile) => {
-          const isSelected = props.settings.speech.selectedProfileId === profile.id
-          const testResult = props.profileTests[profile.id]
-          return (
-            <div key={profile.id} className="settings-engine-item">
-              <div className="settings-engine-item__head">
-                <div>
-                  <span className={`settings-engine-item__name ${isSelected ? 'settings-engine-item__name--active' : ''}`}>
-                    {profile.label}
-                  </span>
-                  <span className="settings-engine-item__preset">
-                    {profile.preset}
-                  </span>
-                  {isSelected ? (
-                    <span className="settings-engine-item__active">active</span>
-                  ) : null}
-                </div>
-                <div className="settings-engine-item__actions">
-                  <Button
-                    label="Select"
-                    disabled={disabled || isSelected}
-                    size="small"
-                    onClick={() => props.onSelectProfile(profile.id)}
-                  />
-                  <Button
-                    label={props.busyAction === `profile-test:${profile.id}` ? 'Testing\u2026' : 'Test'}
-                    disabled={disabled}
-                    size="small"
-                    onClick={() => props.onTestProfile(profile.id)}
-                  />
-                </div>
-              </div>
-              {testResult ? (
-                <div className={`settings-engine-item__result ${testResult.ok ? 'text-success' : 'text-danger'}`}>
-                  {testResult.ok
-                    ? `Ready ${'\u00B7'} local service: ${testResult.localService ?? 'n/a'}`
-                    : testResult.error?.message ?? 'Test failed'}
-                </div>
-              ) : null}
-            </div>
-          )
-        })}
-      </Section>
-
-      <Section title="Input & Output">
-        <Row label="PTT Hotkey">
+      <Section title="Dictation" description="Defaults for quick voice input.">
+        <Row label="Push-to-talk key" htmlFor={fieldId('hotkey')}>
           <Select
+            id={fieldId('hotkey')}
             value={props.settings.input.pttHotkey}
             disabled={disabled}
             onChange={(e) => props.onPttHotkeyChange(e.target.value as PttHotkey)}
           >
-            <option value="RCtrl">Right Ctrl</option>
-            <option value="RAlt">Right Alt</option>
+            <option value="RCtrl">{describePttHotkey('RCtrl')}</option>
+            <option value="RAlt">{describePttHotkey('RAlt')}</option>
           </Select>
         </Row>
-        <Row label="Output Method">
+        <Row label="When dictation finishes" htmlFor={fieldId('output-method')}>
           <Select
+            id={fieldId('output-method')}
             value={props.settings.output.method}
             disabled={disabled}
             onChange={(e) => props.onOutputMethodChange(e.target.value as OutputMethod)}
           >
-            <option value="simulate_input">Simulate Input</option>
-            <option value="clipboard">Clipboard</option>
-            <option value="popup">Popup</option>
+            <option value="simulate_input">{describeOutputMethod('simulate_input')}</option>
+            <option value="clipboard">{describeOutputMethod('clipboard')}</option>
+            <option value="popup">{describeOutputMethod('popup')}</option>
           </Select>
         </Row>
-        <Row label="Mic in meetings">
+      </Section>
+
+      <Section title="Meetings" description="Defaults for live transcripts.">
+        <Row label="Speech language" htmlFor={fieldId('speech-language')}>
+          <Select
+            id={fieldId('speech-language')}
+            value={props.settings.speech.language}
+            disabled={disabled}
+            onChange={(e) => props.onSpeechLanguageChange(e.target.value as SpeechLanguage)}
+          >
+            <option value="auto">Detect automatically</option>
+            <option value="zh">Chinese</option>
+            <option value="en">English</option>
+            <option value="ja">Japanese</option>
+            <option value="ko">Korean</option>
+          </Select>
+        </Row>
+        <Row label="Also capture your microphone" htmlFor={fieldId('meeting-microphone')}>
           <input
+            id={fieldId('meeting-microphone')}
             type="checkbox"
             checked={props.settings.input.includeMicrophoneInMeeting}
             disabled={disabled}
@@ -149,65 +138,115 @@ export function SettingsPage(props: {
         </Row>
       </Section>
 
-      <Section title="Language & Translation">
-        <Row label="Speech Language">
-          <Select
-            value={props.settings.speech.language}
-            disabled={disabled}
-            onChange={(e) => props.onSpeechLanguageChange(e.target.value as SpeechLanguage)}
-          >
-            <option value="auto">Auto</option>
-            <option value="zh">Chinese</option>
-            <option value="en">English</option>
-            <option value="ja">Japanese</option>
-            <option value="ko">Korean</option>
-          </Select>
-        </Row>
-        <Row label="Translate dictation">
+      <Section title="Translation" description="Show a second language under the original text when needed.">
+        <Row label="Quick dictation" htmlFor={fieldId('translation-ptt')}>
           <input
+            id={fieldId('translation-ptt')}
             type="checkbox"
             checked={props.settings.translation.enabledForPtt}
             disabled={disabled}
             onChange={(e) => props.onTranslatePttChange(e.target.checked)}
           />
         </Row>
-        <Row label="Translate live session">
+        <Row label="Live session" htmlFor={fieldId('translation-meeting')}>
           <input
+            id={fieldId('translation-meeting')}
             type="checkbox"
             checked={props.settings.translation.enabledForMeeting}
             disabled={disabled}
             onChange={(e) => props.onTranslateMeetingChange(e.target.checked)}
           />
         </Row>
-        <Row label="Target Language">
-          <Input
-            value={props.settings.translation.targetLanguage}
-            disabled={disabled}
-            onChange={(e) => props.onTranslationTargetLanguageChange(e.target.value)}
-          />
-        </Row>
-        <Row label="Translation Provider">
-          <Select
-            value={props.settings.translation.provider}
-            disabled={disabled}
-            onChange={(e) => props.onTranslationProviderChange(e.target.value as TranslationProvider)}
-          >
-            <option value="openai-compatible">OpenAI Compatible</option>
-          </Select>
-        </Row>
+
+        {translationEnabled ? (
+          <>
+            <Row label="Translate to" htmlFor={fieldId('translation-target')}>
+              <Input
+                id={fieldId('translation-target')}
+                value={props.settings.translation.targetLanguage}
+                disabled={disabled}
+                placeholder="en"
+                onChange={(e) => props.onTranslationTargetLanguageChange(e.target.value)}
+              />
+            </Row>
+            <div className="settings-note">
+              Use a language name or code, for example <code>English</code> or <code>en</code>.
+            </div>
+          </>
+        ) : (
+          <div className="settings-note">
+            Translation stays off until you enable it for dictation or live sessions.
+          </div>
+        )}
       </Section>
 
-      <Section title="Advanced">
-        <Row label="Local Service Host">
+      <Disclosure
+        title="Recognition"
+        summary={selectedProfile ? describeProfileLabel(selectedProfile) : 'Choose a recognition preset'}
+        note="Only change this when you want a different speed or accuracy tradeoff."
+      >
+        {props.profiles.map((profile) => {
+          const isSelected = props.settings.speech.selectedProfileId === profile.id
+          const testResult = props.profileTests[profile.id]
+          return (
+            <div key={profile.id} className="settings-engine-item">
+              <div className="settings-engine-item__head">
+                <div className="settings-engine-item__copy">
+                  <div>
+                    <span className={`settings-engine-item__name ${isSelected ? 'settings-engine-item__name--active' : ''}`}>
+                      {describeProfileLabel(profile)}
+                    </span>
+                    {isSelected ? (
+                      <span className="settings-engine-item__active">Current</span>
+                    ) : null}
+                  </div>
+                  <div className="settings-engine-item__summary">
+                    {describeProfileSummary(profile)}
+                  </div>
+                </div>
+                <div className="settings-engine-item__actions">
+                  <Button
+                    label={isSelected ? 'Current' : 'Use'}
+                    disabled={disabled || isSelected}
+                    size="small"
+                    onClick={() => props.onSelectProfile(profile.id)}
+                  />
+                  <Button
+                    label={props.busyAction === `profile-test:${profile.id}` ? 'Checking\u2026' : 'Check'}
+                    disabled={disabled}
+                    size="small"
+                    variant="secondary"
+                    onClick={() => props.onTestProfile(profile.id)}
+                  />
+                </div>
+              </div>
+              {testResult ? (
+                <div className={`settings-engine-item__result ${testResult.ok ? 'text-success' : 'text-danger'}`}>
+                  {describeProfileTestResult(testResult)}
+                </div>
+              ) : null}
+            </div>
+          )
+        })}
+      </Disclosure>
+
+      <Disclosure
+        title="Advanced"
+        summary="Connection and diagnostics"
+        note="Only change these if support asked you to, or while debugging a local setup."
+      >
+        <Row label="Speech service host" htmlFor={fieldId('service-host')}>
           <Input
+            id={fieldId('service-host')}
             value={props.settings.advanced.localServiceHost ?? ''}
             disabled={disabled}
             placeholder="127.0.0.1"
             onChange={(e) => props.onLocalServiceHostChange(e.target.value)}
           />
         </Row>
-        <Row label="Local Service Port">
+        <Row label="Speech service port" htmlFor={fieldId('service-port')}>
           <Input
+            id={fieldId('service-port')}
             value={props.settings.advanced.localServicePort?.toString() ?? ''}
             disabled={disabled}
             placeholder="8765"
@@ -218,14 +257,14 @@ export function SettingsPage(props: {
             }}
           />
         </Row>
-        <Row label="Diagnostics">
+        <Row label="Diagnostics recording">
           <span className="settings-row__value">
-            {props.settings.advanced.diagnosticsEnabled ? 'enabled' : 'disabled'}
+            {props.settings.advanced.diagnosticsEnabled ? 'Enabled' : 'Disabled'}
           </span>
         </Row>
         <div className="stack-8">
           <SmallButton
-            label={props.busyAction === 'diagnostics-export' ? 'Exporting\u2026' : 'Export Diagnostics'}
+            label={props.busyAction === 'diagnostics-export' ? 'Exporting\u2026' : 'Export diagnostic bundle'}
             disabled={disabled}
             onClick={props.onExportDiagnostics}
           />
@@ -235,30 +274,49 @@ export function SettingsPage(props: {
             {props.diagnosticsMessage}
           </div>
         ) : null}
-      </Section>
+      </Disclosure>
     </div>
   )
 }
 
-function Section(props: { title: string; children: ReactNode }) {
+function Section(props: { title: string; description?: string; children: ReactNode }) {
   return (
     <section className="settings-section">
       <h2 className="settings-section__title">{props.title}</h2>
+      {props.description ? <p className="settings-section__description">{props.description}</p> : null}
       <div>{props.children}</div>
     </section>
   )
 }
 
-function Row(props: { label: string; children: ReactNode }) {
+function Disclosure(props: { title: string; summary: string; note?: string; children: ReactNode }) {
+  return (
+    <details className="settings-disclosure">
+      <summary className="settings-disclosure__summary">
+        <span className="settings-disclosure__title">{props.title}</span>
+        <span className="settings-disclosure__meta">{props.summary}</span>
+      </summary>
+      <div className="settings-disclosure__body">
+        {props.note ? <div className="settings-note">{props.note}</div> : null}
+        {props.children}
+      </div>
+    </details>
+  )
+}
+
+function Row(props: { label: string; htmlFor?: string; children: ReactNode }) {
   return (
     <div className="settings-row">
-      <span className="settings-row__label">{props.label}</span>
+      <label className="settings-row__label" htmlFor={props.htmlFor}>
+        {props.label}
+      </label>
       {props.children}
     </div>
   )
 }
 
 function Select(props: {
+  id?: string
   value: string
   disabled?: boolean
   onChange: (e: ChangeEvent<HTMLSelectElement>) => void
@@ -266,6 +324,7 @@ function Select(props: {
 }) {
   return (
     <SelectField
+      id={props.id}
       value={props.value}
       disabled={props.disabled}
       onChange={props.onChange}
@@ -277,6 +336,7 @@ function Select(props: {
 }
 
 function Input(props: {
+  id?: string
   value: string
   disabled?: boolean
   placeholder?: string
@@ -285,6 +345,7 @@ function Input(props: {
 }) {
   return (
     <TextInput
+      id={props.id}
       value={props.value}
       disabled={props.disabled}
       placeholder={props.placeholder}
@@ -304,4 +365,16 @@ function SmallButton(props: { label: string; disabled?: boolean; onClick: () => 
       onClick={props.onClick}
     />
   )
+}
+
+function describeProfileTestResult(result: ProfileTestResult): string {
+  if (!result.ok) {
+    return result.error?.message ?? 'Check failed.'
+  }
+
+  if (result.localService) {
+    return `${describeLocalServiceStatus(result.localService)}.`
+  }
+
+  return 'Preset ready.'
 }

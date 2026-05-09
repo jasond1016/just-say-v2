@@ -2,6 +2,7 @@ import type { AppSettings, AppRuntimeSnapshot, ExportFormat, MeetingStatus } fro
 import { formatDuration } from '../app/app-model'
 import { selectLiveSessionTimeline } from '../features/runtime/runtime-selectors'
 import { Button } from '../ui/controls'
+import { describeCaptureSource, describeTimelineKind } from '../ui/copy'
 
 export function LiveSessionPage(props: {
   runtime: AppRuntimeSnapshot
@@ -33,62 +34,74 @@ export function LiveSessionPage(props: {
         ) : null}
       </div>
 
-      <div className="status-strip stack-16">
+      <div className="status-strip stack-16" role="status" aria-live="polite">
         <StatusDot active={isStreaming} />
         <span className="status-strip__title">{status.title}</span>
         <span className="text-tertiary">{status.description}</span>
       </div>
 
       {props.liveSessionMessage ? (
-        <div className="caption-text stack-8">
+        <div className="caption-text stack-8" role="status" aria-live="polite">
           {props.liveSessionMessage}
         </div>
       ) : null}
 
-      <div className="inline-actions stack-16">
-        <Button
-          label={props.busyAction === 'meeting-start' ? 'Starting\u2026' : 'Start Meeting'}
-          disabled={props.meetingStartDisabled}
-          variant="primary"
-          onClick={props.onStartMeeting}
-        />
-        <Button
-          label={props.busyAction === 'meeting-stop' ? 'Stopping\u2026' : 'Stop Meeting'}
-          disabled={props.meetingStopDisabled}
-          variant="secondary"
-          onClick={props.onStopMeeting}
-        />
-        <Button
-          label={props.busyAction === 'live-session-copy' ? 'Copying\u2026' : 'Copy'}
-          disabled={!canAct}
-          variant="ghost"
-          onClick={props.onCopyLiveSession}
-        />
-        <Button
-          label={props.busyAction === 'live-session-export:plain_text' ? 'Exporting\u2026' : 'Export Text'}
-          disabled={!canAct}
-          variant="ghost"
-          onClick={() => props.onExportLiveSession('plain_text')}
-        />
-        <Button
-          label={props.busyAction === 'live-session-export:bilingual_text' ? 'Exporting\u2026' : 'Export Bilingual'}
-          disabled={!canAct}
-          variant="ghost"
-          onClick={() => props.onExportLiveSession('bilingual_text')}
-        />
-        <Button
-          label="History"
-          variant="ghost"
-          onClick={props.onOpenHistory}
-        />
+      <div className="action-block stack-20">
+        <div className="action-row">
+          <Button
+            label={props.busyAction === 'meeting-start' ? 'Starting\u2026' : 'Start session'}
+            disabled={props.meetingStartDisabled}
+            variant="primary"
+            onClick={props.onStartMeeting}
+          />
+          <Button
+            label={props.busyAction === 'meeting-stop' ? 'Stopping\u2026' : 'Stop session'}
+            disabled={props.meetingStopDisabled}
+            variant="secondary"
+            onClick={props.onStopMeeting}
+          />
+          <Button
+            label={props.busyAction === 'live-session-copy' ? 'Copying\u2026' : 'Copy transcript'}
+            disabled={!canAct}
+            variant="secondary"
+            onClick={props.onCopyLiveSession}
+          />
+          <Button
+            label="Open history"
+            disabled={!canAct}
+            variant="ghost"
+            onClick={props.onOpenHistory}
+          />
+        </div>
+
+        <details className="action-disclosure" open={Boolean(props.liveSessionMessage)}>
+          <summary className="action-disclosure__summary">
+            <span className="action-disclosure__title">Export</span>
+            <span className="action-disclosure__meta">Text or bilingual text</span>
+          </summary>
+          <div className="action-disclosure__body">
+            <Button
+              label={props.busyAction === 'live-session-export:plain_text' ? 'Exporting\u2026' : 'Export text'}
+              disabled={!canAct}
+              size="small"
+              onClick={() => props.onExportLiveSession('plain_text')}
+            />
+            <Button
+              label={props.busyAction === 'live-session-export:bilingual_text' ? 'Exporting\u2026' : 'Export bilingual'}
+              disabled={!canAct}
+              size="small"
+              onClick={() => props.onExportLiveSession('bilingual_text')}
+            />
+          </div>
+        </details>
       </div>
 
       <hr className="page-rule" />
 
       <div className="stack-20">
         {timeline.length === 0 ? (
-          <div className="text-tertiary">
-            No transcript blocks yet. Start a meeting to see live text here.
+          <div className="text-tertiary" role="status" aria-live="polite">
+            No transcript yet. Start a session to see live text here.
           </div>
         ) : (
           <div className="timeline">
@@ -96,9 +109,9 @@ export function LiveSessionPage(props: {
               <div key={`${item.kind}:${item.id}`} className="timeline-row">
                 <div className="timeline-row__eyebrow">
                   <span className={item.kind === 'draft' ? 'text-accent' : 'text-tertiary'}>
-                    {item.kind}
+                    {describeTimelineKind(item.kind)}
                   </span>
-                  <span>{item.source}</span>
+                  <span>{describeCaptureSource(item.source)}</span>
                 </div>
                 <div
                   className={`timeline-row__body ${
@@ -128,21 +141,21 @@ function StatusDot(props: { active: boolean }) {
 function describeStatus(status: MeetingStatus | undefined) {
   switch (status) {
     case 'preparing':
-      return { title: 'Preparing', description: 'Warming up engine and capture source.' }
+      return { title: 'Preparing', description: 'Getting the recognizer and audio capture ready.' }
     case 'streaming':
       return { title: 'Streaming', description: 'Live transcript active.' }
     case 'recovering':
-      return { title: 'Recovering', description: 'Rebuilding engine, session alive.' }
+      return { title: 'Recovering', description: 'Reconnecting without ending the session.' }
     case 'finishing':
-      return { title: 'Finishing', description: 'Finalizing last recognition blocks.' }
+      return { title: 'Finishing', description: 'Saving the last few lines.' }
     case 'persisting':
-      return { title: 'Saving', description: 'Persisting to history.' }
+      return { title: 'Saving', description: 'Writing this session to history.' }
     case 'stopped_unexpectedly':
-      return { title: 'Stopped', description: 'Unexpected stop. Check notifications.' }
+      return { title: 'Stopped', description: 'The session ended unexpectedly. Check the latest note above.' }
     case 'completed':
       return { title: 'Completed', description: 'Session finished successfully.' }
     case 'error':
-      return { title: 'Error', description: 'Unrecoverable error.' }
+      return { title: 'Error', description: 'JustSay could not recover from this issue.' }
     case 'idle':
     case undefined:
       return { title: 'Idle', description: 'No active session.' }
