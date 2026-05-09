@@ -485,17 +485,21 @@ describe('SessionCoordinator + PTTCoordinator', () => {
   })
 
   it('moves the live session into recovering and back to streaming after a recoverable warning', async () => {
-    const harness = createHarness()
+    const primaryEngine = new FakeRecognitionEngine()
+    const recoveryEngine = new FakeRecognitionEngine()
+    const harness = createHarness({
+      meetingEngines: [primaryEngine, recoveryEngine]
+    })
     const notifications: Array<{ level: string; message: string }> = []
     const unsubscribe = harness.sessionCoordinator.onNotification((notification) => {
       notifications.push(notification)
     })
 
     await harness.sessionCoordinator.startMeeting()
-    harness.meetingEngine.emit({
+    primaryEngine.emit({
       type: 'session-ready'
     })
-    harness.meetingEngine.emit({
+    primaryEngine.emit({
       type: 'warning',
       payload: {
         code: 'W_ENGINE_STALL',
@@ -503,22 +507,38 @@ describe('SessionCoordinator + PTTCoordinator', () => {
         recoverable: true
       }
     })
+    await flushAsyncWork()
 
     expect(harness.sessionCoordinator.getRuntimeSnapshot().liveSession).toMatchObject({
       status: 'recovering'
     })
 
-    harness.meetingEngine.emit({
-      type: 'draft-updated',
-      payload: {
-        blockId: 'draft-1',
-        source: 'system',
-        stableText: 'hello',
-        previewText: 'hello again',
-        startedAt: 1000,
-        updatedAt: 1200
+    expect(primaryEngine.abortSessionCalls).toBe(1)
+    expect(recoveryEngine.startSessionCalls).toEqual([
+      {
+        sessionId: 'meeting-1',
+        mode: 'meeting',
+        sources: ['system'],
+        language: 'auto',
+        translation: {
+          enabled: false
+        }
       }
+    ])
+    expect(harness.meetingCaptureTransport.commands).toEqual([
+      {
+        type: 'start',
+        requestId: 'meeting-1',
+        sources: ['system'],
+        sampleRate: 16000,
+        chunkMs: 100
+      }
+    ])
+
+    recoveryEngine.emit({
+      type: 'session-ready'
     })
+    await flushAsyncWork()
 
     expect(harness.sessionCoordinator.getRuntimeSnapshot().liveSession).toMatchObject({
       status: 'streaming'
@@ -527,9 +547,52 @@ describe('SessionCoordinator + PTTCoordinator', () => {
       {
         level: 'warning',
         message: 'Engine stalled briefly'
+      },
+      {
+        level: 'warning',
+        message: 'Attempting to recover the live session...'
+      },
+      {
+        level: 'info',
+        message: 'Live session recovered.'
       }
     ])
     unsubscribe()
+  })
+
+  it('falls back to stopped_unexpectedly when recovery cannot restart the live session', async () => {
+    const primaryEngine = new FakeRecognitionEngine()
+    const failedRecoveryEngine = new FakeRecognitionEngine({
+      startSessionFailure: new Error('Recovery engine could not start')
+    })
+    const harness = createHarness({
+      meetingEngines: [primaryEngine, failedRecoveryEngine]
+    })
+
+    await harness.sessionCoordinator.startMeeting()
+    primaryEngine.emit({
+      type: 'session-ready'
+    })
+    primaryEngine.emit({
+      type: 'warning',
+      payload: {
+        code: 'W_ENGINE_STALL',
+        message: 'Engine stalled briefly',
+        recoverable: true
+      }
+    })
+    await flushAsyncWork()
+    await flushAsyncWork()
+
+    expect(harness.sessionCoordinator.getRuntimeSnapshot().liveSession).toMatchObject({
+      sessionId: 'meeting-1',
+      status: 'stopped_unexpectedly',
+      error: {
+        code: 'E_ENGINE_PROTOCOL',
+        message: 'Recovery engine could not start',
+        retryable: true
+      }
+    })
   })
 
   it('retains a stopped_unexpectedly live session snapshot when meeting recognition fails', async () => {
@@ -606,6 +669,8 @@ type HarnessOptions = {
   translationFailure?: Error
   translationResults?: Record<string, string>
   disableTranslationPipeline?: boolean
+  meetingEngines?: FakeRecognitionEngine[]
+  recoveryTimeoutMs?: number
 }
 
 function createHarness(options: HarnessOptions = {}) {
@@ -633,7 +698,9 @@ function createHarness(options: HarnessOptions = {}) {
       : {})
   })
   const engine = new FakeRecognitionEngine()
-  const meetingEngine = new FakeRecognitionEngine()
+  const meetingEngines = options.meetingEngines ?? [new FakeRecognitionEngine()]
+  const meetingEngine = meetingEngines[0]!
+  let meetingEngineIndex = 0
   const translationPipeline = options.disableTranslationPipeline
     ? undefined
     : new FakeTranslationPipeline(options.translationResults, options.translationFailure)
@@ -668,12 +735,17 @@ function createHarness(options: HarnessOptions = {}) {
       getSettings: () => settings,
       resolveRuntimeConfig: () => meetingRuntimeConfig
     },
-    engineFactory: () => meetingEngine,
+    engineFactory: () => {
+      const nextEngine = meetingEngines[Math.min(meetingEngineIndex, meetingEngines.length - 1)]!
+      meetingEngineIndex += 1
+      return nextEngine
+    },
     captureWindowService: meetingCaptureWindowService,
     transcriptRepository,
     ...(translationPipeline ? { translationPipeline } : {}),
     now: () => 4000,
-    createSessionId: () => 'meeting-1'
+    createSessionId: () => 'meeting-1',
+    ...(options.recoveryTimeoutMs !== undefined ? { recoveryTimeoutMs: options.recoveryTimeoutMs } : {})
   })
 
   return {
@@ -682,6 +754,7 @@ function createHarness(options: HarnessOptions = {}) {
     meetingRuntimeConfig,
     engine,
     meetingEngine,
+    meetingEngines,
     captureTransport,
     captureWindowService,
     meetingCaptureTransport,
@@ -699,7 +772,14 @@ class FakeRecognitionEngine implements RecognitionEngine {
   readonly warmupCalls: Array<{ mode: 'ptt' | 'meeting'; language: string }> = []
   readonly startSessionCalls: Array<Parameters<RecognitionEngine['startSession']>[0]> = []
   readonly pushAudioCalls: Array<Parameters<RecognitionEngine['pushAudio']>[0]> = []
+  abortSessionCalls = 0
   private readonly listeners = new Set<(event: RecognitionEvent) => void>()
+
+  constructor(
+    private readonly options: {
+      startSessionFailure?: Error
+    } = {}
+  ) {}
 
   async getCapabilities(): Promise<EngineCapabilities> {
     return {
@@ -717,6 +797,9 @@ class FakeRecognitionEngine implements RecognitionEngine {
   }
 
   async startSession(input: Parameters<RecognitionEngine['startSession']>[0]): Promise<void> {
+    if (this.options.startSessionFailure) {
+      throw this.options.startSessionFailure
+    }
     this.startSessionCalls.push(input)
   }
 
@@ -726,7 +809,9 @@ class FakeRecognitionEngine implements RecognitionEngine {
 
   async stopSession(): Promise<void> {}
 
-  async abortSession(): Promise<void> {}
+  async abortSession(): Promise<void> {
+    this.abortSessionCalls += 1
+  }
 
   onEvent(listener: (event: RecognitionEvent) => void): () => void {
     this.listeners.add(listener)
@@ -831,6 +916,9 @@ function createFakeCaptureTransport() {
 }
 
 async function flushAsyncWork(): Promise<void> {
+  await Promise.resolve()
+  await Promise.resolve()
+  await Promise.resolve()
   await Promise.resolve()
   await Promise.resolve()
 }

@@ -38,6 +38,7 @@ export type MeetingCoordinatorDependencies = {
   }
   now?: () => number
   createSessionId?: () => string
+  recoveryTimeoutMs?: number
 }
 
 type MeetingSessionContext = {
@@ -57,6 +58,7 @@ type MeetingSessionContext = {
 export class MeetingCoordinator {
   private readonly now: () => number
   private readonly createSessionId: () => string
+  private readonly recoveryTimeoutMs: number
   private activeSession: MeetingSessionContext | null = null
   private activeEngineUnsubscribe: (() => void) | null = null
   private status: MeetingStatus = 'idle'
@@ -64,10 +66,13 @@ export class MeetingCoordinator {
   private readonly listeners = new Set<(snapshot: MeetingRuntimeSnapshot | null) => void>()
   private readonly notificationListeners = new Set<(notification: RuntimeNotification) => void>()
   private terminalSnapshot: MeetingRuntimeSnapshot | null = null
+  private recoveryPromise: Promise<void> | null = null
+  private recoveryReadySignal: { promise: Promise<void>; settle: () => void } | null = null
 
   constructor(private readonly dependencies: MeetingCoordinatorDependencies) {
     this.now = dependencies.now ?? Date.now
     this.createSessionId = dependencies.createSessionId ?? (() => `meeting-${this.now()}`)
+    this.recoveryTimeoutMs = dependencies.recoveryTimeoutMs ?? 5_000
     this.dependencies.captureWindowService.onEvent((event) => {
       void this.handleCaptureEvent(event)
     })
@@ -120,7 +125,6 @@ export class MeetingCoordinator {
       input
     )
     const includeMicrophone = input.includeMicrophone ?? settings.input.includeMicrophoneInMeeting
-    const sources = includeMicrophone ? (['system', 'microphone'] as const) : (['system'] as const)
     const engine = this.dependencies.engineFactory(runtimeConfig)
     const sessionId = this.createSessionId()
     const startedAt = this.now()
@@ -141,38 +145,10 @@ export class MeetingCoordinator {
       sessionId,
       mode: 'meeting'
     })
-
-    this.activeEngineUnsubscribe = engine.onEvent((event) => {
-      void this.handleEngineEvent(event)
-    })
+    this.attachEngine(engine)
 
     try {
-      await engine.warmup({
-        mode: 'meeting',
-        language: String(runtimeConfig.engineConfig.language)
-      })
-      await engine.startSession({
-        sessionId,
-        mode: 'meeting',
-        sources: [...sources],
-        language: String(runtimeConfig.engineConfig.language),
-        translation: {
-          enabled: Boolean(runtimeConfig.translationConfig) && runtimeConfig.engineProfile.capabilities.translation,
-          ...(runtimeConfig.translationConfig
-            ? {
-                targetLanguage: String(runtimeConfig.translationConfig.targetLanguage)
-              }
-            : {})
-        }
-      })
-
-      await this.dependencies.captureWindowService.startCapture({
-        requestId: sessionId,
-        sources: [...sources],
-        ...(includeMicrophone ? { microphoneDeviceId: settings.input.microphoneDeviceId } : {}),
-        sampleRate: runtimeConfig.captureConfig.sampleRate,
-        chunkMs: runtimeConfig.captureConfig.chunkMs
-      })
+      await this.startSessionRuntime(this.activeSession, settings.input.microphoneDeviceId)
     } catch (error) {
       await this.fail(error)
       throw error
@@ -208,13 +184,15 @@ export class MeetingCoordinator {
             sessionId: session.sessionId,
             profileId: session.runtimeConfig.engineProfile.id
           })
-          this.recoverIfNeeded()
+          if (this.status === 'recovering') {
+            this.recoveryReadySignal?.settle()
+            return
+          }
           if (this.status === 'preparing') {
             this.transition({ type: 'SESSION_READY' })
           }
           return
         case 'draft-updated':
-          this.recoverIfNeeded()
           session.transcript = reduceTranscript(session.transcript, {
             type: 'draft-updated',
             payload: event.payload
@@ -233,7 +211,6 @@ export class MeetingCoordinator {
           }
           return
         case 'block-committed':
-          this.recoverIfNeeded()
           session.transcript = reduceTranscript(session.transcript, {
             type: 'block-committed',
             payload: event.payload
@@ -260,7 +237,6 @@ export class MeetingCoordinator {
 
           return
         case 'translation-updated':
-          this.recoverIfNeeded()
           session.transcript = reduceTranscript(session.transcript, {
             type: 'translation-updated',
             payload: event.payload
@@ -278,14 +254,28 @@ export class MeetingCoordinator {
             level: event.payload.recoverable ? 'warning' : 'error',
             message: event.payload.message
           })
+          if (this.status === 'streaming' && event.payload.recoverable) {
+            this.transition({
+              type: 'ENGINE_WARNING',
+              recoverable: event.payload.recoverable
+            })
+            this.notify({
+              level: 'warning',
+              message: 'Attempting to recover the live session...'
+            })
+            await this.recoverSession(session)
+            return
+          }
+
           if (this.status === 'streaming') {
             this.transition({
               type: 'ENGINE_WARNING',
               recoverable: event.payload.recoverable
             })
-          } else {
-            this.emitSnapshot()
+            return
           }
+
+          this.emitSnapshot()
           return
         case 'error':
           await this.fail(event.payload)
@@ -432,6 +422,8 @@ export class MeetingCoordinator {
   private cleanupActiveSession(): void {
     this.activeEngineUnsubscribe?.()
     this.activeEngineUnsubscribe = null
+    this.recoveryPromise = null
+    this.recoveryReadySignal = null
     this.activeSession = null
   }
 
@@ -455,9 +447,114 @@ export class MeetingCoordinator {
     }
   }
 
-  private recoverIfNeeded(): void {
-    if (this.status === 'recovering') {
+  private attachEngine(engine: RecognitionEngine): void {
+    this.activeEngineUnsubscribe?.()
+    this.activeEngineUnsubscribe = engine.onEvent((event) => {
+      void this.handleEngineEvent(event)
+    })
+  }
+
+  private async startSessionRuntime(
+    session: MeetingSessionContext | null,
+    microphoneDeviceId: string,
+    restartCapture = true
+  ): Promise<void> {
+    if (!session) {
+      throw new Error('No active meeting session')
+    }
+
+    const sources = getMeetingSources(session.includeMicrophone)
+    await session.engine.warmup({
+      mode: 'meeting',
+      language: String(session.runtimeConfig.engineConfig.language)
+    })
+    await session.engine.startSession({
+      sessionId: session.sessionId,
+      mode: 'meeting',
+      sources,
+      language: String(session.runtimeConfig.engineConfig.language),
+      translation: {
+        enabled:
+          Boolean(session.runtimeConfig.translationConfig) &&
+          session.runtimeConfig.engineProfile.capabilities.translation,
+        ...(session.runtimeConfig.translationConfig
+          ? {
+              targetLanguage: String(session.runtimeConfig.translationConfig.targetLanguage)
+            }
+          : {})
+      }
+    })
+
+    if (restartCapture) {
+      await this.dependencies.captureWindowService.startCapture({
+        requestId: session.sessionId,
+        sources,
+        ...(session.includeMicrophone ? { microphoneDeviceId } : {}),
+        sampleRate: session.runtimeConfig.captureConfig.sampleRate,
+        chunkMs: session.runtimeConfig.captureConfig.chunkMs
+      })
+    }
+  }
+
+  private async recoverSession(session: MeetingSessionContext): Promise<void> {
+    if (this.recoveryPromise) {
+      await this.recoveryPromise
+      return
+    }
+
+    const recoveryReadySignal = createCompletionSignal()
+    this.recoveryReadySignal = recoveryReadySignal
+    const recoveryPromise = this.performRecovery(session, recoveryReadySignal).finally(() => {
+      if (this.recoveryPromise === recoveryPromise) {
+        this.recoveryPromise = null
+      }
+      if (this.recoveryReadySignal === recoveryReadySignal) {
+        this.recoveryReadySignal = null
+      }
+    })
+    this.recoveryPromise = recoveryPromise
+    await recoveryPromise
+  }
+
+  private async performRecovery(
+    session: MeetingSessionContext,
+    recoveryReadySignal: { promise: Promise<void>; settle: () => void }
+  ): Promise<void> {
+    try {
+      try {
+        await session.engine.abortSession()
+      } catch {
+        // best effort cleanup before replacement
+      }
+
+      const settings = this.dependencies.settingsProvider.getSettings()
+      const nextEngine = this.dependencies.engineFactory(session.runtimeConfig)
+      session.engine = nextEngine
+      this.attachEngine(nextEngine)
+
+      await this.startSessionRuntime(session, settings.input.microphoneDeviceId, false)
+      await waitForRecoveryReady(
+        recoveryReadySignal.promise,
+        this.recoveryTimeoutMs,
+        'Meeting recovery timed out before the engine became ready'
+      )
+
+      if (this.activeSession?.sessionId !== session.sessionId || this.status !== 'recovering') {
+        return
+      }
+
+      this.error = undefined
       this.transition({ type: 'RECOVERY_SUCCEEDED' })
+      this.notify({
+        level: 'info',
+        message: 'Live session recovered.'
+      })
+    } catch (error) {
+      if (this.activeSession?.sessionId !== session.sessionId) {
+        return
+      }
+
+      await this.fail(error)
     }
   }
 
@@ -597,6 +694,33 @@ function cloneMeetingSnapshot(snapshot: MeetingRuntimeSnapshot): MeetingRuntimeS
     ...snapshot,
     transcript: cloneTranscriptState(snapshot.transcript),
     ...(snapshot.error ? { error: { ...snapshot.error } } : {})
+  }
+}
+
+function getMeetingSources(includeMicrophone: boolean): Array<'system' | 'microphone'> {
+  return includeMicrophone ? ['system', 'microphone'] : ['system']
+}
+
+async function waitForRecoveryReady(
+  promise: Promise<void>,
+  timeoutMs: number,
+  message: string
+): Promise<void> {
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined
+
+  try {
+    await Promise.race([
+      promise,
+      new Promise<void>((_, reject) => {
+        timeoutHandle = setTimeout(() => {
+          reject(new Error(message))
+        }, timeoutMs)
+      })
+    ])
+  } finally {
+    if (timeoutHandle !== undefined) {
+      clearTimeout(timeoutHandle)
+    }
   }
 }
 
