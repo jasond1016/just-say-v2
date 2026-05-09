@@ -1,7 +1,7 @@
-import type { EngineProfile } from '../../shared/api-types'
+import type { EngineProfile, ResolvedRuntimeConfig } from '../../shared/api-types'
 import type { RecognitionEngine } from '../../core/contracts/engine'
 
-export type EngineFactory = (profile: EngineProfile) => RecognitionEngine
+export type EngineFactory = (config: ResolvedRuntimeConfig) => RecognitionEngine
 
 export class EngineRegistry {
   constructor(
@@ -22,7 +22,7 @@ export class EngineRegistry {
     return this.profiles.find((profile) => profile.id === profileId)
   }
 
-  createForProfile(profile: EngineProfile): RecognitionEngine {
-    return this.createEngine(profile)
+  createForRuntimeConfig(config: ResolvedRuntimeConfig): RecognitionEngine {
+    return this.createEngine(config)
   }
 }

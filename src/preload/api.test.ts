@@ -17,6 +17,8 @@ describe('createAppApi', () => {
         theme: 'light'
       }
     })
+    await api.listSpeechProfiles()
+    await api.testSpeechProfile('local-fast')
     await api.prewarmSession('meeting')
     await api.startPtt()
     await api.stopPtt()
@@ -43,6 +45,8 @@ describe('createAppApi', () => {
           }
         }
       ],
+      [IPC_CHANNELS.speechListProfiles],
+      [IPC_CHANNELS.speechTestProfile, 'local-fast'],
       [IPC_CHANNELS.sessionPrewarm, 'meeting'],
       [IPC_CHANNELS.sessionStartPtt],
       [IPC_CHANNELS.sessionStopPtt],

@@ -1,11 +1,13 @@
 import type {
   AppSettings,
   AppRuntimeSnapshot,
+  EngineProfile,
   ExportFormat,
   ExportResult,
   HistoryListQuery,
   HistorySearchQuery,
   PaginatedHistoryResult,
+  ProfileTestResult,
   SavedTranscript,
   StartMeetingCommand,
   SettingsPatch
@@ -17,6 +19,8 @@ export type AppApi = {
   getRuntime: () => Promise<AppRuntimeSnapshot>
   getSettings: () => Promise<AppSettings>
   updateSettings: (patch: SettingsPatch) => Promise<AppSettings>
+  listSpeechProfiles: () => Promise<EngineProfile[]>
+  testSpeechProfile: (profileId: string) => Promise<ProfileTestResult>
   prewarmSession: (mode: SessionMode) => Promise<void>
   startPtt: () => Promise<void>
   stopPtt: () => Promise<void>
@@ -36,6 +40,9 @@ export function createAppApi(invoke: IpcInvoke): AppApi {
     getRuntime: async () => invoke<AppRuntimeSnapshot>(IPC_CHANNELS.sessionGetRuntime),
     getSettings: async () => invoke<AppSettings>(IPC_CHANNELS.settingsGet),
     updateSettings: async (patch) => invoke<AppSettings>(IPC_CHANNELS.settingsUpdate, patch),
+    listSpeechProfiles: async () => invoke<EngineProfile[]>(IPC_CHANNELS.speechListProfiles),
+    testSpeechProfile: async (profileId) =>
+      invoke<ProfileTestResult>(IPC_CHANNELS.speechTestProfile, profileId),
     prewarmSession: async (mode) => invoke<void>(IPC_CHANNELS.sessionPrewarm, mode),
     startPtt: async () => invoke<void>(IPC_CHANNELS.sessionStartPtt),
     stopPtt: async () => invoke<void>(IPC_CHANNELS.sessionStopPtt),

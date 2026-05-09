@@ -89,6 +89,11 @@ describe('RuntimeStore', () => {
           experimentalFlags: []
         }
       }),
+      listSpeechProfiles: async () => [],
+      testSpeechProfile: async () => ({
+        ok: true,
+        profileId: 'local-fast'
+      }),
       prewarmSession: async () => undefined,
       startPtt: async () => undefined,
       stopPtt: async () => undefined,

@@ -37,6 +37,31 @@ export class SettingsService {
 
   async resolveRuntimeConfig(mode: SessionMode): Promise<ResolvedRuntimeConfig> {
     const settings = await this.getSettings()
+    return this.resolveRuntimeConfigForSettings(settings, mode)
+  }
+
+  async resolveProfileRuntimeConfig(
+    profileId: string,
+    mode: SessionMode
+  ): Promise<ResolvedRuntimeConfig> {
+    const settings = await this.getSettings()
+
+    return this.resolveRuntimeConfigForSettings(
+      {
+        ...settings,
+        speech: {
+          ...settings.speech,
+          selectedProfileId: profileId
+        }
+      },
+      mode
+    )
+  }
+
+  private resolveRuntimeConfigForSettings(
+    settings: AppSettings,
+    mode: SessionMode
+  ): ResolvedRuntimeConfig {
     const credentials = this.options.credentialsProvider?.()
     const platform = this.options.platformProvider?.()
 

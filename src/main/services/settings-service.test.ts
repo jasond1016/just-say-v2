@@ -64,4 +64,19 @@ describe('SettingsService', () => {
       }
     })
   })
+
+  it('resolves runtime config for an explicitly requested profile', async () => {
+    const repository = new InMemorySettingsRepository()
+    const service = new SettingsService(repository, {
+      credentialsProvider: () => ({
+        cloudApiKey: 'cloud-secret'
+      })
+    })
+
+    await expect(service.resolveProfileRuntimeConfig('cloud-low-cost', 'meeting')).resolves.toMatchObject({
+      engineProfile: {
+        id: 'cloud-low-cost'
+      }
+    })
+  })
 })

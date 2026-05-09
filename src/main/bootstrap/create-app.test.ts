@@ -24,6 +24,10 @@ describe('createApp', () => {
       delete: vi.fn().mockResolvedValue(false),
       export: vi.fn().mockResolvedValue({ ok: false, error: 'not implemented' })
     }
+    const speechService = {
+      listProfiles: vi.fn().mockResolvedValue([]),
+      testProfile: vi.fn().mockResolvedValue({ ok: true, profileId: 'local-fast' })
+    }
     const settingsService = {
       getSettings: vi.fn().mockResolvedValue({
         general: {
@@ -66,6 +70,7 @@ describe('createApp', () => {
       },
       services: {
         sessionCoordinator,
+        speechService,
         historyService,
         settingsService
       },
@@ -87,6 +92,8 @@ describe('createApp', () => {
       'session.stopPtt',
       'session.startMeeting',
       'session.stopMeeting',
+      'speech.listProfiles',
+      'speech.testProfile',
       'history.list',
       'history.search',
       'history.get',

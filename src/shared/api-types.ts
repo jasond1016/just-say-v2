@@ -51,6 +51,8 @@ export type EngineProfile = {
   preset: EngineProfilePreset
 }
 
+export type LocalServiceStatus = 'stopped' | 'starting' | 'healthy' | 'degraded' | 'failed'
+
 export type TranscriptBlock = {
   id: string
   source: CaptureSource
@@ -260,6 +262,14 @@ export type ExportResult = {
   error?: string
 }
 
+export type ProfileTestResult = {
+  ok: boolean
+  profileId: string
+  capabilities?: EngineCapabilities
+  localService?: LocalServiceStatus
+  error?: AppErrorPayload
+}
+
 export type StartMeetingCommand = {
   includeMicrophone?: boolean
   translationEnabled?: boolean
@@ -290,6 +300,6 @@ export type AppRuntimeSnapshot = {
     translationEnabled: boolean
   } | null
   services: {
-    localService: 'stopped' | 'starting' | 'healthy' | 'degraded' | 'failed'
+    localService: LocalServiceStatus
   }
 }

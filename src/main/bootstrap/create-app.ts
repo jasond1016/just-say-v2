@@ -2,13 +2,16 @@ import { createHistoryHandlers } from '../ipc/history-handlers'
 import { registerIpcHandlers, type IpcRegistrar } from '../ipc/register-ipc'
 import { createSessionHandlers } from '../ipc/session-handlers'
 import { createSettingsHandlers } from '../ipc/settings-handlers'
+import { createSpeechHandlers } from '../ipc/speech-handlers'
 import { createWindows, type AppWindows, type CreateWindowsOptions } from './create-windows'
 import type { HistoryHandlerService } from '../ipc/history-handlers'
 import type { SessionHandlerService } from '../ipc/session-handlers'
 import type { SettingsHandlerService } from '../ipc/settings-handlers'
+import type { SpeechHandlerService } from '../ipc/speech-handlers'
 
 export type CreateAppServices = {
   sessionCoordinator: SessionHandlerService
+  speechService: SpeechHandlerService
   historyService: HistoryHandlerService
   settingsService: SettingsHandlerService
 }
@@ -27,6 +30,7 @@ export async function createApp(options: CreateAppOptions): Promise<AppBootstrap
   registerIpcHandlers(
     options.registrar,
     createSessionHandlers(options.services.sessionCoordinator),
+    createSpeechHandlers(options.services.speechService),
     createHistoryHandlers(options.services.historyService),
     createSettingsHandlers(options.services.settingsService)
   )

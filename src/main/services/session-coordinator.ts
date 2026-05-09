@@ -1,4 +1,4 @@
-import type { AppRuntimeSnapshot, StartMeetingCommand } from '../../shared/api-types'
+import type { AppRuntimeSnapshot, LocalServiceStatus, StartMeetingCommand } from '../../shared/api-types'
 import type { SessionMode } from '../../shared/primitive-types'
 import { INITIAL_RUNTIME_SNAPSHOT } from '../../shared/runtime-snapshot'
 import type { MeetingCoordinator } from './meeting-coordinator'
@@ -97,5 +97,15 @@ export class SessionCoordinator {
 
   async stopMeeting(): Promise<void> {
     await this.meetingCoordinator.stop()
+  }
+
+  setLocalServiceStatus(status: LocalServiceStatus): void {
+    this.snapshot = {
+      ...this.snapshot,
+      services: {
+        ...this.snapshot.services,
+        localService: status
+      }
+    }
   }
 }
