@@ -48,25 +48,15 @@ export class LocalEngineAdapter implements RecognitionEngine {
     const socket = await this.connect(this.getSocketUrl())
     this.socket = socket
     this.activeSession = input
+    const nativeTranslationEnabled = input.translation.enabled && this.config.engineProfile.capabilities.translation
 
     this.send({
       type: 'start-session',
       sessionId: input.sessionId,
       mode: input.mode,
       language: input.language,
-      translationEnabled: input.translation.enabled
+      translationEnabled: nativeTranslationEnabled
     })
-
-    if (input.translation.enabled) {
-      this.emit({
-        type: 'warning',
-        payload: {
-          code: 'W_TRANSLATION_DISABLED',
-          message: 'Local SenseVoice service is running without cloud translation.',
-          recoverable: true
-        }
-      })
-    }
   }
 
   pushAudio(chunk: Parameters<RecognitionEngine['pushAudio']>[0]): void {

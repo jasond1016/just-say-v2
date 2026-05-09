@@ -205,10 +205,19 @@ export type AppSettings = {
 
 export type SettingsPatch = DeepPartial<AppSettings>
 
+export type TranslationRuntimeConfig = {
+  provider: TranslationProvider
+  targetLanguage: string
+  sourceLanguage: SpeechLanguage
+  credentials: {
+    translationApiKey: string
+  }
+}
+
 export type ResolvedRuntimeConfig = {
   engineProfile: EngineProfile
   engineConfig: Record<string, unknown>
-  translationConfig?: Record<string, unknown>
+  translationConfig?: TranslationRuntimeConfig
   captureConfig: {
     sampleRate: 16000
     chunkMs: 100

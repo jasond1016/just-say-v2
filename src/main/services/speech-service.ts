@@ -1,21 +1,10 @@
-import type { AppErrorPayload, EngineProfile, ProfileTestResult } from '../../shared/api-types'
+import type { AppErrorPayload, EngineProfile, ProfileTestResult, ResolvedRuntimeConfig } from '../../shared/api-types'
 import type { SessionMode } from '../../shared/primitive-types'
 import type { EngineRegistry } from './engine-registry'
 import type { LocalServiceSupervisor } from './local-service-supervisor'
 
 export interface RuntimeConfigResolver {
-  resolveProfileRuntimeConfig(profileId: string, mode: SessionMode): Promise<{
-    engineProfile: EngineProfile
-    engineConfig: Record<string, unknown>
-    translationConfig?: Record<string, unknown>
-    captureConfig: {
-      sampleRate: 16000
-      chunkMs: 100
-    }
-    outputConfig: {
-      method: 'simulate_input' | 'clipboard' | 'popup'
-    }
-  }>
+  resolveProfileRuntimeConfig(profileId: string, mode: SessionMode): Promise<ResolvedRuntimeConfig>
 }
 
 export class SpeechService {

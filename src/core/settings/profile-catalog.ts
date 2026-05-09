@@ -8,7 +8,7 @@ export const profileCatalog = [
     preset: 'local-fast',
     capabilities: {
       streaming: true,
-      translation: true,
+      translation: false,
       wordTiming: true,
       speakerSeparation: false,
       requiresNetwork: false,
@@ -22,7 +22,7 @@ export const profileCatalog = [
     preset: 'local-accurate',
     capabilities: {
       streaming: true,
-      translation: true,
+      translation: false,
       wordTiming: true,
       speakerSeparation: true,
       requiresNetwork: false,
@@ -36,7 +36,7 @@ export const profileCatalog = [
     preset: 'cloud-low-latency',
     capabilities: {
       streaming: true,
-      translation: true,
+      translation: false,
       wordTiming: true,
       speakerSeparation: true,
       requiresNetwork: true,
@@ -50,7 +50,7 @@ export const profileCatalog = [
     preset: 'cloud-low-cost',
     capabilities: {
       streaming: true,
-      translation: true,
+      translation: false,
       wordTiming: false,
       speakerSeparation: false,
       requiresNetwork: true,

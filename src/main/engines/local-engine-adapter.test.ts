@@ -168,12 +168,8 @@ describe('LocalEngineAdapter', () => {
     })
   })
 
-  it('warns when translation is requested but unavailable in the local service', async () => {
+  it('keeps native translation disabled for local service sessions', async () => {
     const harness = createHarness()
-    const seenEvents: RecognitionEvent[] = []
-    harness.engine.onEvent((event) => {
-      seenEvents.push(event)
-    })
 
     await harness.engine.startSession({
       sessionId: 'session-1',
@@ -186,13 +182,12 @@ describe('LocalEngineAdapter', () => {
       }
     })
 
-    expect(seenEvents).toContainEqual({
-      type: 'warning',
-      payload: {
-        code: 'W_TRANSLATION_DISABLED',
-        message: 'Local SenseVoice service is running without cloud translation.',
-        recoverable: true
-      }
+    expect(harness.socket.sentMessages).toContainEqual({
+      type: 'start-session',
+      sessionId: 'session-1',
+      mode: 'ptt',
+      language: 'auto',
+      translationEnabled: false
     })
   })
 })

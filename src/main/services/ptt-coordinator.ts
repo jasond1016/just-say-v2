@@ -15,6 +15,7 @@ import type {
 } from '../../core/contracts/engine'
 import { transitionPttStatus } from '../../core/session/session-machine'
 import type { CaptureWindowService } from '../platform/capture-window-service'
+import type { TranslationPipeline } from './translation-pipeline'
 
 export type PttRuntimeSnapshot = {
   status:
@@ -54,6 +55,7 @@ export type PttCoordinatorDependencies = {
   captureWindowService: CaptureWindowService
   transcriptRepository: TranscriptRepositoryLike
   outputDispatcher: OutputDispatcherLike
+  translationPipeline?: Pick<TranslationPipeline, 'translateBlock'>
   diagnostics?: {
     record(event: DiagnosticEvent): void
   }
@@ -170,7 +172,7 @@ export class PttCoordinator {
         sources: ['microphone'],
         language: String(runtimeConfig.engineConfig.language),
         translation: {
-          enabled: Boolean(runtimeConfig.translationConfig),
+          enabled: Boolean(runtimeConfig.translationConfig) && runtimeConfig.engineProfile.capabilities.translation,
           ...(runtimeConfig.translationConfig
             ? {
                 targetLanguage: String(runtimeConfig.translationConfig.targetLanguage)
@@ -221,7 +223,12 @@ export class PttCoordinator {
         case 'warning':
           return
         case 'session-ended':
-          if (this.status === 'post_processing' && session.finalText) {
+          if (
+            this.status === 'post_processing' &&
+            session.finalText &&
+            session.runtimeConfig.translationConfig &&
+            session.runtimeConfig.engineProfile.capabilities.translation
+          ) {
             this.dependencies.diagnostics?.record({
               type: 'translation-failed',
               timestamp: this.now(),
@@ -253,6 +260,11 @@ export class PttCoordinator {
           }
 
           if (session.runtimeConfig.translationConfig) {
+            if (session.runtimeConfig.engineProfile.capabilities.translation) {
+              return
+            }
+
+            await this.translateCommittedBlock(session, event.payload.block)
             return
           }
 
@@ -314,6 +326,55 @@ export class PttCoordinator {
     }
 
     session.translatedText = payload.translatedText
+  }
+
+  private async translateCommittedBlock(
+    session: PttSessionContext,
+    block: SavedTranscript['blocks'][number]
+  ): Promise<void> {
+    if (!session.runtimeConfig.translationConfig || !this.dependencies.translationPipeline) {
+      this.notify({
+        level: 'warning',
+        message: 'Translation is enabled but no translation pipeline is configured. Delivered the original transcript instead.'
+      })
+      this.transition({ type: 'SKIP_TRANSLATION' })
+      await this.finalizeAndDeliver()
+      return
+    }
+
+    try {
+      const translation = await this.dependencies.translationPipeline.translateBlock({
+        runtimeConfig: session.runtimeConfig,
+        block
+      })
+
+      if (this.activeSession?.sessionId !== session.sessionId) {
+        return
+      }
+
+      this.applyTranslationUpdate(session, translation)
+      if (this.status === 'post_processing' && session.translatedText) {
+        this.transition({ type: 'TRANSLATION_DONE' })
+        await this.finalizeAndDeliver()
+      }
+    } catch (errorLike) {
+      if (this.activeSession?.sessionId !== session.sessionId) {
+        return
+      }
+
+      this.dependencies.diagnostics?.record({
+        type: 'translation-failed',
+        timestamp: this.now(),
+        sessionId: session.sessionId,
+        reason: errorLike instanceof Error ? errorLike.message : 'Unknown translation failure'
+      })
+      this.notify({
+        level: 'warning',
+        message: 'Translation failed. Delivered the original transcript instead.'
+      })
+      this.transition({ type: 'SKIP_TRANSLATION' })
+      await this.finalizeAndDeliver()
+    }
   }
 
   private async finalizeAndDeliver(): Promise<void> {

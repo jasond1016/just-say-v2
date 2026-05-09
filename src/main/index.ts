@@ -29,6 +29,7 @@ import { SessionCoordinator } from './services/session-coordinator'
 import { SettingsService } from './services/settings-service'
 import { SpeechService } from './services/speech-service'
 import { PythonLocalServiceController } from './services/python-local-service-controller'
+import { TranslationPipeline } from './services/translation-pipeline'
 
 void wireAppLifecycle(app, {
   onReady: async () => {
@@ -109,12 +110,14 @@ void wireAppLifecycle(app, {
       resolveProfileRuntimeConfig: (profileId, mode) =>
         baseSettingsService.resolveProfileRuntimeConfig(profileId, mode)
     })
+    const translationPipeline = new TranslationPipeline()
     const pttCoordinator = new PttCoordinator({
       settingsProvider,
       engineFactory: (config) => engineRegistry.createForRuntimeConfig(config),
       captureWindowService,
       transcriptRepository,
       outputDispatcher,
+      translationPipeline,
       diagnostics: diagnosticsService
     })
     const meetingCoordinator = new MeetingCoordinator({
@@ -122,6 +125,7 @@ void wireAppLifecycle(app, {
       engineFactory: (config) => engineRegistry.createForRuntimeConfig(config),
       captureWindowService,
       transcriptRepository,
+      translationPipeline,
       diagnostics: diagnosticsService
     })
     const sessionCoordinator = new SessionCoordinator(pttCoordinator, meetingCoordinator)

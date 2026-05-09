@@ -3,7 +3,8 @@ import type {
   AppErrorPayload,
   AppSettings,
   EngineProfile,
-  ResolvedRuntimeConfig
+  ResolvedRuntimeConfig,
+  TranslationRuntimeConfig
 } from '../../shared/api-types'
 import type { SessionMode } from '../../shared/primitive-types'
 import { getProfileById, profileCatalog } from './profile-catalog'
@@ -90,9 +91,9 @@ export function resolveRuntimeConfig(input: ResolveRuntimeConfigInput): Resolved
             targetLanguage: settings.translation.targetLanguage,
             sourceLanguage: settings.speech.language,
             credentials: {
-              translationApiKey: input.credentials?.translationApiKey
+              translationApiKey: input.credentials!.translationApiKey!
             }
-          }
+          } satisfies TranslationRuntimeConfig
         }
       : {}),
     captureConfig: DEFAULT_CAPTURE_CONFIG,
@@ -166,15 +167,6 @@ function assertCredentialAvailability(
 
   if (!translationEnabled) {
     return
-  }
-
-  if (!profile.capabilities.translation) {
-    throw createSettingsResolverError(
-      'E_INVALID_SETTINGS',
-      `Profile "${profile.id}" does not support translation`,
-      false,
-      { profileId: profile.id, mode }
-    )
   }
 
   if (!credentials?.translationApiKey) {

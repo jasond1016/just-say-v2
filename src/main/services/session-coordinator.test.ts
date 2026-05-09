@@ -7,6 +7,7 @@ import type {
   CaptureEvent,
   EngineCapabilities,
   OutputMethod,
+  ResolvedRuntimeConfig,
   SavedTranscript
 } from '../../shared/api-types'
 import type { RecognitionEngine, RecognitionEvent } from '../../core/contracts/engine'
@@ -160,6 +161,9 @@ describe('SessionCoordinator + PTTCoordinator', () => {
           enabledForPtt: true,
           targetLanguage: 'ja'
         }
+      },
+      translationResults: {
+        'block-1': 'こんにちは世界'
       }
     })
 
@@ -183,13 +187,6 @@ describe('SessionCoordinator + PTTCoordinator', () => {
         }
       }
     })
-    harness.engine.emit({
-      type: 'translation-updated',
-      payload: {
-        blockId: 'block-1',
-        translatedText: 'こんにちは世界'
-      }
-    })
     await stopPromise
 
     expect(harness.outputDispatcher.deliveries).toEqual([
@@ -203,6 +200,25 @@ describe('SessionCoordinator + PTTCoordinator', () => {
       translatedPlainText: 'こんにちは世界',
       targetLanguage: 'ja'
     })
+    expect(harness.engine.startSessionCalls).toEqual([
+      {
+        sessionId: 'ptt-1',
+        mode: 'ptt',
+        sources: ['microphone'],
+        language: 'auto',
+        translation: {
+          enabled: false,
+          targetLanguage: 'ja'
+        }
+      }
+    ])
+    expect(harness.translationPipeline?.calls).toEqual([
+      {
+        blockId: 'block-1',
+        text: 'hello world',
+        targetLanguage: 'ja'
+      }
+    ])
   })
 
   it('falls back to idle with an error snapshot when engine delivery fails', async () => {
@@ -256,6 +272,9 @@ describe('SessionCoordinator + PTTCoordinator', () => {
           enabledForMeeting: true,
           targetLanguage: 'en'
         }
+      },
+      translationResults: {
+        'draft-1': '你好，世界'
       }
     })
     const chunk = new Uint8Array([9, 8, 7])
@@ -298,13 +317,7 @@ describe('SessionCoordinator + PTTCoordinator', () => {
         }
       }
     })
-    harness.meetingEngine.emit({
-      type: 'translation-updated',
-      payload: {
-        blockId: 'draft-1',
-        translatedText: '你好，世界'
-      }
-    })
+    await flushAsyncWork()
 
     const streamingSnapshot = harness.sessionCoordinator.getRuntimeSnapshot()
     expect(streamingSnapshot.liveSession).toMatchObject({
@@ -313,6 +326,18 @@ describe('SessionCoordinator + PTTCoordinator', () => {
       engineProfileId: 'local-fast',
       translationEnabled: true
     })
+    expect(harness.meetingEngine.startSessionCalls).toEqual([
+      {
+        sessionId: 'meeting-1',
+        mode: 'meeting',
+        sources: ['system', 'microphone'],
+        language: 'auto',
+        translation: {
+          enabled: false,
+          targetLanguage: 'en'
+        }
+      }
+    ])
     expect(streamingSnapshot.liveSession?.transcript).toMatchObject({
       committedBlocks: [
         {
@@ -332,6 +357,11 @@ describe('SessionCoordinator + PTTCoordinator', () => {
         timestamp: 3333
       }
     ])
+    expect(harness.translationPipeline?.calls).toContainEqual({
+      blockId: 'draft-1',
+      text: 'hello world',
+      targetLanguage: 'en'
+    })
 
     const stopPromise = harness.sessionCoordinator.stopMeeting()
     harness.meetingEngine.emit({
@@ -402,7 +432,7 @@ describe('SessionCoordinator + PTTCoordinator', () => {
     expect(harness.settings.translation.targetLanguage).toBe('en')
   })
 
-  it('falls back to the original PTT transcript when translation never arrives', async () => {
+  it('falls back to the original PTT transcript when cloud translation fails', async () => {
     const harness = createHarness({
       settings: {
         ...DEFAULT_SETTINGS,
@@ -411,7 +441,8 @@ describe('SessionCoordinator + PTTCoordinator', () => {
           enabledForPtt: true,
           targetLanguage: 'ja'
         }
-      }
+      },
+      translationFailure: new Error('Translation upstream unavailable')
     })
 
     await harness.sessionCoordinator.startPtt()
@@ -434,9 +465,6 @@ describe('SessionCoordinator + PTTCoordinator', () => {
         }
       }
     })
-    harness.engine.emit({
-      type: 'session-ended'
-    })
     await stopPromise
 
     expect(harness.outputDispatcher.deliveries).toEqual([
@@ -449,6 +477,9 @@ describe('SessionCoordinator + PTTCoordinator', () => {
       text: 'hello world',
       deliveredAt: 2000,
       deliveryMethod: 'simulate_input'
+    })
+    expect(harness.transcriptRepository.savedTranscripts[0]).toMatchObject({
+      plainText: 'hello world'
     })
   })
 
@@ -571,6 +602,9 @@ type HarnessOptions = {
   settings?: AppSettings
   outputFailure?: Error
   transcriptSaveFailure?: Error
+  translationFailure?: Error
+  translationResults?: Record<string, string>
+  disableTranslationPipeline?: boolean
 }
 
 function createHarness(options: HarnessOptions = {}) {
@@ -599,6 +633,9 @@ function createHarness(options: HarnessOptions = {}) {
   })
   const engine = new FakeRecognitionEngine()
   const meetingEngine = new FakeRecognitionEngine()
+  const translationPipeline = options.disableTranslationPipeline
+    ? undefined
+    : new FakeTranslationPipeline(options.translationResults, options.translationFailure)
   const captureTransport = createFakeCaptureTransport()
   const captureWindowService = new CaptureWindowService(captureTransport, {
     createRequestId: () => 'ptt-1',
@@ -621,6 +658,7 @@ function createHarness(options: HarnessOptions = {}) {
     captureWindowService,
     transcriptRepository,
     outputDispatcher,
+    ...(translationPipeline ? { translationPipeline } : {}),
     now: () => 2000,
     createSessionId: () => 'ptt-1'
   })
@@ -632,6 +670,7 @@ function createHarness(options: HarnessOptions = {}) {
     engineFactory: () => meetingEngine,
     captureWindowService: meetingCaptureWindowService,
     transcriptRepository,
+    ...(translationPipeline ? { translationPipeline } : {}),
     now: () => 4000,
     createSessionId: () => 'meeting-1'
   })
@@ -648,6 +687,7 @@ function createHarness(options: HarnessOptions = {}) {
     meetingCaptureWindowService,
     transcriptRepository,
     outputDispatcher,
+    translationPipeline,
     pttCoordinator,
     meetingCoordinator,
     sessionCoordinator: new SessionCoordinator(pttCoordinator, meetingCoordinator)
@@ -663,7 +703,7 @@ class FakeRecognitionEngine implements RecognitionEngine {
   async getCapabilities(): Promise<EngineCapabilities> {
     return {
       streaming: true,
-      translation: true,
+      translation: false,
       wordTiming: false,
       speakerSeparation: false,
       requiresNetwork: false,
@@ -730,6 +770,37 @@ class FakeOutputDispatcher {
 
     return {
       methodUsed: input.method
+    }
+  }
+}
+
+class FakeTranslationPipeline {
+  readonly calls: Array<{ blockId: string; text: string; targetLanguage: string }> = []
+
+  constructor(
+    private readonly results: Record<string, string> = {},
+    private readonly failure?: Error
+  ) {}
+
+  async translateBlock(input: {
+    runtimeConfig: ResolvedRuntimeConfig
+    block: SavedTranscript['blocks'][number]
+  }): Promise<{ blockId: string; translatedText: string }> {
+    const targetLanguage = input.runtimeConfig.translationConfig?.targetLanguage ?? ''
+    this.calls.push({
+      blockId: input.block.id,
+      text: input.block.text,
+      targetLanguage
+    })
+    await Promise.resolve()
+
+    if (this.failure) {
+      throw this.failure
+    }
+
+    return {
+      blockId: input.block.id,
+      translatedText: this.results[input.block.id] ?? `translated:${input.block.text}`
     }
   }
 }

@@ -2,7 +2,7 @@
 
 ## 1. 文档目的
 
-本文件是 [`docs/rebuild-v2-blueprint.md`](D:\my_projects\JustSay\docs\rebuild-v2-blueprint.md) 的工程化延伸。
+本文件是 [`docs/rebuild-v2-blueprint.md`](./rebuild-v2-blueprint.md) 的工程化延伸。
 
 蓝图回答“做什么”和“为什么这样做”，本文件回答：
 
@@ -254,6 +254,18 @@ export type EngineCapabilities = {
 }
 ```
 
+这里的 `translation` 明确表示“引擎原生翻译能力”。
+
+它只决定：
+
+1. 识别引擎是否会自己发出翻译事件
+2. `startSession` 是否需要把翻译请求下发给引擎
+
+它不决定：
+
+1. 产品层是否允许启用翻译
+2. 本地 ASR 是否可以接云翻译 provider
+
 ### 6.3 引擎配置
 
 ```ts
@@ -409,7 +421,22 @@ export type SavedTranscript = {
 2. 暴露 profile catalog
 3. 隐藏 provider 实现差异
 
-### 7.6 `LocalServiceSupervisor`
+### 7.6 `TranslationPipeline`
+
+职责：
+
+1. 接收 committed transcript block
+2. 按 `translationConfig` 选择 cloud translation provider
+3. 将翻译结果转换成统一 `translation-updated` 事件
+4. 翻译失败时只记录诊断并返回非阻塞错误
+
+原则：
+
+1. Translation 是独立流水线，不依赖 ASR profile 是否原生支持翻译
+2. V2 首先保证 committed-block translation；draft translation 为可选增强
+3. 允许“本地转录 + 云翻译”这种交叉组合
+
+### 7.7 `LocalServiceSupervisor`
 
 职责：
 
@@ -426,7 +453,7 @@ export type SavedTranscript = {
 4. `degraded`
 5. `failed`
 
-### 7.7 `OutputDispatcher`
+### 7.8 `OutputDispatcher`
 
 职责：
 
@@ -525,6 +552,12 @@ export type BlockCommittedPayload = {
 2. 不把 preview/final 的判定责任交给 UI
 3. `blockId` 在同一 session 内稳定
 4. commit 后的 block 不再改写
+
+说明：
+
+1. `translation-updated` 既可以来自支持原生翻译的识别引擎
+2. 也可以来自独立 `TranslationPipeline`
+3. UI 和 reducer 不区分来源，只消费统一事件
 
 ---
 
@@ -719,6 +752,7 @@ export type AppSettings = {
 2. profile catalog
 3. secure store 中的凭证
 4. 当前平台能力
+5. translation provider 运行时参数
 
 解析成：
 
@@ -726,7 +760,14 @@ export type AppSettings = {
 export type ResolvedRuntimeConfig = {
   engineProfile: EngineProfile
   engineConfig: Record<string, unknown>
-  translationConfig?: Record<string, unknown>
+  translationConfig?: {
+    provider: 'openai-compatible'
+    targetLanguage: string
+    sourceLanguage: 'auto' | 'zh' | 'en' | 'ja' | 'ko'
+    credentials: {
+      translationApiKey: string
+    }
+  }
   captureConfig: {
     sampleRate: 16000
     chunkMs: 100
@@ -736,6 +777,13 @@ export type ResolvedRuntimeConfig = {
   }
 }
 ```
+
+关键规则：
+
+1. `engineProfile` 只决定 ASR 路径
+2. `translationConfig` 只决定翻译路径
+3. translation enablement 不再依赖 `engineProfile.capabilities.translation`
+4. 若引擎无原生翻译能力，则由独立 translation pipeline 处理 committed block
 
 ---
 

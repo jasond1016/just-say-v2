@@ -13,6 +13,7 @@ import { transcriptReducer, INITIAL_TRANSCRIPT_STATE } from '../../core/transcri
 import type { TranscriptEvent } from '../../core/transcript/transcript-types'
 import type { CaptureWindowService } from '../platform/capture-window-service'
 import type { SettingsProvider, TranscriptRepositoryLike } from './ptt-coordinator'
+import type { TranslationPipeline } from './translation-pipeline'
 
 export type MeetingRuntimeSnapshot = {
   sessionId: string
@@ -30,6 +31,7 @@ export type MeetingCoordinatorDependencies = {
   engineFactory: (config: ResolvedRuntimeConfig) => RecognitionEngine
   captureWindowService: CaptureWindowService
   transcriptRepository: TranscriptRepositoryLike
+  translationPipeline?: Pick<TranslationPipeline, 'translateBlock'>
   diagnostics?: {
     record(event: DiagnosticEvent): void
   }
@@ -44,6 +46,7 @@ type MeetingSessionContext = {
   includeMicrophone: boolean
   engine: RecognitionEngine
   transcript: TranscriptState
+  pendingTranslations: Set<Promise<void>>
   completion: {
     promise: Promise<void>
     settle: () => void
@@ -128,6 +131,7 @@ export class MeetingCoordinator {
       includeMicrophone,
       engine,
       transcript: INITIAL_TRANSCRIPT_STATE,
+      pendingTranslations: new Set(),
       completion: createCompletionSignal()
     }
     this.dependencies.diagnostics?.record({
@@ -152,7 +156,7 @@ export class MeetingCoordinator {
         sources: [...sources],
         language: String(runtimeConfig.engineConfig.language),
         translation: {
-          enabled: Boolean(runtimeConfig.translationConfig),
+          enabled: Boolean(runtimeConfig.translationConfig) && runtimeConfig.engineProfile.capabilities.translation,
           ...(runtimeConfig.translationConfig
             ? {
                 targetLanguage: String(runtimeConfig.translationConfig.targetLanguage)
@@ -245,6 +249,14 @@ export class MeetingCoordinator {
           } else {
             this.emitSnapshot()
           }
+
+          if (
+            session.runtimeConfig.translationConfig &&
+            !session.runtimeConfig.engineProfile.capabilities.translation
+          ) {
+            this.startTranslationTask(session, event.payload.block)
+          }
+
           return
         case 'translation-updated':
           this.recoverIfNeeded()
@@ -318,6 +330,7 @@ export class MeetingCoordinator {
 
   private async persistAndComplete(): Promise<void> {
     const session = this.requireActiveSession()
+    await Promise.allSettled([...session.pendingTranslations])
     const endedAt = this.now()
     const plainText = session.transcript.committedBlocks.map((block) => block.text).join('\n')
     const translatedPlainText = session.transcript.committedBlocks
@@ -470,6 +483,62 @@ export class MeetingCoordinator {
 
     return this.activeSession
   }
+
+  private startTranslationTask(
+    session: MeetingSessionContext,
+    block: TranscriptState['committedBlocks'][number]
+  ): void {
+    const task = this.translateCommittedBlock(session, block)
+    session.pendingTranslations.add(task)
+    void task.finally(() => {
+      session.pendingTranslations.delete(task)
+    })
+  }
+
+  private async translateCommittedBlock(
+    session: MeetingSessionContext,
+    block: TranscriptState['committedBlocks'][number]
+  ): Promise<void> {
+    if (!session.runtimeConfig.translationConfig || !this.dependencies.translationPipeline) {
+      this.notify({
+        level: 'warning',
+        message: 'Translation is enabled but no translation pipeline is configured. Continuing without translated text.'
+      })
+      return
+    }
+
+    try {
+      const translation = await this.dependencies.translationPipeline.translateBlock({
+        runtimeConfig: session.runtimeConfig,
+        block
+      })
+
+      if (this.activeSession?.sessionId !== session.sessionId) {
+        return
+      }
+
+      session.transcript = reduceTranscript(session.transcript, {
+        type: 'translation-updated',
+        payload: translation
+      })
+      this.emitSnapshot()
+    } catch (errorLike) {
+      if (this.activeSession?.sessionId !== session.sessionId) {
+        return
+      }
+
+      this.dependencies.diagnostics?.record({
+        type: 'translation-failed',
+        timestamp: this.now(),
+        sessionId: session.sessionId,
+        reason: errorLike instanceof Error ? errorLike.message : 'Unknown translation failure'
+      })
+      this.notify({
+        level: 'warning',
+        message: 'Translation failed for one transcript block. Continuing with the original transcript.'
+      })
+    }
+  }
 }
 
 function reduceTranscript(state: TranscriptState, event: TranscriptEvent): TranscriptState {
@@ -481,8 +550,9 @@ function applyMeetingOverrides(
   input: StartMeetingCommand
 ): ResolvedRuntimeConfig {
   const translationEnabled = input.translationEnabled ?? Boolean(runtimeConfig.translationConfig)
+  const baseTranslationConfig = runtimeConfig.translationConfig
 
-  if (!translationEnabled) {
+  if (!translationEnabled || !baseTranslationConfig) {
     return {
       engineProfile: runtimeConfig.engineProfile,
       engineConfig: { ...runtimeConfig.engineConfig },
@@ -491,20 +561,13 @@ function applyMeetingOverrides(
     }
   }
 
-  const baseTranslationConfig = runtimeConfig.translationConfig
-
   return {
     ...runtimeConfig,
     engineConfig: { ...runtimeConfig.engineConfig },
     captureConfig: { ...runtimeConfig.captureConfig },
     outputConfig: { ...runtimeConfig.outputConfig },
     translationConfig: {
-      ...(baseTranslationConfig ? { ...baseTranslationConfig } : {}),
-      ...(baseTranslationConfig
-        ? {}
-        : {
-            sourceLanguage: String(runtimeConfig.engineConfig.language)
-          }),
+      ...baseTranslationConfig,
       ...(input.targetLanguage ? { targetLanguage: input.targetLanguage } : {})
     }
   }

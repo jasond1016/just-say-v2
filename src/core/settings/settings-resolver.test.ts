@@ -155,41 +155,25 @@ describe('resolveRuntimeConfig', () => {
     ).toThrowError(SettingsResolverError)
   })
 
-  it('throws when translation is enabled but the profile cannot translate', () => {
-    const baseProfile = profileCatalog[0]
-
-    expect(baseProfile).toBeDefined()
-
-    const nonTranslatingProfile: EngineProfile = {
-      id: 'custom-no-translation',
-      label: baseProfile!.label,
-      kind: baseProfile!.kind,
-      preset: baseProfile!.preset,
-      capabilities: {
-        ...baseProfile!.capabilities,
-        translation: false
+  it('allows translation with a non-translating recognition profile', () => {
+    const config = resolveRuntimeConfig({
+      settings: {
+        ...DEFAULT_SETTINGS,
+        translation: {
+          ...DEFAULT_SETTINGS.translation,
+          enabledForPtt: true
+        }
+      },
+      mode: 'ptt',
+      credentials: {
+        translationApiKey: 'translation-secret'
       }
-    }
+    })
 
-    expect(() =>
-      resolveRuntimeConfig({
-        settings: {
-          ...DEFAULT_SETTINGS,
-          speech: {
-            ...DEFAULT_SETTINGS.speech,
-            selectedProfileId: 'custom-no-translation'
-          },
-          translation: {
-            ...DEFAULT_SETTINGS.translation,
-            enabledForPtt: true
-          }
-        },
-        mode: 'ptt',
-        credentials: {
-          translationApiKey: 'translation-secret'
-        },
-        profiles: [nonTranslatingProfile]
-      })
-    ).toThrowError(SettingsResolverError)
+    expect(config.engineProfile.capabilities.translation).toBe(false)
+    expect(config.translationConfig).toMatchObject({
+      provider: 'openai-compatible',
+      targetLanguage: 'en'
+    })
   })
 })
