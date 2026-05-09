@@ -182,6 +182,8 @@ function WorkspaceApp() {
             selectedTranscript={selectedHistory}
             exportMessage={exportMessage}
             busyAction={busyAction}
+            onOpenQuickDictation={() => { controller.setActiveSection('quick-dictation') }}
+            onOpenLiveSession={() => { controller.openLiveSessionSection() }}
             onSearchQueryChange={(query) => { void controller.setHistoryQuery(query) }}
             onModeChange={(mode) => { void controller.setHistoryMode(mode) }}
             onSourceChange={(source) => { void controller.setHistorySource(source) }}

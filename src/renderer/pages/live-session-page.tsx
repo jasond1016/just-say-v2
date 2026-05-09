@@ -22,6 +22,9 @@ export function LiveSessionPage(props: {
   const status = describeStatus(liveSession?.status)
   const canAct = Boolean(liveSession) && !props.busyAction
   const isStreaming = liveSession?.status === 'streaming'
+  const sourceSummary = props.settings.input.includeMicrophoneInMeeting ? 'System audio + microphone' : 'System audio only'
+  const translationSummary = liveSession?.translationEnabled ? 'Bilingual transcript on' : 'Original language only'
+  const sessionSummary = liveSession ? `${sourceSummary} · ${translationSummary}` : 'Ready when you are'
 
   return (
     <div className="page">
@@ -38,6 +41,21 @@ export function LiveSessionPage(props: {
         <StatusDot active={isStreaming} />
         <span className="status-strip__title">{status.title}</span>
         <span className="text-tertiary">{status.description}</span>
+      </div>
+
+      <div className="session-summary stack-12" role="status" aria-live="polite">
+        <div className="session-summary__item">
+          <span className="session-summary__label">Capture</span>
+          <span className="session-summary__value">{sourceSummary}</span>
+        </div>
+        <div className="session-summary__item">
+          <span className="session-summary__label">Output</span>
+          <span className="session-summary__value">{translationSummary}</span>
+        </div>
+        <div className="session-summary__item">
+          <span className="session-summary__label">Session</span>
+          <span className="session-summary__value">{sessionSummary}</span>
+        </div>
       </div>
 
       {props.liveSessionMessage ? (

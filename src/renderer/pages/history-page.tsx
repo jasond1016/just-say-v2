@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { ExportFormat, SavedTranscript } from '../../shared/api-types'
 import type { CaptureSource } from '../../shared/primitive-types'
 import { Button, SelectField, TextInput } from '../ui/controls'
@@ -16,6 +16,8 @@ export function HistoryPage(props: {
   selectedTranscript: SavedTranscript | null
   exportMessage: string | null
   busyAction: string | null
+  onOpenQuickDictation: () => void
+  onOpenLiveSession: () => void
   onSearchQueryChange: (value: string) => void
   onModeChange: (value: 'all' | SavedTranscript['mode']) => void
   onSourceChange: (value: 'all' | CaptureSource) => void
@@ -25,13 +27,42 @@ export function HistoryPage(props: {
   onCopy: (id: string, format: ExportFormat) => void
   onExport: (id: string, format: ExportFormat) => void
 }) {
+  const headingId = useId()
   const [detailQuery, setDetailQuery] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
+  const detailHeadingRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     setDetailQuery('')
     setConfirmDelete(false)
   }, [props.selectedTranscript?.id])
+
+  useEffect(() => {
+    if (!props.selectedTranscript) {
+      return
+    }
+
+    detailHeadingRef.current?.focus()
+  }, [props.selectedTranscript])
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') {
+        event.preventDefault()
+        searchInputRef.current?.focus()
+        searchInputRef.current?.select()
+      }
+
+      if (event.key === 'Escape' && confirmDelete) {
+        event.preventDefault()
+        setConfirmDelete(false)
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [confirmDelete])
 
   const filteredBlocks = useMemo(() => {
     if (!props.selectedTranscript) return []
@@ -59,10 +90,12 @@ export function HistoryPage(props: {
 
       <div className="toolbar stack-16">
         <TextInput
+          ref={searchInputRef}
           value={props.searchQuery}
           onChange={(e) => props.onSearchQueryChange(e.target.value)}
           placeholder="Search transcripts"
           ariaLabel="Search transcripts"
+          ariaDescribedBy={`${headingId}-help`}
           className="field-input--full"
         />
         <SelectField
@@ -110,6 +143,9 @@ export function HistoryPage(props: {
           />
         ) : null}
       </div>
+      <div id={`${headingId}-help`} className="caption-text stack-8">
+        Press Ctrl+F or Cmd+F to jump back to search.
+      </div>
 
       <div
         className={`panel panel--split two-pane stack-20 ${sel ? 'two-pane--detail-open' : 'two-pane--list-only'}`}
@@ -120,6 +156,12 @@ export function HistoryPage(props: {
               {hasActiveFilters
                 ? 'No transcripts match these filters. Clear filters to see everything again.'
                 : 'No transcripts yet. Finished dictation and live sessions will appear here.'}
+              {!hasActiveFilters ? (
+                <div className="empty-copy__actions">
+                  <Button label="Open quick dictation" size="small" onClick={props.onOpenQuickDictation} />
+                  <Button label="Open live session" size="small" variant="secondary" onClick={props.onOpenLiveSession} />
+                </div>
+              ) : null}
             </div>
           ) : (
             props.items.map((item) => {
@@ -149,10 +191,12 @@ export function HistoryPage(props: {
         </div>
 
         {sel ? (
-          <div className="record-detail" aria-label="Transcript detail">
+          <div className="record-detail" aria-label="Transcript detail" aria-labelledby={headingId}>
             <div className="record-detail__header">
               <div>
-                <div className="detail-title">{sel.title}</div>
+                <div id={headingId} className="detail-title" ref={detailHeadingRef} tabIndex={-1}>
+                  {sel.title}
+                </div>
                 <div className="detail-meta">
                   <span>{describeSessionMode(sel.mode)}</span>
                   <span>{describeTranscriptSources(sel)}</span>
@@ -169,12 +213,14 @@ export function HistoryPage(props: {
                   disabled={Boolean(props.busyAction)}
                   size="small"
                   variant="primary"
+                  ariaLabel="Copy transcript text"
                   onClick={() => props.onCopy(sel.id, 'plain_text')}
                 />
                 <Button
                   label="Export text"
                   disabled={Boolean(props.busyAction)}
                   size="small"
+                  ariaLabel="Export transcript text"
                   onClick={() => props.onExport(sel.id, 'plain_text')}
                 />
                 <Button
@@ -182,6 +228,7 @@ export function HistoryPage(props: {
                   disabled={Boolean(props.busyAction)}
                   size="small"
                   variant="ghost"
+                  ariaLabel="Copy bilingual transcript"
                   onClick={() => props.onCopy(sel.id, 'bilingual_text')}
                 />
               </div>
@@ -196,12 +243,14 @@ export function HistoryPage(props: {
                     label="Export bilingual"
                     disabled={Boolean(props.busyAction)}
                     size="small"
+                    ariaLabel="Export bilingual transcript"
                     onClick={() => props.onExport(sel.id, 'bilingual_text')}
                   />
                   <Button
                     label="Export JSON"
                     disabled={Boolean(props.busyAction)}
                     size="small"
+                    ariaLabel="Export transcript JSON"
                     onClick={() => props.onExport(sel.id, 'json')}
                   />
                   <Button

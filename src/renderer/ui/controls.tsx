@@ -1,4 +1,4 @@
-import type { ChangeEvent, ReactNode } from 'react'
+import { forwardRef, type ChangeEvent, type ReactNode } from 'react'
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost'
 
@@ -43,7 +43,7 @@ export function Button(props: {
   )
 }
 
-export function TextInput(props: {
+export const TextInput = forwardRef<HTMLInputElement, {
   id?: string | undefined
   ariaLabel?: string | undefined
   ariaDescribedBy?: string | undefined
@@ -53,9 +53,10 @@ export function TextInput(props: {
   inputMode?: 'text' | 'numeric' | undefined
   className?: string | undefined
   onChange: (e: ChangeEvent<HTMLInputElement>) => void
-}) {
+}>((props, ref) => {
   return (
     <input
+      ref={ref}
       id={props.id}
       aria-label={props.ariaLabel}
       aria-describedby={props.ariaDescribedBy}
@@ -67,7 +68,8 @@ export function TextInput(props: {
       className={['field-input', props.className ?? ''].filter(Boolean).join(' ')}
     />
   )
-}
+})
+TextInput.displayName = 'TextInput'
 
 export function SelectField(props: {
   id?: string | undefined
