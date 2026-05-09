@@ -35,6 +35,11 @@ import { SpeechService } from './services/speech-service'
 import { PythonLocalServiceController } from './services/python-local-service-controller'
 import { TranslationPipeline } from './services/translation-pipeline'
 
+const remoteDebuggingPort = process.env.JUSTSAY_REMOTE_DEBUGGING_PORT
+if (remoteDebuggingPort) {
+  app.commandLine.appendSwitch('remote-debugging-port', remoteDebuggingPort)
+}
+
 void wireAppLifecycle(app, {
   onReady: async () => {
     registerElectronDisplayMediaHandler(session.defaultSession, desktopCapturer)

@@ -6,6 +6,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "dev": "pnpm build && electron .",
+    "debug:ui": "node scripts/run-electron-debug.mjs",
     "start": "electron .",
     "test": "vitest run",
     "test:watch": "vitest",
