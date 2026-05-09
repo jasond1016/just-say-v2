@@ -10,6 +10,7 @@ import type {
 import type { RecognitionEngine, RecognitionEvent } from '../../core/contracts/engine'
 import { transitionMeetingStatus } from '../../core/session/session-machine'
 import { transcriptReducer, INITIAL_TRANSCRIPT_STATE } from '../../core/transcript/transcript-reducer'
+import { selectPlainText, selectTranslatedPlainText } from '../../core/transcript/transcript-selectors'
 import type { TranscriptEvent } from '../../core/transcript/transcript-types'
 import type { CaptureWindowService } from '../platform/capture-window-service'
 import type { SettingsProvider, TranscriptRepositoryLike } from './ptt-coordinator'
@@ -332,11 +333,8 @@ export class MeetingCoordinator {
     const session = this.requireActiveSession()
     await Promise.allSettled([...session.pendingTranslations])
     const endedAt = this.now()
-    const plainText = session.transcript.committedBlocks.map((block) => block.text).join('\n')
-    const translatedPlainText = session.transcript.committedBlocks
-      .map((block) => block.translatedText)
-      .filter((value): value is string => Boolean(value))
-      .join('\n')
+    const plainText = selectPlainText(session.transcript)
+    const translatedPlainText = selectTranslatedPlainText(session.transcript)
 
     try {
       await this.dependencies.transcriptRepository.save({

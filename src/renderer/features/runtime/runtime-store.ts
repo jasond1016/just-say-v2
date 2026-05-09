@@ -1,6 +1,7 @@
 import type { AppRuntimeSnapshot } from '../../../shared/api-types'
 import { INITIAL_RUNTIME_SNAPSHOT } from '../../../shared/runtime-snapshot'
 export { INITIAL_RUNTIME_SNAPSHOT }
+export { selectLiveSessionTimeline } from './runtime-selectors'
 
 export class RuntimeStore {
   private snapshot: AppRuntimeSnapshot = INITIAL_RUNTIME_SNAPSHOT

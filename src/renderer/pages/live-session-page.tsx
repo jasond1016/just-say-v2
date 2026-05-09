@@ -1,5 +1,6 @@
 import type { AppSettings, AppRuntimeSnapshot } from '../../shared/api-types'
-import { buildTranscriptTimeline, formatDuration } from '../app/app-model'
+import { formatDuration } from '../app/app-model'
+import { selectLiveSessionTimeline } from '../features/runtime/runtime-selectors'
 
 type Palette = {
   panel: string
@@ -21,7 +22,7 @@ export function LiveSessionPage(props: {
   onOpenHistory: () => void
 }) {
   const liveSession = props.runtime.liveSession
-  const timeline = liveSession ? buildTranscriptTimeline(liveSession.transcript) : []
+  const timeline = selectLiveSessionTimeline(props.runtime)
 
   return (
     <section
