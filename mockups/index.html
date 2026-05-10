@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JustSay Mockups</title>
+    <link rel="stylesheet" href="./live-session/styles.css" />
+    <style>
+      :root {
+        color-scheme: light;
+        --page: oklch(0.952 0.014 84);
+        --surface: oklch(0.986 0.005 84);
+        --surface-2: oklch(0.97 0.01 86);
+        --line: oklch(0.86 0.008 74);
+        --ink: oklch(0.245 0.015 58);
+        --muted: oklch(0.5 0.012 58);
+        --accent: oklch(0.57 0.135 40);
+        --accent-soft: oklch(0.925 0.032 40);
+        --success: oklch(0.55 0.11 156);
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at top left, oklch(0.988 0.03 92), transparent 26%),
+          linear-gradient(180deg, oklch(0.972 0.015 84), var(--page));
+        color: var(--ink);
+      }
+
+      .variant-header {
+        background: color-mix(in oklab, var(--surface) 88%, transparent);
+        border-bottom: 1px solid color-mix(in oklab, var(--line) 88%, transparent);
+      }
+
+      .variant-brand__eyebrow,
+      .frame-note {
+        color: var(--muted);
+      }
+
+      .overview-shell {
+        padding: 56px 0 72px;
+      }
+
+      .overview-hero {
+        display: grid;
+        gap: 18px;
+        margin-bottom: 30px;
+      }
+
+      .overview-hero h1 {
+        margin: 0;
+        font-size: clamp(42px, 5vw, 72px);
+        line-height: 0.96;
+        letter-spacing: -0.05em;
+        max-width: 10ch;
+      }
+
+      .overview-hero p {
+        max-width: 66ch;
+        margin: 0;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.72;
+      }
+
+      .overview-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 20px;
+      }
+
+      .overview-card {
+        display: grid;
+        gap: 18px;
+        padding: 24px;
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        background: color-mix(in oklab, var(--surface) 96%, transparent);
+        box-shadow: var(--shadow-soft);
+      }
+
+      .overview-card__eyebrow {
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .overview-card__title {
+        font-size: clamp(30px, 3vw, 42px);
+        line-height: 0.98;
+        letter-spacing: -0.05em;
+      }
+
+      .overview-card__body {
+        max-width: 34ch;
+        font-size: 14px;
+        line-height: 1.65;
+      }
+
+      .overview-card__meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        font-size: 12px;
+      }
+
+      .overview-card__meta span {
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--surface-2) 80%, transparent);
+        color: var(--muted);
+      }
+
+      .overview-card--hud {
+        background: color-mix(in oklab, var(--surface) 96%, transparent);
+      }
+
+      .overview-card--live {
+        background: linear-gradient(180deg, color-mix(in oklab, var(--surface) 96%, transparent), oklch(0.97 0.012 86));
+      }
+
+      .overview-card--history {
+        background: linear-gradient(180deg, color-mix(in oklab, var(--surface) 96%, transparent), oklch(0.962 0.014 84));
+      }
+
+      .overview-card--settings {
+        background: linear-gradient(180deg, color-mix(in oklab, var(--surface) 96%, transparent), oklch(0.968 0.012 82));
+      }
+
+      @media (max-width: 960px) {
+        .overview-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="mock-shell">
+      <header class="variant-header">
+        <div class="variant-brand">
+          <div class="variant-brand__eyebrow">JustSay redesign mockups</div>
+          <div class="variant-brand__title">Final surface set</div>
+        </div>
+      </header>
+
+      <main class="screen overview-shell">
+        <section class="overview-hero">
+          <h1>Four surfaces matter.</h1>
+          <p>
+            The product resolves into four distinct surfaces: a transcript-first Live Session workspace for long attention, a highly compressed PTT HUD that should barely interrupt the user at all, a searchable History archive for finding and reusing past speech, and a calm Settings surface for defaults that should mostly disappear from daily use.
+          </p>
+        </section>
+
+        <section class="overview-grid" aria-label="Mockup overview">
+          <a class="overview-card overview-card--live" href="./live-session/focused-flow.html">
+            <div class="overview-card__eyebrow">Live Session</div>
+            <div class="overview-card__title">Focused Flow</div>
+            <div class="overview-card__body">
+              Single-column transcript workspace. Streaming and completed states stay on one canvas, with the interface consistently subordinate to the text.
+            </div>
+            <div class="overview-card__meta">
+              <span>Transcript-first</span>
+              <span>Streaming</span>
+              <span>Completed</span>
+            </div>
+          </a>
+
+          <a class="overview-card overview-card--hud" href="./quick-dictation/ptt-hud.html">
+            <div class="overview-card__eyebrow">Quick Dictation</div>
+            <div class="overview-card__title">PTT HUD</div>
+            <div class="overview-card__body">
+              System-layer push-to-talk feedback. Recording, processing, success, and failure recovery are handled as brief overlays rather than page-first UI.
+            </div>
+            <div class="overview-card__meta">
+              <span>HUD</span>
+              <span>PTT</span>
+              <span>Recovery strip</span>
+            </div>
+          </a>
+
+          <a class="overview-card overview-card--history" href="./history/focused-archive.html">
+            <div class="overview-card__eyebrow">History</div>
+            <div class="overview-card__title">Focused Archive</div>
+            <div class="overview-card__body">
+              Searchable transcript library for both quick dictation and live sessions. Built for fast scan on the left, deep reading and export on the right.
+            </div>
+            <div class="overview-card__meta">
+              <span>Archive</span>
+              <span>Search</span>
+              <span>Detail</span>
+            </div>
+          </a>
+
+          <a class="overview-card overview-card--settings" href="./settings/focused-controls.html">
+            <div class="overview-card__eyebrow">Settings</div>
+            <div class="overview-card__title">Focused Controls</div>
+            <div class="overview-card__body">
+              A support surface for defaults, profiles, and service connection. Built as a calm control sheet instead of a technical admin panel.
+            </div>
+            <div class="overview-card__meta">
+              <span>Defaults</span>
+              <span>Profiles</span>
+              <span>Advanced</span>
+            </div>
+          </a>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

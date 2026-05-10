@@ -1,0 +1,1409 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Focused Archive · JustSay History</title>
+    <link rel="stylesheet" href="../live-session/styles.css" />
+    <style>
+      :root {
+        color-scheme: light;
+        --page: oklch(0.952 0.014 84);
+        --surface: oklch(0.986 0.005 84);
+        --surface-2: oklch(0.97 0.01 86);
+        --surface-3: oklch(0.958 0.014 84);
+        --line: oklch(0.86 0.008 74);
+        --ink: oklch(0.245 0.015 58);
+        --muted: oklch(0.5 0.012 58);
+        --muted-2: oklch(0.63 0.01 60);
+        --accent: oklch(0.57 0.135 40);
+        --accent-soft: oklch(0.925 0.032 40);
+        --success: oklch(0.55 0.11 156);
+        --danger: oklch(0.57 0.17 28);
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at top left, oklch(0.988 0.03 92), transparent 26%),
+          linear-gradient(180deg, oklch(0.972 0.015 84), var(--page));
+        color: var(--ink);
+      }
+
+      .variant-header {
+        background: color-mix(in oklab, var(--surface) 88%, transparent);
+        border-bottom: 1px solid color-mix(in oklab, var(--line) 88%, transparent);
+      }
+
+      .variant-brand__eyebrow,
+      .frame-note {
+        color: var(--muted);
+      }
+
+      .variant-nav__link {
+        background: color-mix(in oklab, var(--surface) 90%, transparent);
+        border-color: var(--line);
+        color: var(--muted);
+      }
+
+      .variant-nav__link[aria-current="page"] {
+        background: var(--accent-soft);
+        border-color: color-mix(in oklab, var(--accent) 28%, var(--line));
+        color: oklch(0.35 0.07 38);
+      }
+
+      .archive-shell {
+        padding: 26px 0 40px;
+      }
+
+      .archive-intro {
+        display: grid;
+        gap: 14px;
+        margin-bottom: 18px;
+      }
+
+      .archive-intro h1 {
+        margin: 0;
+        font-size: clamp(34px, 4.2vw, 58px);
+        line-height: 0.96;
+        letter-spacing: -0.05em;
+        max-width: 11ch;
+      }
+
+      .archive-intro p {
+        max-width: 66ch;
+        margin: 0;
+        font-size: 15px;
+        line-height: 1.72;
+        color: var(--muted);
+      }
+
+      .archive-anchors {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+
+      .archive-anchor {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 38px;
+        padding: 0 14px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--surface) 92%, transparent);
+        font-size: 13px;
+      }
+
+      .archive-stack {
+        display: grid;
+        gap: 26px;
+      }
+
+      .archive-demo {
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 30px;
+        background: color-mix(in oklab, var(--surface) 96%, transparent);
+        box-shadow: var(--shadow-soft);
+      }
+
+      .archive-demo__label {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        padding: 18px 22px;
+        border-bottom: 1px solid var(--line);
+        background: color-mix(in oklab, var(--surface-2) 82%, transparent);
+      }
+
+      .archive-demo__label strong {
+        font-size: 15px;
+      }
+
+      .archive-demo__label span {
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .workspace-preview {
+        display: grid;
+        grid-template-columns: 188px minmax(0, 1fr);
+        min-height: 820px;
+      }
+
+      .workspace-sidebar {
+        display: grid;
+        grid-template-rows: auto auto 1fr auto auto;
+        gap: 10px;
+        padding: 22px 16px 16px;
+        border-right: 1px solid var(--line);
+        background: color-mix(in oklab, var(--surface-3) 78%, transparent);
+      }
+
+      .workspace-sidebar__brand {
+        display: grid;
+        gap: 5px;
+        padding: 0 6px 8px;
+      }
+
+      .workspace-sidebar__brand-mark {
+        font-size: 18px;
+        line-height: 1;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+      }
+
+      .workspace-sidebar__eyebrow {
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .workspace-sidebar__nav {
+        display: grid;
+        gap: 4px;
+      }
+
+      .workspace-sidebar__link {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        min-height: 34px;
+        padding: 0 10px;
+        border: 1px solid transparent;
+        border-radius: 10px;
+        color: var(--muted);
+        font-size: 12px;
+        letter-spacing: 0.01em;
+      }
+
+      .workspace-sidebar__link::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--line-strong) 72%, transparent);
+        opacity: 0;
+      }
+
+      .workspace-sidebar__link--active {
+        background: color-mix(in oklab, var(--accent-soft) 44%, var(--surface));
+        border-color: color-mix(in oklab, var(--accent) 16%, var(--line));
+        color: oklch(0.35 0.07 38);
+        font-weight: 600;
+      }
+
+      .workspace-sidebar__link--active::before {
+        opacity: 1;
+        background: color-mix(in oklab, var(--accent) 72%, white);
+      }
+
+      .workspace-sidebar__utility {
+        display: grid;
+        gap: 10px;
+        padding-top: 8px;
+      }
+
+      .workspace-sidebar__status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 30px;
+        padding: 0 10px;
+        border: 1px solid transparent;
+        border-radius: 10px;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.4;
+      }
+
+      .workspace-sidebar__status-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        flex-shrink: 0;
+      }
+
+      .workspace-sidebar__status--healthy {
+        background: color-mix(in oklab, oklch(0.94 0.026 156) 30%, var(--surface));
+        border-color: color-mix(in oklab, var(--success) 16%, var(--line));
+      }
+
+      .workspace-sidebar__status--healthy .workspace-sidebar__status-dot {
+        background: var(--success);
+      }
+
+      .workspace-sidebar__refresh {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 32px;
+        padding: 0 10px;
+        border: 1px dashed var(--line);
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--surface) 96%, transparent);
+        font-size: 11px;
+        color: var(--muted);
+      }
+
+      .workspace-main {
+        min-width: 0;
+        padding: 0;
+        background: color-mix(in oklab, var(--surface) 90%, transparent);
+      }
+
+      .history-screen {
+        min-height: 780px;
+        background: color-mix(in oklab, var(--surface) 92%, transparent);
+      }
+
+      .history-screen--overview {
+        display: grid;
+        grid-template-rows: auto auto minmax(0, 1fr);
+      }
+
+      .history-screen--detail-transcript {
+        display: grid;
+        grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
+      }
+
+      .history-screen--detail-derived {
+        display: grid;
+        grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+      }
+
+      .history-header {
+        display: grid;
+        gap: 10px;
+        padding: 24px 28px 18px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .history-header__eyebrow,
+      .detail-back {
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .history-header__row,
+      .detail-header__row {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+
+      .history-header__title,
+      .detail-header__title {
+        font-size: clamp(30px, 2.8vw, 42px);
+        line-height: 0.98;
+        letter-spacing: -0.05em;
+      }
+
+      .history-header__meta,
+      .detail-header__meta {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .history-header__sub,
+      .detail-header__sub {
+        max-width: 62ch;
+        font-size: 14px;
+        line-height: 1.68;
+        color: var(--muted);
+      }
+
+      .history-controls {
+        display: grid;
+        gap: 12px;
+        padding: 18px 28px;
+        border-bottom: 1px solid var(--line);
+        background: color-mix(in oklab, var(--surface-2) 58%, transparent);
+      }
+
+      .history-search {
+        width: min(520px, 100%);
+        min-height: 42px;
+        padding: 0 14px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: color-mix(in oklab, var(--surface) 98%, transparent);
+        color: var(--ink);
+        font: inherit;
+      }
+
+      .history-filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .history-chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 32px;
+        padding: 0 10px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--surface) 96%, transparent);
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .history-chip--active {
+        background: var(--accent-soft);
+        border-color: color-mix(in oklab, var(--accent) 24%, var(--line));
+        color: oklch(0.35 0.07 38);
+        font-weight: 600;
+      }
+
+      .history-list {
+        min-height: 0;
+        overflow: auto;
+        padding: 10px 0 18px;
+      }
+
+      .history-row {
+        display: grid;
+        gap: 8px;
+        padding: 18px 28px 20px;
+        border-bottom: 1px solid color-mix(in oklab, var(--line) 76%, transparent);
+      }
+
+      .history-row__head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 14px;
+      }
+
+      .history-row__title {
+        min-width: 0;
+        font-size: 17px;
+        line-height: 1.28;
+        font-weight: 600;
+      }
+
+      .history-row__time {
+        color: var(--muted-2);
+        font-size: 11px;
+        white-space: nowrap;
+      }
+
+      .history-row__meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 12px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .history-row__preview {
+        max-width: 84ch;
+        color: var(--ink);
+        font-size: 14px;
+        line-height: 1.62;
+      }
+
+      .detail-header {
+        display: grid;
+        gap: 12px;
+        padding: 24px 28px 18px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .detail-header__headline {
+        display: grid;
+        gap: 10px;
+      }
+
+      .audio-strip {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        align-items: center;
+        gap: 14px;
+        padding: 14px 28px;
+        border-bottom: 1px solid var(--line);
+        background: color-mix(in oklab, var(--surface-2) 42%, transparent);
+      }
+
+      .audio-strip__button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 34px;
+        min-width: 34px;
+        padding: 0;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--surface) 98%, transparent);
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .audio-strip__track {
+        display: grid;
+        gap: 8px;
+      }
+
+      .audio-strip__meta {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .audio-strip__bar {
+        position: relative;
+        height: 6px;
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--line) 76%, transparent);
+        overflow: hidden;
+      }
+
+      .audio-strip__bar::before {
+        content: "";
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 38%;
+        border-radius: inherit;
+        background: color-mix(in oklab, var(--accent) 38%, var(--line));
+      }
+
+      .audio-strip__time,
+      .audio-strip__label {
+        font-family: "Cascadia Mono", Consolas, monospace;
+        font-size: 12px;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .audio-strip__label {
+        font-family: inherit;
+      }
+
+      .detail-views {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        padding: 14px 28px;
+        border-bottom: 1px solid var(--line);
+        background: color-mix(in oklab, var(--surface-2) 56%, transparent);
+      }
+
+      .detail-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .detail-tab {
+        display: inline-flex;
+        align-items: center;
+        min-height: 34px;
+        padding: 0 12px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .detail-tab--active {
+        background: var(--accent-soft);
+        border-color: color-mix(in oklab, var(--accent) 24%, var(--line));
+        color: oklch(0.35 0.07 38);
+        font-weight: 600;
+      }
+
+      .view-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .view-action {
+        display: inline-flex;
+        align-items: center;
+        min-height: 34px;
+        padding: 0 12px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--surface) 96%, transparent);
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .view-action--primary {
+        background: var(--accent-soft);
+        border-color: color-mix(in oklab, var(--accent) 24%, var(--line));
+        color: oklch(0.35 0.07 38);
+        font-weight: 600;
+      }
+
+      .view-action--subtle {
+        border-style: dashed;
+      }
+
+      .detail-more {
+        display: inline-flex;
+        align-items: center;
+        min-height: 34px;
+        padding: 0 12px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--surface) 96%, transparent);
+        font-size: 12px;
+      }
+
+      .detail-searchbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        padding: 14px 28px;
+        border-bottom: 1px solid var(--line);
+        background: color-mix(in oklab, var(--surface-2) 56%, transparent);
+      }
+
+      .detail-searchbar__input {
+        width: min(420px, 100%);
+        min-height: 38px;
+        padding: 0 12px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: color-mix(in oklab, var(--surface) 98%, transparent);
+        color: var(--ink);
+        font: inherit;
+      }
+
+      .detail-searchbar__count {
+        color: var(--muted);
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      .detail-transcript {
+        min-height: 0;
+        overflow: auto;
+        padding: 0 28px 24px;
+      }
+
+      .detail-stack {
+        display: grid;
+        gap: 14px;
+        padding-top: 18px;
+      }
+
+      .detail-block {
+        display: grid;
+        grid-template-columns: 88px minmax(0, 1fr);
+        gap: 16px;
+        padding-bottom: 14px;
+        border-bottom: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+      }
+
+      .detail-block__time {
+        padding-top: 4px;
+        color: var(--muted-2);
+        font-family: "Cascadia Mono", Consolas, monospace;
+        font-size: 12px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .detail-block__body {
+        display: grid;
+        gap: 10px;
+      }
+
+      .detail-block__meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        color: var(--muted-2);
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .detail-block__text {
+        max-width: 46ch;
+        font-size: clamp(18px, 1.45vw, 24px);
+        line-height: 1.58;
+        letter-spacing: -0.018em;
+      }
+
+      .detail-block__translated {
+        max-width: 56ch;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.68;
+      }
+
+      .detail-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        padding: 16px 28px 18px;
+        border-top: 1px solid var(--line);
+        background: color-mix(in oklab, var(--surface-2) 38%, transparent);
+      }
+
+      .detail-footer__note {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .detail-footer__link {
+        color: var(--accent);
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .notes-canvas {
+        min-height: 0;
+        overflow: auto;
+        padding: 18px 28px 26px;
+      }
+
+      .notes-stack {
+        display: grid;
+        gap: 18px;
+      }
+
+      .notes-card {
+        display: grid;
+        gap: 10px;
+        padding: 18px 0;
+        border-bottom: 1px solid color-mix(in oklab, var(--line) 72%, transparent);
+      }
+
+      .notes-card__eyebrow {
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .notes-card__title {
+        font-size: 23px;
+        line-height: 1.08;
+        letter-spacing: -0.03em;
+      }
+
+      .notes-card__body {
+        max-width: 68ch;
+        font-size: 15px;
+        line-height: 1.74;
+      }
+
+      .notes-list {
+        display: grid;
+        gap: 10px;
+        padding: 0;
+        margin: 0;
+        list-style: none;
+      }
+
+      .notes-list li {
+        max-width: 68ch;
+        font-size: 15px;
+        line-height: 1.72;
+        color: var(--ink);
+      }
+
+      .notes-state-stack {
+        display: grid;
+        gap: 18px;
+      }
+
+      .notes-state {
+        display: grid;
+        gap: 12px;
+        padding: 20px 0;
+        border-bottom: 1px solid color-mix(in oklab, var(--line) 72%, transparent);
+      }
+
+      .notes-state__eyebrow {
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .notes-state__title {
+        font-size: 23px;
+        line-height: 1.08;
+        letter-spacing: -0.03em;
+      }
+
+      .notes-state__body {
+        max-width: 66ch;
+        font-size: 15px;
+        line-height: 1.74;
+      }
+
+      .notes-state__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .notes-state__button {
+        display: inline-flex;
+        align-items: center;
+        min-height: 34px;
+        padding: 0 12px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--surface) 96%, transparent);
+        font-size: 12px;
+      }
+
+      .notes-state__button--primary {
+        background: var(--accent-soft);
+        border-color: color-mix(in oklab, var(--accent) 24%, var(--line));
+        color: oklch(0.35 0.07 38);
+        font-weight: 600;
+      }
+
+      .notes-state__dots {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+      }
+
+      .notes-state__dots span {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--accent) 32%, var(--line));
+      }
+
+      .notes-state__dots span:nth-child(2) {
+        opacity: 0.7;
+      }
+
+      .notes-state__dots span:nth-child(3) {
+        opacity: 0.45;
+      }
+
+      @media (max-width: 1160px) {
+        .workspace-preview {
+          grid-template-columns: 168px minmax(0, 1fr);
+        }
+      }
+
+      @media (max-width: 920px) {
+        .workspace-preview {
+          grid-template-columns: 1fr;
+        }
+
+        .workspace-sidebar {
+          grid-template-rows: auto auto;
+          gap: 14px;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .workspace-sidebar__status,
+        .workspace-sidebar__refresh {
+          display: none;
+        }
+
+        .detail-views,
+        .detail-searchbar,
+        .detail-footer,
+        .history-header__row,
+        .detail-header__row {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+      }
+
+      @media (max-width: 720px) {
+        .archive-shell {
+          padding-top: 18px;
+        }
+
+        .workspace-main {
+          padding: 0;
+        }
+
+        .history-header,
+        .history-controls,
+        .history-row,
+        .detail-header,
+        .audio-strip,
+        .detail-views,
+        .detail-searchbar,
+        .detail-transcript,
+        .detail-footer,
+        .notes-canvas,
+        .notes-canvas {
+          padding-left: 16px;
+          padding-right: 16px;
+        }
+
+        .detail-block {
+          grid-template-columns: 1fr;
+          gap: 8px;
+        }
+
+        .history-row__head {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .audio-strip,
+        .detail-views {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="mock-shell">
+      <header class="variant-header">
+        <div class="variant-brand">
+          <div class="variant-brand__eyebrow">Third core surface</div>
+          <div class="variant-brand__title">Focused Archive</div>
+        </div>
+        <nav class="variant-nav" aria-label="Variant navigation">
+          <a class="variant-nav__link" href="../index.html">Overview</a>
+          <a class="variant-nav__link" href="../live-session/focused-flow.html">Focused Flow</a>
+          <a class="variant-nav__link" href="../quick-dictation/ptt-hud.html">PTT HUD</a>
+          <a class="variant-nav__link" aria-current="page" href="./focused-archive.html">History</a>
+          <a class="variant-nav__link" href="../settings/focused-controls.html">Settings</a>
+        </nav>
+      </header>
+
+      <main class="screen archive-shell">
+        <div class="frame-note">History works better as a two-step flow: find first, read second.</div>
+
+        <section class="archive-intro">
+          <h1>Past speech should open like documents, not panels.</h1>
+          <p>
+            This direction drops the split view. History becomes a focused list screen for retrieval, then a dedicated detail screen for reading, searching, exporting, and deleting without asking the user to parse a crowded three-column layout.
+          </p>
+        </section>
+
+        <div class="archive-anchors">
+          <div class="archive-anchor"><strong>Overview</strong> Find the right record fast.</div>
+          <div class="archive-anchor"><strong>Detail</strong> Open one transcript and work inside it.</div>
+          <div class="archive-anchor"><strong>States</strong> Notes covers idle, loading, and failure.</div>
+        </div>
+
+        <section class="archive-stack">
+          <article class="archive-demo">
+            <div class="archive-demo__label">
+              <strong>History Overview</strong>
+              <span>Search, filter, scan, then enter a record.</span>
+            </div>
+
+            <div class="workspace-preview">
+              <aside class="workspace-sidebar">
+                <div class="workspace-sidebar__brand">
+                  <div class="workspace-sidebar__brand-mark">JustSay</div>
+                  <div class="workspace-sidebar__eyebrow">Voice workspace</div>
+                </div>
+
+                <nav class="workspace-sidebar__nav" aria-label="App sections">
+                  <div class="workspace-sidebar__link">Quick Dictation</div>
+                  <div class="workspace-sidebar__link">Live Session</div>
+                  <div class="workspace-sidebar__link workspace-sidebar__link--active">History</div>
+                  <div class="workspace-sidebar__link">Settings</div>
+                </nav>
+
+                <div></div>
+
+                <div class="workspace-sidebar__utility">
+                  <div class="workspace-sidebar__status workspace-sidebar__status--healthy">
+                    <span class="workspace-sidebar__status-dot"></span>
+                    Local service healthy
+                  </div>
+
+                  <div class="workspace-sidebar__refresh">Refresh</div>
+                </div>
+              </aside>
+
+              <div class="workspace-main">
+                <section class="history-screen history-screen--overview">
+                  <div class="history-header">
+                    <div class="history-header__eyebrow">History</div>
+                    <div class="history-header__row">
+                      <div class="history-header__title">Archive</div>
+                      <div class="history-header__meta">248 records</div>
+                    </div>
+                    <div class="history-header__sub">
+                      Search by phrase, filter by mode or source, then open the transcript that matters.
+                    </div>
+                  </div>
+
+                  <div class="history-controls">
+                    <input class="history-search" value="rebuild review" aria-label="Search transcripts" />
+                    <div class="history-filters">
+                      <div class="history-chip history-chip--active">All modes</div>
+                      <div class="history-chip">Live session</div>
+                      <div class="history-chip">Quick dictation</div>
+                      <div class="history-chip">Last 7 days</div>
+                      <div class="history-chip">System audio</div>
+                    </div>
+                  </div>
+
+                  <div class="history-list">
+                    <article class="history-row">
+                      <div class="history-row__head">
+                        <div class="history-row__title">Transcript-first rebuild review</div>
+                        <div class="history-row__time">May 10 · 09:09</div>
+                      </div>
+                      <div class="history-row__meta">
+                        <span>Live session</span>
+                        <span>System + microphone</span>
+                        <span>35m 02s</span>
+                      </div>
+                      <div class="history-row__preview">
+                        We should treat Live Session as the place where text stays primary. The interface should disappear behind the transcript, not compete with it.
+                      </div>
+                    </article>
+
+                    <article class="history-row">
+                      <div class="history-row__head">
+                        <div class="history-row__title">Clipboard fallback wording</div>
+                        <div class="history-row__time">May 10 · 08:41</div>
+                      </div>
+                      <div class="history-row__meta">
+                        <span>Quick dictation</span>
+                        <span>Microphone</span>
+                        <span>00m 07s</span>
+                      </div>
+                      <div class="history-row__preview">
+                        If automatic typing fails, copy to clipboard and let the user paste manually instead of showing a heavy recovery window.
+                      </div>
+                    </article>
+
+                    <article class="history-row">
+                      <div class="history-row__head">
+                        <div class="history-row__title">Meeting export naming pass</div>
+                        <div class="history-row__time">May 09 · 16:18</div>
+                      </div>
+                      <div class="history-row__meta">
+                        <span>Live session</span>
+                        <span>System audio</span>
+                        <span>22m 14s</span>
+                      </div>
+                      <div class="history-row__preview">
+                        Auto-generated titles should stay provisional until the session finishes. Users can rename later, but they should not need to name first.
+                      </div>
+                    </article>
+
+                    <article class="history-row">
+                      <div class="history-row__head">
+                        <div class="history-row__title">Hotkey delivery edge case</div>
+                        <div class="history-row__time">May 09 · 11:03</div>
+                      </div>
+                      <div class="history-row__meta">
+                        <span>Quick dictation</span>
+                        <span>Microphone</span>
+                        <span>00m 09s</span>
+                      </div>
+                      <div class="history-row__preview">
+                        Simulated input succeeded in Notepad but failed in the browser field. Need a safer fallback recommendation.
+                      </div>
+                    </article>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </article>
+
+          <article class="archive-demo">
+            <div class="archive-demo__label">
+              <strong>History Detail · Transcript</strong>
+              <span>Open one record, then work inside the source transcript.</span>
+            </div>
+
+            <div class="workspace-preview">
+              <aside class="workspace-sidebar">
+                <div class="workspace-sidebar__brand">
+                  <div class="workspace-sidebar__brand-mark">JustSay</div>
+                  <div class="workspace-sidebar__eyebrow">Voice workspace</div>
+                </div>
+
+                <nav class="workspace-sidebar__nav" aria-label="App sections">
+                  <div class="workspace-sidebar__link">Quick Dictation</div>
+                  <div class="workspace-sidebar__link">Live Session</div>
+                  <div class="workspace-sidebar__link workspace-sidebar__link--active">History</div>
+                  <div class="workspace-sidebar__link">Settings</div>
+                </nav>
+
+                <div></div>
+
+                <div class="workspace-sidebar__utility">
+                  <div class="workspace-sidebar__status workspace-sidebar__status--healthy">
+                    <span class="workspace-sidebar__status-dot"></span>
+                    Local service healthy
+                  </div>
+
+                  <div class="workspace-sidebar__refresh">Refresh</div>
+                </div>
+              </aside>
+
+              <div class="workspace-main">
+                <section class="history-screen history-screen--detail-transcript">
+                  <div class="detail-header">
+                    <div class="detail-back">Back to archive</div>
+                    <div class="detail-header__row">
+                      <div class="detail-header__headline">
+                        <div class="detail-header__title">Transcript-first rebuild review</div>
+                        <div class="detail-header__meta">
+                          Live session · System + microphone · 35m 02s · Preset: local accurate · Saved May 10, 09:44
+                        </div>
+                      </div>
+                    </div>
+                    <div class="detail-header__sub">
+                      Open one transcript as a document. Derived views stay in the same place, but they do not crowd the source.
+                    </div>
+                  </div>
+
+                  <div class="audio-strip">
+                    <div class="audio-strip__button">▶</div>
+                    <div class="audio-strip__track">
+                      <div class="audio-strip__meta">
+                        <span class="audio-strip__label">Session audio</span>
+                        <span class="audio-strip__time">13:21 / 35:02</span>
+                      </div>
+                      <div class="audio-strip__bar"></div>
+                    </div>
+                  </div>
+
+                  <div class="detail-views">
+                    <div class="detail-tabs">
+                      <div class="detail-tab detail-tab--active">Transcript</div>
+                      <div class="detail-tab">Notes</div>
+                    </div>
+                    <div class="view-actions">
+                      <div class="detail-more">More ▾</div>
+                    </div>
+                  </div>
+
+                  <div class="detail-searchbar">
+                    <input class="detail-searchbar__input" value="review" aria-label="Search within transcript" />
+                    <div class="detail-searchbar__count">6 of 184 lines</div>
+                  </div>
+
+                  <div class="detail-transcript">
+                    <div class="detail-stack">
+                      <article class="detail-block">
+                        <div class="detail-block__time">09:42:11</div>
+                        <div class="detail-block__body">
+                          <div class="detail-block__meta">
+                            <span>System audio</span>
+                            <span>Speaker A</span>
+                          </div>
+                          <div class="detail-block__text">
+                            我们这次应该把 Live Session 当成真正的工作台，而不是一个转录结果不断往下堆的窗口。
+                          </div>
+                          <div class="detail-block__translated">
+                            We should treat Live Session as a real workstation this time, not just a window where transcript results keep stacking downward.
+                          </div>
+                        </div>
+                      </article>
+
+                      <article class="detail-block">
+                        <div class="detail-block__time">09:42:36</div>
+                        <div class="detail-block__body">
+                          <div class="detail-block__meta">
+                            <span>Microphone</span>
+                            <span>Speaker B</span>
+                          </div>
+                          <div class="detail-block__text">
+                            对，尤其是会后整理时，用户常常已经知道哪一句是决定，哪一句只是铺垫，界面应该允许他当场做轻量标记。
+                          </div>
+                          <div class="detail-block__translated">
+                            Right, especially during post-meeting cleanup. Users often already know which sentence is a decision and which one is only setup, so the interface should let them make lightweight marks on the spot.
+                          </div>
+                        </div>
+                      </article>
+
+                      <article class="detail-block">
+                        <div class="detail-block__time">09:43:03</div>
+                        <div class="detail-block__body">
+                          <div class="detail-block__meta">
+                            <span>System audio</span>
+                            <span>Speaker A</span>
+                          </div>
+                          <div class="detail-block__text">
+                            复制、导出、打开历史这些动作其实都属于会后整理，不该在实时态里持续占位。
+                          </div>
+                          <div class="detail-block__translated">
+                            Actions like copy, export, and open history belong to post-session cleanup and should not keep taking space in the live state.
+                          </div>
+                        </div>
+                      </article>
+
+                      <article class="detail-block">
+                        <div class="detail-block__time">09:43:24</div>
+                        <div class="detail-block__body">
+                          <div class="detail-block__meta">
+                            <span>Microphone</span>
+                            <span>Speaker B</span>
+                          </div>
+                          <div class="detail-block__text">
+                            结束之后也不要跳回空状态，让当前内容继续留在这里，然后把这个页面自然切成可回看的完成态。
+                          </div>
+                          <div class="detail-block__translated">
+                            After stopping, do not jump back to an empty state. Leave the current content here, then let the page naturally shift into a reviewable completed state.
+                          </div>
+                        </div>
+                      </article>
+                    </div>
+                  </div>
+
+                  <div class="detail-footer">
+                    <div class="detail-footer__note">More contains copy, export, and delete. Search remains scoped to the current record.</div>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </article>
+
+          <article class="archive-demo">
+            <div class="archive-demo__label">
+              <strong>History Detail · Notes</strong>
+              <span>Generated notes and action items merged into one derived view.</span>
+            </div>
+
+            <div class="workspace-preview">
+              <aside class="workspace-sidebar">
+                <div class="workspace-sidebar__brand">
+                  <div class="workspace-sidebar__brand-mark">JustSay</div>
+                  <div class="workspace-sidebar__eyebrow">Voice workspace</div>
+                </div>
+
+                <nav class="workspace-sidebar__nav" aria-label="App sections">
+                  <div class="workspace-sidebar__link">Quick Dictation</div>
+                  <div class="workspace-sidebar__link">Live Session</div>
+                  <div class="workspace-sidebar__link workspace-sidebar__link--active">History</div>
+                  <div class="workspace-sidebar__link">Settings</div>
+                </nav>
+
+                <div></div>
+
+                <div class="workspace-sidebar__utility">
+                  <div class="workspace-sidebar__status workspace-sidebar__status--healthy">
+                    <span class="workspace-sidebar__status-dot"></span>
+                    Local service healthy
+                  </div>
+
+                  <div class="workspace-sidebar__refresh">Refresh</div>
+                </div>
+              </aside>
+
+              <div class="workspace-main">
+                <section class="history-screen history-screen--detail-derived">
+                  <div class="detail-header">
+                    <div class="detail-back">Back to archive</div>
+                    <div class="detail-header__row">
+                      <div class="detail-header__headline">
+                        <div class="detail-header__title">Transcript-first rebuild review</div>
+                        <div class="detail-header__meta">
+                          Live session · System + microphone · 35m 02s · Notes generated 2m ago
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="audio-strip">
+                    <div class="audio-strip__button">▶</div>
+                    <div class="audio-strip__track">
+                      <div class="audio-strip__meta">
+                        <span class="audio-strip__label">Session audio</span>
+                        <span class="audio-strip__time">13:21 / 35:02</span>
+                      </div>
+                      <div class="audio-strip__bar"></div>
+                    </div>
+                  </div>
+
+                  <div class="detail-views">
+                    <div class="detail-tabs">
+                      <div class="detail-tab">Transcript</div>
+                      <div class="detail-tab detail-tab--active">Notes</div>
+                    </div>
+                    <div class="view-actions">
+                      <div class="view-action view-action--primary">Regenerate notes</div>
+                      <div class="detail-more">More ▾</div>
+                    </div>
+                  </div>
+
+                  <div class="notes-canvas">
+                    <div class="notes-stack">
+                      <section class="notes-card">
+                        <div class="notes-card__eyebrow">Overview</div>
+                        <div class="notes-card__title">The redesign direction is now transcript-first.</div>
+                        <div class="notes-card__body">
+                          The discussion converged on a quieter Live Session surface, a HUD-native Quick Dictation model, and a History flow that behaves more like opening documents than managing records in place.
+                        </div>
+                      </section>
+
+                      <section class="notes-card">
+                        <div class="notes-card__eyebrow">Decisions</div>
+                        <ul class="notes-list">
+                          <li>Live Session should keep transcript on one canvas from streaming through completion.</li>
+                          <li>Quick Dictation should not rely on a page-first experience. The HUD is the primary surface.</li>
+                          <li>History should separate retrieval from reading instead of forcing split view.</li>
+                        </ul>
+                      </section>
+
+                      <section class="notes-card">
+                        <div class="notes-card__eyebrow">Action Items</div>
+                        <ul class="notes-list">
+                          <li>Move low-frequency transcript actions under More so the header stops behaving like a toolbar.</li>
+                          <li>Keep generated notes inside the detail page instead of branching into a separate side panel or modal.</li>
+                          <li>Decide later whether generated notes should remain read-only or support lightweight inline edits.</li>
+                        </ul>
+                      </section>
+                    </div>
+                  </div>
+
+                  <div class="detail-footer">
+                    <div class="detail-footer__note">Notes include summary, decisions, and action items in one generated view.</div>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </article>
+
+          <article class="archive-demo">
+            <div class="archive-demo__label">
+              <strong>History Detail · Notes States</strong>
+              <span>Show the three states that matter before and after generation.</span>
+            </div>
+
+            <div class="workspace-preview">
+              <aside class="workspace-sidebar">
+                <div class="workspace-sidebar__brand">
+                  <div class="workspace-sidebar__brand-mark">JustSay</div>
+                  <div class="workspace-sidebar__eyebrow">Voice workspace</div>
+                </div>
+
+                <nav class="workspace-sidebar__nav" aria-label="App sections">
+                  <div class="workspace-sidebar__link">Quick Dictation</div>
+                  <div class="workspace-sidebar__link">Live Session</div>
+                  <div class="workspace-sidebar__link workspace-sidebar__link--active">History</div>
+                  <div class="workspace-sidebar__link">Settings</div>
+                </nav>
+
+                <div></div>
+
+                <div class="workspace-sidebar__utility">
+                  <div class="workspace-sidebar__status workspace-sidebar__status--healthy">
+                    <span class="workspace-sidebar__status-dot"></span>
+                    Local service healthy
+                  </div>
+
+                  <div class="workspace-sidebar__refresh">Refresh</div>
+                </div>
+              </aside>
+
+              <div class="workspace-main">
+                <section class="history-screen history-screen--detail-derived">
+                  <div class="detail-header">
+                    <div class="detail-back">Back to archive</div>
+                    <div class="detail-header__row">
+                      <div class="detail-header__headline">
+                        <div class="detail-header__title">Transcript-first rebuild review</div>
+                        <div class="detail-header__meta">
+                          Live session · System + microphone · 35m 02s · Notes state variations
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="audio-strip">
+                    <div class="audio-strip__button">▶</div>
+                    <div class="audio-strip__track">
+                      <div class="audio-strip__meta">
+                        <span class="audio-strip__label">Session audio</span>
+                        <span class="audio-strip__time">13:21 / 35:02</span>
+                      </div>
+                      <div class="audio-strip__bar"></div>
+                    </div>
+                  </div>
+
+                  <div class="detail-views">
+                    <div class="detail-tabs">
+                      <div class="detail-tab">Transcript</div>
+                      <div class="detail-tab detail-tab--active">Notes</div>
+                    </div>
+                    <div class="view-actions">
+                      <div class="detail-more">More ▾</div>
+                    </div>
+                  </div>
+
+                  <div class="notes-canvas">
+                    <div class="notes-state-stack">
+                      <section class="notes-state">
+                        <div class="notes-state__eyebrow">Not generated yet</div>
+                        <div class="notes-state__title">No notes yet for this transcript.</div>
+                        <div class="notes-state__body">
+                          Generate one notes view that includes summary, decisions, and follow-up items. The source transcript stays unchanged.
+                        </div>
+                        <div class="notes-state__actions">
+                          <div class="notes-state__button notes-state__button--primary">Generate notes</div>
+                        </div>
+                      </section>
+
+                      <section class="notes-state">
+                        <div class="notes-state__eyebrow">Generating</div>
+                        <div class="notes-state__title">Building notes from the transcript.</div>
+                        <div class="notes-state__body">
+                          JustSay is condensing the conversation into one readable notes view. Keep the transcript available while this runs.
+                        </div>
+                        <div class="notes-state__dots" aria-hidden="true">
+                          <span></span>
+                          <span></span>
+                          <span></span>
+                        </div>
+                      </section>
+
+                      <section class="notes-state">
+                        <div class="notes-state__eyebrow">Generation failed</div>
+                        <div class="notes-state__title">Notes could not be generated this time.</div>
+                        <div class="notes-state__body">
+                          The transcript and audio are still safe. Retry generation, or stay in Transcript and continue working from the source material.
+                        </div>
+                        <div class="notes-state__actions">
+                          <div class="notes-state__button notes-state__button--primary">Try again</div>
+                          <div class="notes-state__button">Back to transcript</div>
+                        </div>
+                      </section>
+                    </div>
+                  </div>
+
+                  <div class="detail-footer">
+                    <div class="detail-footer__note">The important part is that notes generation is progressive, not assumed.</div>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </article>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Focused Rail · JustSay Sidebar</title>
+    <link rel="stylesheet" href="../live-session/styles.css" />
+    <style>
+      :root {
+        color-scheme: light;
+        --page: oklch(0.952 0.014 84);
+        --surface: oklch(0.986 0.005 84);
+        --surface-2: oklch(0.97 0.01 86);
+        --surface-3: oklch(0.958 0.014 84);
+        --line: oklch(0.86 0.008 74);
+        --line-strong: oklch(0.78 0.012 72);
+        --ink: oklch(0.245 0.015 58);
+        --muted: oklch(0.5 0.012 58);
+        --muted-2: oklch(0.63 0.01 60);
+        --accent: oklch(0.57 0.135 40);
+        --accent-soft: oklch(0.925 0.032 40);
+        --success: oklch(0.55 0.11 156);
+        --success-soft: oklch(0.94 0.026 156);
+        --warning: oklch(0.69 0.13 78);
+        --warning-soft: oklch(0.95 0.03 82);
+        --danger: oklch(0.57 0.17 28);
+        --danger-soft: oklch(0.95 0.028 28);
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at top left, oklch(0.988 0.03 92), transparent 26%),
+          linear-gradient(180deg, oklch(0.972 0.015 84), var(--page));
+        color: var(--ink);
+      }
+
+      .variant-header {
+        background: color-mix(in oklab, var(--surface) 88%, transparent);
+        border-bottom: 1px solid color-mix(in oklab, var(--line) 88%, transparent);
+      }
+
+      .variant-brand__eyebrow,
+      .frame-note {
+        color: var(--muted);
+      }
+
+      .variant-nav__link {
+        background: color-mix(in oklab, var(--surface) 90%, transparent);
+        border-color: var(--line);
+        color: var(--muted);
+      }
+
+      .variant-nav__link[aria-current="page"] {
+        background: var(--accent-soft);
+        border-color: color-mix(in oklab, var(--accent) 28%, var(--line));
+        color: oklch(0.35 0.07 38);
+      }
+
+      .rail-shell {
+        padding: 28px 0 40px;
+      }
+
+      .rail-intro {
+        display: grid;
+        gap: 14px;
+        margin-bottom: 22px;
+      }
+
+      .rail-intro h1 {
+        margin: 0;
+        font-size: clamp(38px, 4.4vw, 62px);
+        line-height: 0.96;
+        letter-spacing: -0.05em;
+        max-width: 11ch;
+      }
+
+      .rail-intro p {
+        max-width: 68ch;
+        margin: 0;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.7;
+      }
+
+      .rail-anchors {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 22px;
+      }
+
+      .rail-anchor {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 38px;
+        padding: 0 14px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--surface) 92%, transparent);
+        font-size: 13px;
+      }
+
+      .rail-stack {
+        display: grid;
+        gap: 26px;
+      }
+
+      .rail-demo {
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 30px;
+        background: color-mix(in oklab, var(--surface) 96%, transparent);
+        box-shadow: var(--shadow-soft);
+      }
+
+      .rail-demo__label {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        padding: 18px 22px;
+        border-bottom: 1px solid var(--line);
+        background: color-mix(in oklab, var(--surface-2) 82%, transparent);
+      }
+
+      .rail-demo__label strong {
+        font-size: 15px;
+      }
+
+      .rail-demo__label span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .app-frame {
+        display: grid;
+        grid-template-columns: 188px minmax(0, 1fr);
+        min-height: 720px;
+      }
+
+      .app-rail {
+        display: grid;
+        grid-template-rows: auto auto 1fr auto auto;
+        gap: 10px;
+        padding: 22px 16px 16px;
+        border-right: 1px solid var(--line);
+        background: color-mix(in oklab, var(--surface-3) 78%, transparent);
+      }
+
+      .app-rail__brand {
+        display: grid;
+        gap: 5px;
+        padding: 0 6px 8px;
+      }
+
+      .app-rail__brand-mark {
+        font-size: 18px;
+        line-height: 1;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+      }
+
+      .app-rail__brand-sub {
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .app-rail__nav {
+        display: grid;
+        gap: 4px;
+      }
+
+      .app-rail__link {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        min-height: 34px;
+        padding: 0 10px;
+        border: 1px solid transparent;
+        border-radius: 10px;
+        color: var(--muted);
+        font-size: 12px;
+        letter-spacing: 0.01em;
+      }
+
+      .app-rail__link::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--line-strong) 72%, transparent);
+        opacity: 0;
+      }
+
+      .app-rail__link--active {
+        background: color-mix(in oklab, var(--accent-soft) 44%, var(--surface));
+        border-color: color-mix(in oklab, var(--accent) 16%, var(--line));
+        color: oklch(0.35 0.07 38);
+        font-weight: 600;
+      }
+
+      .app-rail__link--active::before {
+        opacity: 1;
+        background: color-mix(in oklab, var(--accent) 72%, white);
+      }
+
+      .app-rail__utility {
+        display: grid;
+        gap: 10px;
+        padding-top: 8px;
+      }
+
+      .app-rail__status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 30px;
+        padding: 0 10px;
+        border: 1px solid transparent;
+        border-radius: 10px;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.4;
+      }
+
+      .app-rail__status-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        flex-shrink: 0;
+      }
+
+      .app-rail__status--healthy {
+        background: color-mix(in oklab, var(--success-soft) 30%, var(--surface));
+        border-color: color-mix(in oklab, var(--success) 16%, var(--line));
+      }
+
+      .app-rail__status--healthy .app-rail__status-dot {
+        background: var(--success);
+      }
+
+      .app-rail__status--degraded {
+        background: color-mix(in oklab, var(--warning-soft) 40%, var(--surface));
+        border-color: color-mix(in oklab, var(--warning) 18%, var(--line));
+        color: oklch(0.47 0.08 82);
+      }
+
+      .app-rail__status--degraded .app-rail__status-dot {
+        background: var(--warning);
+      }
+
+      .app-rail__status--failed {
+        background: color-mix(in oklab, var(--danger-soft) 40%, var(--surface));
+        border-color: color-mix(in oklab, var(--danger) 18%, var(--line));
+        color: oklch(0.44 0.09 28);
+      }
+
+      .app-rail__status--failed .app-rail__status-dot {
+        background: var(--danger);
+      }
+
+      .app-rail__refresh {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 32px;
+        padding: 0 10px;
+        border: 1px dashed var(--line);
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--surface) 96%, transparent);
+        font-size: 11px;
+        color: var(--muted);
+      }
+
+      .app-content {
+        min-width: 0;
+        padding: 26px 28px;
+        background: color-mix(in oklab, var(--surface) 90%, transparent);
+      }
+
+      .content-head {
+        display: grid;
+        gap: 10px;
+        padding-bottom: 18px;
+        border-bottom: 1px solid color-mix(in oklab, var(--line) 72%, transparent);
+      }
+
+      .content-head__eyebrow {
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .content-head__title {
+        font-size: clamp(30px, 3vw, 42px);
+        line-height: 0.98;
+        letter-spacing: -0.05em;
+      }
+
+      .content-head__body {
+        max-width: 58ch;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.68;
+      }
+
+      .content-ghost {
+        display: grid;
+        gap: 12px;
+        padding-top: 18px;
+      }
+
+      .content-ghost__line {
+        height: 12px;
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--surface-2) 70%, transparent);
+      }
+
+      .content-ghost__line--w1 { width: 76%; }
+      .content-ghost__line--w2 { width: 48%; }
+      .content-ghost__line--w3 { width: 84%; }
+      .content-ghost__line--w4 { width: 64%; }
+
+      @media (max-width: 920px) {
+        .app-frame {
+          grid-template-columns: 1fr;
+        }
+
+        .app-rail {
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="mock-shell">
+      <header class="variant-header">
+        <div class="variant-brand">
+          <div class="variant-brand__eyebrow">Global skeleton study</div>
+          <div class="variant-brand__title">Focused Rail</div>
+        </div>
+        <nav class="variant-nav" aria-label="Variant navigation">
+          <a class="variant-nav__link" href="../index.html">Overview</a>
+          <a class="variant-nav__link" href="../live-session/focused-flow.html">Focused Flow</a>
+          <a class="variant-nav__link" href="../quick-dictation/ptt-hud.html">PTT HUD</a>
+          <a class="variant-nav__link" href="../history/focused-archive.html">History</a>
+          <a class="variant-nav__link" href="../settings/focused-controls.html">Settings</a>
+          <a class="variant-nav__link" aria-current="page" href="./focused-rail.html">Sidebar</a>
+        </nav>
+      </header>
+
+      <main class="screen rail-shell">
+        <div class="frame-note">This study isolates the global left rail, so identity, active-state grammar, and utility hierarchy can be judged without page content noise.</div>
+
+        <section class="rail-intro">
+          <h1>The app rail should feel like a spine, not a list.</h1>
+          <p>
+            The goal is not a flashy sidebar. It is a precise global skeleton: brand at the top, just a few clear workspace sections in the middle, then a quiet utility zone for service health and refresh at the bottom.
+          </p>
+        </section>
+
+        <div class="rail-anchors">
+          <div class="rail-anchor"><strong>Brand block</strong> A clearer start to the app shell.</div>
+          <div class="rail-anchor"><strong>Active grammar</strong> Dot plus soft field, not a loud slab.</div>
+          <div class="rail-anchor"><strong>Utility zone</strong> Status and refresh, visibly not navigation.</div>
+        </div>
+
+        <section class="rail-stack">
+          <article class="rail-demo">
+            <div class="rail-demo__label">
+              <strong>Healthy · Live Session active</strong>
+              <span>The default daily state.</span>
+            </div>
+
+            <div class="app-frame">
+              <aside class="app-rail">
+                <div class="app-rail__brand">
+                  <div class="app-rail__brand-mark">JustSay</div>
+                  <div class="app-rail__brand-sub">Voice workspace</div>
+                </div>
+
+                <nav class="app-rail__nav" aria-label="Workspace sections">
+                  <div class="app-rail__link">Quick Dictation</div>
+                  <div class="app-rail__link app-rail__link--active">Live Session</div>
+                  <div class="app-rail__link">History</div>
+                  <div class="app-rail__link">Settings</div>
+                </nav>
+
+                <div></div>
+
+                <div class="app-rail__utility">
+                  <div class="app-rail__status app-rail__status--healthy">
+                    <span class="app-rail__status-dot"></span>
+                    Local service healthy
+                  </div>
+                  <div class="app-rail__refresh">Refresh</div>
+                </div>
+              </aside>
+
+              <section class="app-content">
+                <div class="content-head">
+                  <div class="content-head__eyebrow">Content placeholder</div>
+                  <div class="content-head__title">Live Session</div>
+                  <div class="content-head__body">The content area is intentionally quiet here. The point is to let the rail establish the application identity without competing with page detail.</div>
+                </div>
+                <div class="content-ghost">
+                  <div class="content-ghost__line content-ghost__line--w1"></div>
+                  <div class="content-ghost__line content-ghost__line--w2"></div>
+                  <div class="content-ghost__line content-ghost__line--w3"></div>
+                  <div class="content-ghost__line content-ghost__line--w4"></div>
+                </div>
+              </section>
+            </div>
+          </article>
+
+          <article class="rail-demo">
+            <div class="rail-demo__label">
+              <strong>Healthy · History active</strong>
+              <span>Active state should stay consistent across sections.</span>
+            </div>
+
+            <div class="app-frame">
+              <aside class="app-rail">
+                <div class="app-rail__brand">
+                  <div class="app-rail__brand-mark">JustSay</div>
+                  <div class="app-rail__brand-sub">Voice workspace</div>
+                </div>
+
+                <nav class="app-rail__nav" aria-label="Workspace sections">
+                  <div class="app-rail__link">Quick Dictation</div>
+                  <div class="app-rail__link">Live Session</div>
+                  <div class="app-rail__link app-rail__link--active">History</div>
+                  <div class="app-rail__link">Settings</div>
+                </nav>
+
+                <div></div>
+
+                <div class="app-rail__utility">
+                  <div class="app-rail__status app-rail__status--healthy">
+                    <span class="app-rail__status-dot"></span>
+                    Local service healthy
+                  </div>
+                  <div class="app-rail__refresh">Refresh</div>
+                </div>
+              </aside>
+
+              <section class="app-content">
+                <div class="content-head">
+                  <div class="content-head__eyebrow">Content placeholder</div>
+                  <div class="content-head__title">History</div>
+                  <div class="content-head__body">The same active grammar should hold across every section, so the rail feels like one stable system instead of four differently styled buttons.</div>
+                </div>
+                <div class="content-ghost">
+                  <div class="content-ghost__line content-ghost__line--w2"></div>
+                  <div class="content-ghost__line content-ghost__line--w3"></div>
+                  <div class="content-ghost__line content-ghost__line--w1"></div>
+                  <div class="content-ghost__line content-ghost__line--w4"></div>
+                </div>
+              </section>
+            </div>
+          </article>
+
+          <article class="rail-demo">
+            <div class="rail-demo__label">
+              <strong>Degraded utility zone</strong>
+              <span>Status becomes more explicit, but still stays outside main navigation.</span>
+            </div>
+
+            <div class="app-frame">
+              <aside class="app-rail">
+                <div class="app-rail__brand">
+                  <div class="app-rail__brand-mark">JustSay</div>
+                  <div class="app-rail__brand-sub">Voice workspace</div>
+                </div>
+
+                <nav class="app-rail__nav" aria-label="Workspace sections">
+                  <div class="app-rail__link">Quick Dictation</div>
+                  <div class="app-rail__link">Live Session</div>
+                  <div class="app-rail__link">History</div>
+                  <div class="app-rail__link app-rail__link--active">Settings</div>
+                </nav>
+
+                <div></div>
+
+                <div class="app-rail__utility">
+                  <div class="app-rail__status app-rail__status--degraded">
+                    <span class="app-rail__status-dot"></span>
+                    Local service degraded
+                  </div>
+                  <div class="app-rail__refresh">Refresh</div>
+                </div>
+              </aside>
+
+              <section class="app-content">
+                <div class="content-head">
+                  <div class="content-head__eyebrow">Content placeholder</div>
+                  <div class="content-head__title">Settings</div>
+                  <div class="content-head__body">Utility feedback should become stronger when the system degrades, but it still should not look like another navigational destination.</div>
+                </div>
+                <div class="content-ghost">
+                  <div class="content-ghost__line content-ghost__line--w4"></div>
+                  <div class="content-ghost__line content-ghost__line--w1"></div>
+                  <div class="content-ghost__line content-ghost__line--w3"></div>
+                  <div class="content-ghost__line content-ghost__line--w2"></div>
+                </div>
+              </section>
+            </div>
+          </article>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

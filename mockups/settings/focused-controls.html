@@ -1,0 +1,1104 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Focused Controls · JustSay Settings</title>
+    <link rel="stylesheet" href="../live-session/styles.css" />
+    <style>
+      :root {
+        color-scheme: light;
+        --page: oklch(0.952 0.014 84);
+        --surface: oklch(0.986 0.005 84);
+        --surface-2: oklch(0.97 0.01 86);
+        --surface-3: oklch(0.958 0.014 84);
+        --line: oklch(0.86 0.008 74);
+        --ink: oklch(0.245 0.015 58);
+        --muted: oklch(0.5 0.012 58);
+        --muted-2: oklch(0.63 0.01 60);
+        --accent: oklch(0.57 0.135 40);
+        --accent-soft: oklch(0.925 0.032 40);
+        --success: oklch(0.55 0.11 156);
+        --success-soft: oklch(0.94 0.026 156);
+        --warning: oklch(0.69 0.13 78);
+        --warning-soft: oklch(0.95 0.03 82);
+        --danger: oklch(0.57 0.17 28);
+        --danger-soft: oklch(0.95 0.028 28);
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at top left, oklch(0.988 0.03 92), transparent 26%),
+          linear-gradient(180deg, oklch(0.972 0.015 84), var(--page));
+        color: var(--ink);
+      }
+
+      .variant-header {
+        background: color-mix(in oklab, var(--surface) 88%, transparent);
+        border-bottom: 1px solid color-mix(in oklab, var(--line) 88%, transparent);
+      }
+
+      .variant-brand__eyebrow,
+      .frame-note {
+        color: var(--muted);
+      }
+
+      .variant-nav__link {
+        background: color-mix(in oklab, var(--surface) 90%, transparent);
+        border-color: var(--line);
+        color: var(--muted);
+      }
+
+      .variant-nav__link[aria-current="page"] {
+        background: var(--accent-soft);
+        border-color: color-mix(in oklab, var(--accent) 28%, var(--line));
+        color: oklch(0.35 0.07 38);
+      }
+
+      .settings-shell {
+        padding: 26px 0 40px;
+      }
+
+      .settings-intro {
+        display: grid;
+        gap: 14px;
+        margin-bottom: 18px;
+      }
+
+      .settings-intro h1 {
+        margin: 0;
+        font-size: clamp(34px, 4.2vw, 58px);
+        line-height: 0.96;
+        letter-spacing: -0.05em;
+        max-width: 11ch;
+      }
+
+      .settings-intro p {
+        max-width: 68ch;
+        margin: 0;
+        font-size: 15px;
+        line-height: 1.72;
+        color: var(--muted);
+      }
+
+      .settings-anchors {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+
+      .settings-anchor {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 38px;
+        padding: 0 14px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--surface) 92%, transparent);
+        font-size: 13px;
+      }
+
+      .settings-stack {
+        display: grid;
+        gap: 26px;
+      }
+
+      .settings-demo {
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 30px;
+        background: color-mix(in oklab, var(--surface) 96%, transparent);
+        box-shadow: var(--shadow-soft);
+      }
+
+      .settings-demo__label {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        padding: 18px 22px;
+        border-bottom: 1px solid var(--line);
+        background: color-mix(in oklab, var(--surface-2) 82%, transparent);
+      }
+
+      .settings-demo__label strong {
+        font-size: 15px;
+      }
+
+      .settings-demo__label span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .workspace-preview {
+        display: grid;
+        grid-template-columns: 188px minmax(0, 1fr);
+        min-height: 780px;
+      }
+
+      .workspace-sidebar {
+        display: grid;
+        grid-template-rows: auto auto 1fr auto auto;
+        gap: 10px;
+        padding: 22px 16px 16px;
+        border-right: 1px solid var(--line);
+        background: color-mix(in oklab, var(--surface-3) 78%, transparent);
+      }
+
+      .workspace-sidebar__brand {
+        display: grid;
+        gap: 5px;
+        padding: 0 6px 8px;
+      }
+
+      .workspace-sidebar__brand-mark {
+        font-size: 18px;
+        line-height: 1;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+      }
+
+      .workspace-sidebar__eyebrow {
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .workspace-sidebar__nav {
+        display: grid;
+        gap: 4px;
+      }
+
+      .workspace-sidebar__link {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        min-height: 34px;
+        padding: 0 10px;
+        border: 1px solid transparent;
+        border-radius: 10px;
+        color: var(--muted);
+        font-size: 12px;
+        letter-spacing: 0.01em;
+      }
+
+      .workspace-sidebar__link::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--line-strong) 72%, transparent);
+        opacity: 0;
+      }
+
+      .workspace-sidebar__link--active {
+        background: color-mix(in oklab, var(--accent-soft) 44%, var(--surface));
+        border-color: color-mix(in oklab, var(--accent) 16%, var(--line));
+        color: oklch(0.35 0.07 38);
+        font-weight: 600;
+      }
+
+      .workspace-sidebar__link--active::before {
+        opacity: 1;
+        background: color-mix(in oklab, var(--accent) 72%, white);
+      }
+
+      .workspace-sidebar__utility {
+        display: grid;
+        gap: 10px;
+        padding-top: 8px;
+      }
+
+      .workspace-sidebar__status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 30px;
+        padding: 0 10px;
+        border: 1px solid transparent;
+        border-radius: 10px;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.4;
+      }
+
+      .workspace-sidebar__status-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        flex-shrink: 0;
+      }
+
+      .workspace-sidebar__status--healthy {
+        background: color-mix(in oklab, var(--success-soft) 30%, var(--surface));
+        border-color: color-mix(in oklab, var(--success) 16%, var(--line));
+      }
+
+      .workspace-sidebar__status--healthy .workspace-sidebar__status-dot {
+        background: var(--success);
+      }
+
+      .workspace-sidebar__status--degraded .workspace-sidebar__status-dot {
+        background: var(--warning);
+      }
+
+      .workspace-sidebar__refresh {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 32px;
+        padding: 0 10px;
+        border: 1px dashed var(--line);
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--surface) 96%, transparent);
+        font-size: 11px;
+        color: var(--muted);
+      }
+
+      .workspace-main {
+        min-width: 0;
+        background: color-mix(in oklab, var(--surface) 90%, transparent);
+      }
+
+      .settings-screen {
+        display: grid;
+        grid-template-columns: 220px minmax(0, 1fr);
+        min-height: 100%;
+      }
+
+      .settings-directory {
+        display: grid;
+        align-content: start;
+        gap: 4px;
+        padding: 26px 18px;
+        border-right: 1px solid var(--line);
+        background: color-mix(in oklab, var(--surface-2) 32%, transparent);
+      }
+
+      .settings-directory__eyebrow {
+        margin-bottom: 10px;
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .settings-directory__link {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 32px;
+        padding: 0 10px;
+        border: 1px solid transparent;
+        border-radius: 10px;
+        color: var(--muted);
+        font-size: 12px;
+        letter-spacing: 0.01em;
+      }
+
+      .settings-directory__link::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--line-strong) 72%, transparent);
+        opacity: 0;
+      }
+
+      .settings-directory__link--active {
+        background: color-mix(in oklab, var(--accent-soft) 44%, var(--surface));
+        border-color: color-mix(in oklab, var(--accent) 16%, var(--line));
+        color: oklch(0.35 0.07 38);
+        font-weight: 600;
+      }
+
+      .settings-directory__link--active::before {
+        opacity: 1;
+        background: color-mix(in oklab, var(--accent) 72%, white);
+      }
+
+      .settings-content {
+        min-width: 0;
+      }
+
+      .settings-header {
+        display: grid;
+        gap: 10px;
+        padding: 26px 28px 20px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .settings-header__eyebrow {
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .settings-header__row {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+
+      .settings-header__title {
+        font-size: clamp(30px, 2.8vw, 42px);
+        line-height: 0.98;
+        letter-spacing: -0.05em;
+      }
+
+      .settings-header__meta {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 26px;
+        padding: 0 10px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--surface) 96%, transparent);
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .status-pill--saved {
+        background: color-mix(in oklab, var(--success-soft) 56%, var(--surface));
+        border-color: color-mix(in oklab, var(--success) 24%, var(--line));
+        color: oklch(0.38 0.08 156);
+      }
+
+      .status-pill--warning {
+        background: color-mix(in oklab, var(--warning-soft) 58%, var(--surface));
+        border-color: color-mix(in oklab, var(--warning) 24%, var(--line));
+        color: oklch(0.48 0.08 82);
+      }
+
+      .settings-header__sub {
+        max-width: 64ch;
+        font-size: 14px;
+        line-height: 1.68;
+        color: var(--muted);
+      }
+
+      .settings-sheet {
+        padding: 0 28px 24px;
+      }
+
+      .settings-section {
+        display: grid;
+        gap: 2px;
+        padding: 22px 0 6px;
+      }
+
+      .settings-section__head {
+        display: grid;
+        gap: 6px;
+        margin-bottom: 10px;
+      }
+
+      .settings-section__title {
+        font-size: 22px;
+        line-height: 1.08;
+        letter-spacing: -0.03em;
+      }
+
+      .settings-section__body {
+        max-width: 62ch;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.7;
+      }
+
+      .settings-row {
+        display: grid;
+        grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
+        gap: 18px;
+        align-items: start;
+        padding: 16px 0;
+        border-top: 1px solid color-mix(in oklab, var(--line) 58%, transparent);
+      }
+
+      .settings-row__label {
+        display: grid;
+        gap: 6px;
+      }
+
+      .settings-row__title {
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .settings-row__hint {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.6;
+      }
+
+      .settings-row__control {
+        display: grid;
+        gap: 10px;
+        max-width: 560px;
+      }
+
+      .field-chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 40px;
+        padding: 0 14px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: color-mix(in oklab, var(--surface) 98%, transparent);
+        font-size: 13px;
+      }
+
+      .field-chip--invalid {
+        border-color: color-mix(in oklab, var(--danger) 28%, var(--line));
+        background: color-mix(in oklab, var(--danger-soft) 42%, var(--surface));
+        color: oklch(0.44 0.09 28);
+      }
+
+      .segmented {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .segment {
+        display: inline-flex;
+        align-items: center;
+        min-height: 34px;
+        padding: 0 12px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .segment--active {
+        background: var(--accent-soft);
+        border-color: color-mix(in oklab, var(--accent) 24%, var(--line));
+        color: oklch(0.35 0.07 38);
+        font-weight: 600;
+      }
+
+      .switch {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        min-height: 34px;
+        font-size: 13px;
+      }
+
+      .switch__track {
+        position: relative;
+        width: 46px;
+        height: 28px;
+        border-radius: 999px;
+        border: 1px solid color-mix(in oklab, var(--accent) 16%, var(--line));
+        background: color-mix(in oklab, var(--accent-soft) 60%, var(--surface));
+      }
+
+      .switch__track::after {
+        content: "";
+        position: absolute;
+        top: 3px;
+        left: 21px;
+        width: 20px;
+        height: 20px;
+        border-radius: 999px;
+        background: var(--surface);
+        border: 1px solid color-mix(in oklab, var(--line) 84%, transparent);
+      }
+
+      .switch--off .switch__track {
+        background: color-mix(in oklab, var(--surface-2) 72%, transparent);
+        border-color: var(--line);
+      }
+
+      .switch--off .switch__track::after {
+        left: 3px;
+      }
+
+      .settings-note {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.6;
+      }
+
+      .settings-note--danger {
+        color: oklch(0.44 0.09 28);
+      }
+
+      .preset-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .preset {
+        display: grid;
+        gap: 10px;
+        padding: 14px 0;
+        border-top: 1px solid color-mix(in oklab, var(--line) 58%, transparent);
+      }
+
+      .preset__row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+      }
+
+      .preset__copy {
+        display: grid;
+        gap: 6px;
+      }
+
+      .preset__name {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .preset__current {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        padding: 0 8px;
+        border: 1px solid color-mix(in oklab, var(--accent) 24%, var(--line));
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: oklch(0.35 0.07 38);
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .preset__summary {
+        max-width: 42ch;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.64;
+      }
+
+      .preset__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .quiet-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 34px;
+        padding: 0 12px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--surface) 96%, transparent);
+        font-size: 12px;
+      }
+
+      .quiet-button--active {
+        background: var(--accent-soft);
+        border-color: color-mix(in oklab, var(--accent) 24%, var(--line));
+        color: oklch(0.35 0.07 38);
+        font-weight: 600;
+      }
+
+      .quiet-button--busy {
+        background: color-mix(in oklab, var(--warning-soft) 54%, var(--surface));
+        border-color: color-mix(in oklab, var(--warning) 24%, var(--line));
+        color: oklch(0.48 0.08 82);
+      }
+
+      .quiet-button--secondary {
+        border-style: dashed;
+      }
+
+      .result-line {
+        font-size: 12px;
+        line-height: 1.6;
+        color: var(--muted);
+      }
+
+      .result-line--danger {
+        color: oklch(0.44 0.09 28);
+      }
+
+      .advanced-shell {
+        display: grid;
+        gap: 12px;
+        padding-top: 4px;
+      }
+
+      .advanced-summary {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 16px;
+        padding: 14px 0 10px;
+        border-top: 1px solid color-mix(in oklab, var(--line) 58%, transparent);
+      }
+
+      .advanced-summary__title {
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .advanced-summary__meta {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .advanced-warning {
+        max-width: 62ch;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.65;
+      }
+
+      @media (max-width: 1180px) {
+        .settings-screen {
+          grid-template-columns: 188px minmax(0, 1fr);
+        }
+
+        .settings-row {
+          grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+        }
+      }
+
+      @media (max-width: 920px) {
+        .workspace-preview {
+          grid-template-columns: 1fr;
+        }
+
+        .workspace-sidebar {
+          grid-template-rows: auto auto;
+          gap: 14px;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .workspace-sidebar__status,
+        .workspace-sidebar__refresh {
+          display: none;
+        }
+
+        .settings-screen {
+          grid-template-columns: 1fr;
+        }
+
+        .settings-directory {
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .settings-row {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 720px) {
+        .settings-shell {
+          padding-top: 18px;
+        }
+
+        .settings-header,
+        .settings-sheet,
+        .settings-directory {
+          padding-left: 16px;
+          padding-right: 16px;
+        }
+
+        .preset__row,
+        .advanced-summary,
+        .settings-header__row {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="mock-shell">
+      <header class="variant-header">
+        <div class="variant-brand">
+          <div class="variant-brand__eyebrow">Support surface</div>
+          <div class="variant-brand__title">Focused Controls</div>
+        </div>
+        <nav class="variant-nav" aria-label="Variant navigation">
+          <a class="variant-nav__link" href="../index.html">Overview</a>
+          <a class="variant-nav__link" href="../live-session/focused-flow.html">Focused Flow</a>
+          <a class="variant-nav__link" href="../quick-dictation/ptt-hud.html">PTT HUD</a>
+          <a class="variant-nav__link" href="../history/focused-archive.html">History</a>
+          <a class="variant-nav__link" aria-current="page" href="./focused-controls.html">Settings</a>
+        </nav>
+      </header>
+
+      <main class="screen settings-shell">
+        <div class="frame-note">Settings should feel like a calm control sheet, not a technical back office.</div>
+
+        <section class="settings-intro">
+          <h1>Defaults should be easy to trust and easy to ignore.</h1>
+          <p>
+            This surface is for occasional maintenance, not daily work. The final direction keeps the left directory persistent, shows only one section at a time on the right, and makes risky areas quieter but still discoverable.
+          </p>
+        </section>
+
+        <div class="settings-anchors">
+          <div class="settings-anchor"><strong>Single section</strong> The right pane changes with the directory.</div>
+          <div class="settings-anchor"><strong>Saved state</strong> Routine changes stay calm.</div>
+          <div class="settings-anchor"><strong>Checking</strong> Recognition needs active feedback.</div>
+          <div class="settings-anchor"><strong>Guarded advanced</strong> Visible, but low confidence by default.</div>
+        </div>
+
+        <section class="settings-stack">
+          <article class="settings-demo">
+            <div class="settings-demo__label">
+              <strong>Settings · Workspace</strong>
+              <span>Common defaults, current section only, with saved feedback.</span>
+            </div>
+
+            <div class="workspace-preview">
+              <aside class="workspace-sidebar">
+                <div class="workspace-sidebar__brand">
+                  <div class="workspace-sidebar__brand-mark">JustSay</div>
+                  <div class="workspace-sidebar__eyebrow">Voice workspace</div>
+                </div>
+                <nav class="workspace-sidebar__nav" aria-label="App sections">
+                  <div class="workspace-sidebar__link">Quick Dictation</div>
+                  <div class="workspace-sidebar__link">Live Session</div>
+                  <div class="workspace-sidebar__link">History</div>
+                  <div class="workspace-sidebar__link workspace-sidebar__link--active">Settings</div>
+                </nav>
+                <div></div>
+                <div class="workspace-sidebar__utility">
+                  <div class="workspace-sidebar__status workspace-sidebar__status--healthy">
+                    <span class="workspace-sidebar__status-dot"></span>
+                    Local service healthy
+                  </div>
+                  <div class="workspace-sidebar__refresh">Refresh</div>
+                </div>
+              </aside>
+
+              <div class="workspace-main">
+                <section class="settings-screen">
+                  <aside class="settings-directory">
+                    <div class="settings-directory__eyebrow">Sections</div>
+                    <div class="settings-directory__link settings-directory__link--active">Workspace</div>
+                    <div class="settings-directory__link">Dictation</div>
+                    <div class="settings-directory__link">Meetings</div>
+                    <div class="settings-directory__link">Translation</div>
+                    <div class="settings-directory__link">Recognition</div>
+                    <div class="settings-directory__link">Advanced</div>
+                  </aside>
+
+                  <div class="settings-content">
+                    <div class="settings-header">
+                      <div class="settings-header__eyebrow">Settings</div>
+                      <div class="settings-header__row">
+                        <div class="settings-header__title">Workspace</div>
+                        <div class="settings-header__meta">
+                          <span class="status-pill status-pill--saved">Saved just now</span>
+                          <span>Appearance and basic app behavior</span>
+                        </div>
+                      </div>
+                      <div class="settings-header__sub">
+                        Quiet defaults. These are the choices most people should set once, then stop thinking about.
+                      </div>
+                    </div>
+
+                    <div class="settings-sheet">
+                      <section class="settings-section">
+                        <div class="settings-row">
+                          <div class="settings-row__label">
+                            <div class="settings-row__title">App language</div>
+                            <div class="settings-row__hint">The interface language for the desktop app.</div>
+                          </div>
+                          <div class="settings-row__control">
+                            <div class="field-chip">Chinese (Simplified)</div>
+                          </div>
+                        </div>
+
+                        <div class="settings-row">
+                          <div class="settings-row__label">
+                            <div class="settings-row__title">Theme</div>
+                            <div class="settings-row__hint">Usually this should follow the operating system.</div>
+                          </div>
+                          <div class="settings-row__control">
+                            <div class="segmented">
+                              <div class="segment segment--active">Match system</div>
+                              <div class="segment">Light</div>
+                              <div class="segment">Dark</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div class="settings-row">
+                          <div class="settings-row__label">
+                            <div class="settings-row__title">Keep JustSay in the tray</div>
+                            <div class="settings-row__hint">Useful if you want PTT and Live Session ready without reopening the app.</div>
+                          </div>
+                          <div class="settings-row__control">
+                            <div class="switch">
+                              <div class="switch__track"></div>
+                              <span>Enabled</span>
+                            </div>
+                          </div>
+                        </div>
+                      </section>
+                    </div>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </article>
+
+          <article class="settings-demo">
+            <div class="settings-demo__label">
+              <strong>Settings · Recognition</strong>
+              <span>Checking, current preset emphasis, and failure feedback.</span>
+            </div>
+
+            <div class="workspace-preview">
+              <aside class="workspace-sidebar">
+                <div class="workspace-sidebar__brand">
+                  <div class="workspace-sidebar__brand-mark">JustSay</div>
+                  <div class="workspace-sidebar__eyebrow">Voice workspace</div>
+                </div>
+                <nav class="workspace-sidebar__nav" aria-label="App sections">
+                  <div class="workspace-sidebar__link">Quick Dictation</div>
+                  <div class="workspace-sidebar__link">Live Session</div>
+                  <div class="workspace-sidebar__link">History</div>
+                  <div class="workspace-sidebar__link workspace-sidebar__link--active">Settings</div>
+                </nav>
+                <div></div>
+                <div class="workspace-sidebar__utility">
+                  <div class="workspace-sidebar__status workspace-sidebar__status--healthy">
+                    <span class="workspace-sidebar__status-dot"></span>
+                    Local service healthy
+                  </div>
+                  <div class="workspace-sidebar__refresh">Refresh</div>
+                </div>
+              </aside>
+
+              <div class="workspace-main">
+                <section class="settings-screen">
+                  <aside class="settings-directory">
+                    <div class="settings-directory__eyebrow">Sections</div>
+                    <div class="settings-directory__link">Workspace</div>
+                    <div class="settings-directory__link">Dictation</div>
+                    <div class="settings-directory__link">Meetings</div>
+                    <div class="settings-directory__link">Translation</div>
+                    <div class="settings-directory__link settings-directory__link--active">Recognition</div>
+                    <div class="settings-directory__link">Advanced</div>
+                  </aside>
+
+                  <div class="settings-content">
+                    <div class="settings-header">
+                      <div class="settings-header__eyebrow">Settings</div>
+                      <div class="settings-header__row">
+                        <div class="settings-header__title">Recognition</div>
+                        <div class="settings-header__meta">
+                          <span class="status-pill status-pill--warning">Checking profile</span>
+                          <span>Speed and accuracy tradeoff</span>
+                        </div>
+                      </div>
+                      <div class="settings-header__sub">
+                        The current preset should be obvious at a glance. Alternative presets remain available, but they should not compete for attention unless the user is actively changing them.
+                      </div>
+                    </div>
+
+                    <div class="settings-sheet">
+                      <section class="settings-section">
+                        <div class="settings-section__head">
+                          <div class="settings-section__title">Available presets</div>
+                          <div class="settings-section__body">Most people should stay on one default unless they are explicitly trading speed against quality.</div>
+                        </div>
+
+                        <div class="preset-list">
+                          <div class="preset">
+                            <div class="preset__row">
+                              <div class="preset__copy">
+                                <div class="preset__name">
+                                  Local accurate
+                                  <span class="preset__current">Current</span>
+                                </div>
+                                <div class="preset__summary">Best overall quality for longer meetings and cleanup work. Slightly slower.</div>
+                              </div>
+                              <div class="preset__actions">
+                                <div class="quiet-button quiet-button--active">Current</div>
+                                <div class="quiet-button">Check</div>
+                              </div>
+                            </div>
+                            <div class="result-line">Last check passed, local model available and ready.</div>
+                          </div>
+
+                          <div class="preset">
+                            <div class="preset__row">
+                              <div class="preset__copy">
+                                <div class="preset__name">Local balanced</div>
+                                <div class="preset__summary">Lower latency and good enough accuracy for everyday dictation and lighter meetings.</div>
+                              </div>
+                              <div class="preset__actions">
+                                <div class="quiet-button">Use</div>
+                                <div class="quiet-button quiet-button--busy">Checking…</div>
+                              </div>
+                            </div>
+                            <div class="result-line">Running a short validation against the local service.</div>
+                          </div>
+
+                          <div class="preset">
+                            <div class="preset__row">
+                              <div class="preset__copy">
+                                <div class="preset__name">Cloud fallback</div>
+                                <div class="preset__summary">Use only when local quality or hardware constraints make remote recognition necessary.</div>
+                              </div>
+                              <div class="preset__actions">
+                                <div class="quiet-button">Use</div>
+                                <div class="quiet-button quiet-button--secondary">Check again</div>
+                              </div>
+                            </div>
+                            <div class="result-line result-line--danger">Last check failed, remote endpoint did not respond within 8 seconds.</div>
+                          </div>
+                        </div>
+                      </section>
+                    </div>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </article>
+
+          <article class="settings-demo">
+            <div class="settings-demo__label">
+              <strong>Settings · Advanced</strong>
+              <span>Still visible, but quieter, with invalid input and degraded service states.</span>
+            </div>
+
+            <div class="workspace-preview">
+              <aside class="workspace-sidebar">
+                <div class="workspace-sidebar__brand">
+                  <div class="workspace-sidebar__brand-mark">JustSay</div>
+                  <div class="workspace-sidebar__eyebrow">Voice workspace</div>
+                </div>
+                <nav class="workspace-sidebar__nav" aria-label="App sections">
+                  <div class="workspace-sidebar__link">Quick Dictation</div>
+                  <div class="workspace-sidebar__link">Live Session</div>
+                  <div class="workspace-sidebar__link">History</div>
+                  <div class="workspace-sidebar__link workspace-sidebar__link--active">Settings</div>
+                </nav>
+                <div></div>
+                <div class="workspace-sidebar__utility">
+                  <div class="workspace-sidebar__status workspace-sidebar__status--degraded">
+                    <span class="workspace-sidebar__status-dot"></span>
+                    Local service degraded
+                  </div>
+                  <div class="workspace-sidebar__refresh">Refresh</div>
+                </div>
+              </aside>
+
+              <div class="workspace-main">
+                <section class="settings-screen">
+                  <aside class="settings-directory">
+                    <div class="settings-directory__eyebrow">Sections</div>
+                    <div class="settings-directory__link">Workspace</div>
+                    <div class="settings-directory__link">Dictation</div>
+                    <div class="settings-directory__link">Meetings</div>
+                    <div class="settings-directory__link">Translation</div>
+                    <div class="settings-directory__link">Recognition</div>
+                    <div class="settings-directory__link settings-directory__link--active">Advanced</div>
+                  </aside>
+
+                  <div class="settings-content">
+                    <div class="settings-header">
+                      <div class="settings-header__eyebrow">Settings</div>
+                      <div class="settings-header__row">
+                        <div class="settings-header__title">Advanced</div>
+                        <div class="settings-header__meta">
+                          <span class="status-pill status-pill--warning">Service degraded</span>
+                          <span>Connection and diagnostics</span>
+                        </div>
+                      </div>
+                      <div class="settings-header__sub">
+                        Advanced stays visible so it can be found quickly, but it should feel clearly less safe to touch than the rest of the page.
+                      </div>
+                    </div>
+
+                    <div class="settings-sheet">
+                      <section class="settings-section">
+                        <div class="advanced-shell">
+                          <div class="advanced-summary">
+                            <div class="advanced-summary__title">Local speech service</div>
+                            <div class="advanced-summary__meta">Only change this when support asked you to, or while debugging a custom setup.</div>
+                          </div>
+
+                          <div class="settings-row">
+                            <div class="settings-row__label">
+                              <div class="settings-row__title">Speech service host</div>
+                              <div class="settings-row__hint">This usually stays on the machine itself.</div>
+                            </div>
+                            <div class="settings-row__control">
+                              <div class="field-chip">127.0.0.1</div>
+                            </div>
+                          </div>
+
+                          <div class="settings-row">
+                            <div class="settings-row__label">
+                              <div class="settings-row__title">Speech service port</div>
+                              <div class="settings-row__hint">A wrong value here can break dictation and meeting capture completely.</div>
+                            </div>
+                            <div class="settings-row__control">
+                              <div class="field-chip field-chip--invalid">87A5</div>
+                              <div class="settings-note settings-note--danger">Port must be numeric. The current value cannot be used.</div>
+                            </div>
+                          </div>
+
+                          <div class="settings-row">
+                            <div class="settings-row__label">
+                              <div class="settings-row__title">Diagnostics recording</div>
+                              <div class="settings-row__hint">Only meaningful while troubleshooting. Keep it off otherwise.</div>
+                            </div>
+                            <div class="settings-row__control">
+                              <div class="switch switch--off">
+                                <div class="switch__track"></div>
+                                <span>Disabled</span>
+                              </div>
+                              <div class="quiet-button">Export diagnostic bundle</div>
+                              <div class="settings-note">Latest check could not reach the local service. Export can still package current logs.</div>
+                            </div>
+                          </div>
+
+                          <div class="advanced-warning">
+                            Dictation and Live Session are still available, but recognition may fall back or respond slowly until the local service connection is corrected.
+                          </div>
+                        </div>
+                      </section>
+                    </div>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </article>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,804 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Focused Flow · JustSay Live Session</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <style>
+      :root {
+        color-scheme: light;
+        --page: oklch(0.952 0.014 84);
+        --surface: oklch(0.986 0.005 84);
+        --surface-2: oklch(0.97 0.01 86);
+        --line: oklch(0.86 0.008 74);
+        --ink: oklch(0.245 0.015 58);
+        --muted: oklch(0.5 0.012 58);
+        --muted-2: oklch(0.63 0.01 60);
+        --accent: oklch(0.57 0.135 40);
+        --accent-soft: oklch(0.925 0.032 40);
+        --success: oklch(0.55 0.11 156);
+        --success-soft: oklch(0.94 0.026 156);
+        --danger: oklch(0.57 0.17 28);
+      }
+
+      body {
+        background:
+          radial-gradient(circle at top left, oklch(0.988 0.03 92), transparent 26%),
+          linear-gradient(180deg, oklch(0.972 0.015 84), var(--page));
+        color: var(--ink);
+      }
+
+      .variant-header {
+        background: color-mix(in oklab, var(--surface) 88%, transparent);
+        border-bottom: 1px solid color-mix(in oklab, var(--line) 88%, transparent);
+      }
+
+      .variant-brand__eyebrow,
+      .frame-note {
+        color: var(--muted);
+      }
+
+      .variant-nav__link {
+        background: color-mix(in oklab, var(--surface) 90%, transparent);
+        border-color: var(--line);
+        color: var(--muted);
+      }
+
+      .variant-nav__link[aria-current="page"] {
+        background: var(--accent-soft);
+        border-color: color-mix(in oklab, var(--accent) 28%, var(--line));
+        color: oklch(0.35 0.07 38);
+      }
+
+      .flow-shell {
+        padding: 26px 0 40px;
+      }
+
+      .flow-intro {
+        display: grid;
+        gap: 14px;
+        margin-bottom: 18px;
+      }
+
+      .flow-intro h1 {
+        margin: 0;
+        font-size: clamp(34px, 4.2vw, 58px);
+        line-height: 0.96;
+        letter-spacing: -0.05em;
+        max-width: 12ch;
+      }
+
+      .flow-intro p {
+        max-width: 66ch;
+        margin: 0;
+        font-size: 15px;
+        line-height: 1.72;
+        color: var(--muted);
+      }
+
+      .flow-anchors {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+
+      .flow-anchor {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 38px;
+        padding: 0 14px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--surface) 92%, transparent);
+        font-size: 13px;
+      }
+
+      .flow-anchor strong {
+        font-weight: 600;
+      }
+
+      .flow-stack {
+        display: grid;
+        gap: 26px;
+      }
+
+      .flow-demo {
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 30px;
+        background: color-mix(in oklab, var(--surface) 96%, transparent);
+        box-shadow: var(--shadow-soft);
+      }
+
+      .flow-demo__label {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        padding: 18px 22px;
+        border-bottom: 1px solid var(--line);
+        background: color-mix(in oklab, var(--surface-2) 82%, transparent);
+      }
+
+      .flow-demo__label strong {
+        font-size: 15px;
+      }
+
+      .flow-demo__label span {
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .workspace-preview {
+        display: grid;
+        grid-template-columns: 188px minmax(0, 1fr);
+        min-height: 760px;
+      }
+
+      .workspace-sidebar {
+        display: grid;
+        grid-template-rows: auto auto 1fr auto auto;
+        gap: 10px;
+        padding: 22px 16px 16px;
+        border-right: 1px solid var(--line);
+        background: color-mix(in oklab, var(--surface-3) 78%, transparent);
+      }
+
+      .workspace-sidebar__brand {
+        display: grid;
+        gap: 5px;
+        padding: 0 6px 8px;
+      }
+
+      .workspace-sidebar__brand-mark {
+        font-size: 18px;
+        line-height: 1;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+      }
+
+      .workspace-sidebar__eyebrow {
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .workspace-sidebar__nav {
+        display: grid;
+        gap: 4px;
+      }
+
+      .workspace-sidebar__link {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        min-height: 34px;
+        padding: 0 10px;
+        border: 1px solid transparent;
+        border-radius: 10px;
+        color: var(--muted);
+        font-size: 12px;
+        letter-spacing: 0.01em;
+      }
+
+      .workspace-sidebar__link::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--line-strong) 72%, transparent);
+        opacity: 0;
+      }
+
+      .workspace-sidebar__link--active {
+        background: color-mix(in oklab, var(--accent-soft) 44%, var(--surface));
+        border-color: color-mix(in oklab, var(--accent) 16%, var(--line));
+        color: oklch(0.35 0.07 38);
+        font-weight: 600;
+      }
+
+      .workspace-sidebar__link--active::before {
+        opacity: 1;
+        background: color-mix(in oklab, var(--accent) 72%, white);
+      }
+
+      .workspace-sidebar__utility {
+        display: grid;
+        gap: 10px;
+        padding-top: 8px;
+      }
+
+      .workspace-sidebar__status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 30px;
+        padding: 0 10px;
+        border: 1px solid transparent;
+        border-radius: 10px;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.4;
+      }
+
+      .workspace-sidebar__status-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        flex-shrink: 0;
+      }
+
+      .workspace-sidebar__status--healthy {
+        background: color-mix(in oklab, var(--success-soft) 30%, var(--surface));
+        border-color: color-mix(in oklab, var(--success) 16%, var(--line));
+      }
+
+      .workspace-sidebar__status--healthy .workspace-sidebar__status-dot {
+        background: var(--success);
+      }
+
+      .workspace-sidebar__refresh {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 32px;
+        padding: 0 10px;
+        border: 1px dashed var(--line);
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--surface) 96%, transparent);
+        font-size: 11px;
+        color: var(--muted);
+      }
+
+      .workspace-main {
+        min-width: 0;
+        background: color-mix(in oklab, var(--surface) 90%, transparent);
+      }
+
+      .flow-screen {
+        min-height: 760px;
+        display: grid;
+        grid-template-rows: auto auto minmax(0, 1fr) auto;
+      }
+
+      .flow-status {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 18px;
+        padding: 24px 28px 18px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .flow-status__title {
+        display: grid;
+        gap: 8px;
+      }
+
+      .flow-status__eyebrow {
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .flow-status__headline {
+        font-size: clamp(28px, 2.8vw, 42px);
+        line-height: 0.98;
+        letter-spacing: -0.05em;
+      }
+
+      .flow-status__headline-row {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .flow-status__rename {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        padding: 0 10px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .flow-status__body {
+        max-width: 58ch;
+        font-size: 14px;
+        line-height: 1.68;
+        color: var(--muted);
+      }
+
+      .flow-time {
+        display: flex;
+        justify-content: flex-end;
+        align-items: baseline;
+        min-width: 0;
+      }
+
+      .flow-time--live {
+        color: var(--accent);
+      }
+
+      .flow-time--done {
+        color: var(--success);
+      }
+
+      .flow-time__value {
+        font-family: "Cascadia Mono", Consolas, monospace;
+        font-size: clamp(26px, 2.5vw, 36px);
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.03em;
+      }
+
+      .flow-transcript {
+        min-height: 0;
+        overflow: auto;
+        padding: 18px 28px 18px;
+      }
+
+      .flow-transcript__stack {
+        display: grid;
+        gap: 16px;
+      }
+
+      .flow-entry {
+        display: grid;
+        grid-template-columns: 84px minmax(0, 1fr);
+        gap: 16px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid color-mix(in oklab, var(--line) 64%, transparent);
+      }
+
+      .flow-entry--draft {
+        padding: 16px 16px 18px;
+        border: 1px solid color-mix(in oklab, var(--accent) 22%, var(--line));
+        border-radius: 18px;
+        background:
+          linear-gradient(180deg, color-mix(in oklab, var(--accent-soft) 88%, transparent), color-mix(in oklab, var(--surface) 96%, transparent));
+      }
+
+      .flow-entry__time {
+        padding-top: 5px;
+        font-family: "Cascadia Mono", Consolas, monospace;
+        font-size: 12px;
+        color: var(--muted-2);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .flow-entry__body {
+        display: grid;
+        gap: 10px;
+      }
+
+      .flow-entry__meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted-2);
+      }
+
+      .flow-entry__meta strong {
+        color: var(--accent);
+      }
+
+      .flow-entry__primary {
+        max-width: 46ch;
+        font-size: clamp(20px, 1.6vw, 28px);
+        line-height: 1.54;
+        letter-spacing: -0.02em;
+      }
+
+      .flow-entry__secondary {
+        max-width: 58ch;
+        font-size: 14px;
+        line-height: 1.68;
+        color: var(--muted);
+      }
+
+      .flow-bottom {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        padding: 16px 20px 20px;
+        border-top: 1px solid var(--line);
+        background: color-mix(in oklab, var(--surface) 94%, transparent);
+      }
+
+      .flow-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: flex-end;
+      }
+
+      .flow-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 42px;
+        padding: 0 14px;
+        border-radius: 14px;
+        border: 1px solid var(--line);
+        background: color-mix(in oklab, var(--surface) 94%, transparent);
+        font-size: 13px;
+      }
+
+      .flow-button--primary {
+        background: var(--danger);
+        border-color: color-mix(in oklab, var(--danger) 70%, black);
+        color: oklch(0.98 0.01 90);
+        font-weight: 600;
+      }
+
+      .flow-button--strong {
+        background: var(--accent);
+        border-color: color-mix(in oklab, var(--accent) 72%, black);
+        color: oklch(0.98 0.01 90);
+        font-weight: 600;
+      }
+
+      @media (max-width: 920px) {
+        .workspace-preview {
+          grid-template-columns: 1fr;
+        }
+
+        .workspace-sidebar {
+          grid-template-rows: auto auto;
+          gap: 14px;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .workspace-sidebar__status,
+        .workspace-sidebar__refresh {
+          display: none;
+        }
+      }
+
+      @media (max-width: 860px) {
+        .flow-status {
+          grid-template-columns: 1fr;
+        }
+
+        .flow-time {
+          justify-content: flex-start;
+        }
+
+        .flow-bottom {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .flow-actions {
+          justify-content: flex-start;
+        }
+      }
+
+      @media (max-width: 720px) {
+        .flow-shell {
+          padding-top: 18px;
+        }
+
+        .flow-status,
+        .flow-transcript,
+        .flow-bottom {
+          padding-left: 16px;
+          padding-right: 16px;
+        }
+
+        .flow-entry {
+          grid-template-columns: 1fr;
+          gap: 8px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="mock-shell">
+      <header class="variant-header">
+        <div class="variant-brand">
+          <div class="variant-brand__eyebrow">Recommended direction</div>
+          <div class="variant-brand__title">Focused Flow</div>
+        </div>
+        <nav class="variant-nav" aria-label="Variant navigation">
+          <a class="variant-nav__link" href="../index.html">Overview</a>
+          <a class="variant-nav__link" aria-current="page" href="./focused-flow.html">Focused Flow</a>
+          <a class="variant-nav__link" href="../quick-dictation/ptt-hud.html">PTT HUD</a>
+          <a class="variant-nav__link" href="../history/focused-archive.html">History</a>
+          <a class="variant-nav__link" href="../settings/focused-controls.html">Settings</a>
+        </nav>
+      </header>
+
+      <main class="screen flow-shell">
+        <div class="frame-note">Scene: the user stays with the transcript itself, not with the app chrome. Controls stay near the text. Post-session actions arrive only after the session is complete.</div>
+
+        <section class="flow-intro">
+          <h1>One canvas, two honest states.</h1>
+          <p>
+            This mockup is the direct follow-up to your feedback. It removes the persistent right rail, reduces the streaming state to one essential action, and keeps the transcript in place after stopping so the same surface becomes the review screen instead of snapping back to empty.
+          </p>
+        </section>
+
+        <div class="flow-anchors" aria-label="State anchors">
+          <a class="flow-anchor" href="#streaming"><strong>Streaming</strong> minimal live mode</a>
+          <a class="flow-anchor" href="#completed"><strong>Completed</strong> transcript preserved for review</a>
+        </div>
+
+        <div class="flow-stack">
+          <section class="flow-demo" id="streaming" aria-label="Streaming state mockup">
+            <div class="flow-demo__label">
+              <strong>Streaming state</strong>
+              <span>Only session facts, transcript, and a near-hand stop action remain visible.</span>
+            </div>
+
+            <div class="workspace-preview">
+              <aside class="workspace-sidebar">
+                <div class="workspace-sidebar__brand">
+                  <div class="workspace-sidebar__brand-mark">JustSay</div>
+                  <div class="workspace-sidebar__eyebrow">Voice workspace</div>
+                </div>
+
+                <nav class="workspace-sidebar__nav" aria-label="App sections">
+                  <div class="workspace-sidebar__link">Quick Dictation</div>
+                  <div class="workspace-sidebar__link workspace-sidebar__link--active">Live Session</div>
+                  <div class="workspace-sidebar__link">History</div>
+                  <div class="workspace-sidebar__link">Settings</div>
+                </nav>
+
+                <div></div>
+
+                <div class="workspace-sidebar__utility">
+                  <div class="workspace-sidebar__status workspace-sidebar__status--healthy">
+                    <span class="workspace-sidebar__status-dot"></span>
+                    Local service healthy
+                  </div>
+                  <div class="workspace-sidebar__refresh">Refresh</div>
+                </div>
+              </aside>
+
+              <div class="workspace-main">
+                <div class="flow-screen">
+              <div class="flow-status">
+                <div class="flow-status__title">
+                  <div class="flow-status__headline">Live Session</div>
+                </div>
+
+                <div class="flow-time flow-time--live" aria-label="Live session timing">
+                  <div class="flow-time__value">00:34:18</div>
+                </div>
+              </div>
+
+              <div class="flow-transcript">
+                <div class="flow-transcript__stack">
+                  <article class="flow-entry">
+                    <div class="flow-entry__time">09:42:11</div>
+                    <div class="flow-entry__body">
+                      <div class="flow-entry__meta">
+                        <span>Committed</span>
+                        <span>System audio</span>
+                        <span>Speaker A</span>
+                      </div>
+                      <div class="flow-entry__primary">
+                        如果这是实时转录页面，那它首先应该是一个好的阅读界面，而不是一个功能区再加一条转录流。
+                      </div>
+                      <div class="flow-entry__secondary">
+                        If this is the live transcription screen, it should first be a strong reading interface, not a feature area with a transcript stream attached to it.
+                      </div>
+                    </div>
+                  </article>
+
+                  <article class="flow-entry">
+                    <div class="flow-entry__time">09:42:37</div>
+                    <div class="flow-entry__body">
+                      <div class="flow-entry__meta">
+                        <span>Committed</span>
+                        <span>Microphone</span>
+                        <span>Speaker B</span>
+                      </div>
+                      <div class="flow-entry__primary">
+                        对，而且停止按钮应该离文本很近，因为这是用户在转录过程中最有可能执行的唯一操作。
+                      </div>
+                      <div class="flow-entry__secondary">
+                        Right, and the stop button should sit close to the text, because during transcription it is the only action the user is realistically likely to take.
+                      </div>
+                    </div>
+                  </article>
+
+                  <article class="flow-entry">
+                    <div class="flow-entry__time">09:43:03</div>
+                    <div class="flow-entry__body">
+                      <div class="flow-entry__meta">
+                        <span>Committed</span>
+                        <span>System audio</span>
+                        <span>Speaker A</span>
+                      </div>
+                      <div class="flow-entry__primary">
+                        复制、导出、打开历史这些动作其实都属于会后整理，不该在实时态里持续占位。
+                      </div>
+                      <div class="flow-entry__secondary">
+                        Actions like copy, export, and open history really belong to post-session cleanup and should not keep taking space in the live state.
+                      </div>
+                    </div>
+                  </article>
+
+                  <article class="flow-entry flow-entry--draft">
+                    <div class="flow-entry__time">09:43:24</div>
+                    <div class="flow-entry__body">
+                      <div class="flow-entry__meta">
+                        <span><strong>Draft</strong></span>
+                        <span>Microphone</span>
+                        <span>Now hearing</span>
+                      </div>
+                      <div class="flow-entry__primary">
+                        结束之后也不要跳回空状态，让当前内容继续留在这里，然后把这个页面自然切成可回看的完成态。
+                      </div>
+                      <div class="flow-entry__secondary">
+                        And after stopping, do not jump back to an empty state. Leave the current content here, then naturally turn the same page into a reviewable completed state.
+                      </div>
+                    </div>
+                  </article>
+                </div>
+              </div>
+
+              <div class="flow-bottom">
+                <div class="flow-actions">
+                  <div class="flow-button flow-button--primary">Stop session</div>
+                </div>
+              </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="flow-demo" id="completed" aria-label="Completed state mockup">
+            <div class="flow-demo__label">
+              <strong>Completed state</strong>
+              <span>The same canvas stays in place. Post-session actions appear only after the session is done.</span>
+            </div>
+
+            <div class="workspace-preview">
+              <aside class="workspace-sidebar">
+                <div class="workspace-sidebar__brand">
+                  <div class="workspace-sidebar__brand-mark">JustSay</div>
+                  <div class="workspace-sidebar__eyebrow">Voice workspace</div>
+                </div>
+
+                <nav class="workspace-sidebar__nav" aria-label="App sections">
+                  <div class="workspace-sidebar__link">Quick Dictation</div>
+                  <div class="workspace-sidebar__link workspace-sidebar__link--active">Live Session</div>
+                  <div class="workspace-sidebar__link">History</div>
+                  <div class="workspace-sidebar__link">Settings</div>
+                </nav>
+
+                <div></div>
+
+                <div class="workspace-sidebar__utility">
+                  <div class="workspace-sidebar__status workspace-sidebar__status--healthy">
+                    <span class="workspace-sidebar__status-dot"></span>
+                    Local service healthy
+                  </div>
+                  <div class="workspace-sidebar__refresh">Refresh</div>
+                </div>
+              </aside>
+
+              <div class="workspace-main">
+                <div class="flow-screen">
+              <div class="flow-status">
+                <div class="flow-status__title">
+                  <div class="flow-status__eyebrow">Live Session</div>
+                  <div class="flow-status__headline-row">
+                    <div class="flow-status__headline">Transcript-first rebuild review</div>
+                    <div class="flow-status__rename">Rename</div>
+                  </div>
+                </div>
+
+                <div class="flow-time flow-time--done" aria-label="Completed session timing">
+                  <div class="flow-time__value">00:35:02</div>
+                </div>
+              </div>
+
+              <div class="flow-transcript">
+                <div class="flow-transcript__stack">
+                  <article class="flow-entry">
+                    <div class="flow-entry__time">09:42:11</div>
+                    <div class="flow-entry__body">
+                      <div class="flow-entry__meta">
+                        <span>Committed</span>
+                        <span>System audio</span>
+                        <span>Speaker A</span>
+                      </div>
+                      <div class="flow-entry__primary">
+                        如果这是实时转录页面，那它首先应该是一个好的阅读界面，而不是一个功能区再加一条转录流。
+                      </div>
+                      <div class="flow-entry__secondary">
+                        If this is the live transcription screen, it should first be a strong reading interface, not a feature area with a transcript stream attached to it.
+                      </div>
+                    </div>
+                  </article>
+
+                  <article class="flow-entry">
+                    <div class="flow-entry__time">09:42:37</div>
+                    <div class="flow-entry__body">
+                      <div class="flow-entry__meta">
+                        <span>Committed</span>
+                        <span>Microphone</span>
+                        <span>Speaker B</span>
+                      </div>
+                      <div class="flow-entry__primary">
+                        对，而且停止按钮应该离文本很近，因为这是用户在转录过程中最有可能执行的唯一操作。
+                      </div>
+                      <div class="flow-entry__secondary">
+                        Right, and the stop button should sit close to the text, because during transcription it is the only action the user is realistically likely to take.
+                      </div>
+                    </div>
+                  </article>
+
+                  <article class="flow-entry">
+                    <div class="flow-entry__time">09:43:03</div>
+                    <div class="flow-entry__body">
+                      <div class="flow-entry__meta">
+                        <span>Committed</span>
+                        <span>System audio</span>
+                        <span>Speaker A</span>
+                      </div>
+                      <div class="flow-entry__primary">
+                        复制、导出、打开历史这些动作其实都属于会后整理，不该在实时态里持续占位。
+                      </div>
+                      <div class="flow-entry__secondary">
+                        Actions like copy, export, and open history really belong to post-session cleanup and should not keep taking space in the live state.
+                      </div>
+                    </div>
+                  </article>
+
+                  <article class="flow-entry">
+                    <div class="flow-entry__time">09:43:24</div>
+                    <div class="flow-entry__body">
+                      <div class="flow-entry__meta">
+                        <span>Committed</span>
+                        <span>Microphone</span>
+                        <span>Speaker B</span>
+                      </div>
+                      <div class="flow-entry__primary">
+                        结束之后也不要跳回空状态，让当前内容继续留在这里，然后把这个页面自然切成可回看的完成态。
+                      </div>
+                      <div class="flow-entry__secondary">
+                        And after stopping, do not jump back to an empty state. Leave the current content here, then naturally turn the same page into a reviewable completed state.
+                      </div>
+                    </div>
+                  </article>
+                </div>
+              </div>
+
+              <div class="flow-bottom">
+                <div class="flow-actions">
+                  <div class="flow-button flow-button--strong">Start new session</div>
+                  <div class="flow-button">Copy transcript</div>
+                  <div class="flow-button">Export bilingual</div>
+                  <div class="flow-button">Open in history</div>
+                </div>
+              </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

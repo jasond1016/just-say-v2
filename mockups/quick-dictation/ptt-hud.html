@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PTT HUD · JustSay Quick Dictation</title>
+    <link rel="stylesheet" href="../live-session/styles.css" />
+    <style>
+      :root {
+        color-scheme: light;
+        --page: oklch(0.952 0.014 84);
+        --surface: oklch(0.986 0.005 84);
+        --surface-2: oklch(0.97 0.01 86);
+        --line: oklch(0.86 0.008 74);
+        --ink: oklch(0.245 0.015 58);
+        --muted: oklch(0.5 0.012 58);
+        --muted-2: oklch(0.63 0.01 60);
+        --accent: oklch(0.57 0.135 40);
+        --accent-soft: oklch(0.925 0.032 40);
+        --success: oklch(0.55 0.11 156);
+        --success-soft: oklch(0.94 0.026 156);
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at top left, oklch(0.988 0.03 92), transparent 26%),
+          linear-gradient(180deg, oklch(0.972 0.015 84), var(--page));
+        color: var(--ink);
+      }
+
+      .variant-header {
+        background: color-mix(in oklab, var(--surface) 88%, transparent);
+        border-bottom: 1px solid color-mix(in oklab, var(--line) 88%, transparent);
+      }
+
+      .variant-brand__eyebrow,
+      .frame-note {
+        color: var(--muted);
+      }
+
+      .variant-nav__link {
+        background: color-mix(in oklab, var(--surface) 90%, transparent);
+        border-color: var(--line);
+        color: var(--muted);
+      }
+
+      .variant-nav__link[aria-current="page"] {
+        background: var(--accent-soft);
+        border-color: color-mix(in oklab, var(--accent) 28%, var(--line));
+        color: oklch(0.35 0.07 38);
+      }
+
+      .hud-shell {
+        padding: 28px 0 40px;
+      }
+
+      .hud-intro {
+        display: grid;
+        gap: 14px;
+        margin-bottom: 24px;
+      }
+
+      .hud-intro h1 {
+        margin: 0;
+        font-size: clamp(38px, 4.2vw, 62px);
+        line-height: 0.96;
+        letter-spacing: -0.05em;
+        max-width: 11ch;
+      }
+
+      .hud-intro p {
+        max-width: 66ch;
+        margin: 0;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.7;
+      }
+
+      .hud-stack {
+        display: grid;
+        gap: 26px;
+      }
+
+      .hud-demo {
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 30px;
+        background: color-mix(in oklab, var(--surface) 96%, transparent);
+        box-shadow: var(--shadow-soft);
+      }
+
+      .hud-demo__label {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        padding: 18px 22px;
+        border-bottom: 1px solid var(--line);
+        background: color-mix(in oklab, var(--surface-2) 82%, transparent);
+      }
+
+      .hud-demo__label strong {
+        font-size: 15px;
+      }
+
+      .hud-demo__label span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .hud-stage {
+        min-height: 220px;
+        display: grid;
+        place-items: center;
+        padding: 34px;
+      }
+
+      .hud-card {
+        width: min(176px, 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 56px;
+        padding: 8px 12px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: color-mix(in oklab, var(--surface) 98%, transparent);
+        box-shadow: 0 10px 24px rgba(31, 34, 38, 0.08);
+      }
+
+      .hud-card--listening {
+        border-color: color-mix(in oklab, var(--accent) 24%, var(--line));
+        background: color-mix(in oklab, var(--accent-soft) 44%, var(--surface));
+      }
+
+      .hud-card--sent {
+        border-color: color-mix(in oklab, var(--success) 24%, var(--line));
+        background: color-mix(in oklab, var(--success-soft) 50%, var(--surface));
+        animation: sent-capsule 0.82s var(--ease-out) infinite;
+      }
+
+      .hud-card--processing {
+        border-color: color-mix(in oklab, var(--line) 90%, transparent);
+      }
+
+      .hud-card__timer {
+        font-family: "Cascadia Mono", Consolas, monospace;
+        font-size: clamp(15px, 1.2vw, 17px);
+        line-height: 1;
+        letter-spacing: -0.03em;
+        color: var(--ink);
+      }
+
+      .hud-motion {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 18px;
+      }
+
+      .hud-motion--recording span {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--accent);
+      }
+
+      .hud-motion--recording span {
+        box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 28%, transparent);
+        animation: recording-ring 1.6s ease-out infinite;
+      }
+
+      .hud-motion--processing {
+        gap: 6px;
+      }
+
+      .hud-motion--processing span {
+        width: 5px;
+        height: 5px;
+        border-radius: 999px;
+        background: var(--muted-2);
+        animation: processing-dots 1.2s ease-in-out infinite;
+      }
+
+      .hud-motion--processing span:nth-child(2) {
+        animation-delay: 0.12s;
+      }
+
+      .hud-motion--processing span:nth-child(3) {
+        animation-delay: 0.24s;
+      }
+
+      .hud-motion--sent {
+        width: 20px;
+        height: 20px;
+      }
+
+      .hud-motion--sent span {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--success);
+        animation: sent-dot 0.82s var(--ease-out) infinite;
+      }
+
+      .hud-strip {
+        width: min(360px, 100%);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        min-height: 56px;
+        padding: 8px 10px 8px 14px;
+        border: 1px solid color-mix(in oklab, var(--accent) 18%, var(--line));
+        border-radius: 14px;
+        background: color-mix(in oklab, var(--surface) 98%, transparent);
+        box-shadow: 0 10px 24px rgba(31, 34, 38, 0.08);
+      }
+
+      .hud-strip__copy {
+        display: grid;
+        gap: 4px;
+        min-width: 0;
+      }
+
+      .hud-strip__title {
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1.2;
+        color: var(--ink);
+      }
+
+      .hud-strip__sub {
+        font-size: 11px;
+        line-height: 1.4;
+        color: var(--muted);
+      }
+
+      .hud-strip__actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+      }
+
+      .hud-strip__button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 36px;
+        padding: 0 12px;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        background: color-mix(in oklab, var(--surface) 96%, transparent);
+        font-size: 12px;
+        color: var(--ink);
+      }
+
+      .hud-strip__button--primary {
+        background: var(--accent);
+        border-color: color-mix(in oklab, var(--accent) 72%, black);
+        color: oklch(0.98 0.01 90);
+        font-weight: 600;
+      }
+
+      .hud-strip__button--ghost {
+        padding: 0 8px;
+        border-color: transparent;
+        background: transparent;
+        color: var(--muted);
+      }
+
+      @keyframes recording-ring {
+        0% {
+          box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 28%, transparent);
+          transform: scale(1);
+        }
+        70% {
+          box-shadow: 0 0 0 10px color-mix(in oklab, var(--accent) 0%, transparent);
+          transform: scale(1.05);
+        }
+        100% {
+          box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 0%, transparent);
+          transform: scale(1);
+        }
+      }
+
+      @keyframes processing-dots {
+        0%, 80%, 100% {
+          transform: scale(0.82);
+          opacity: 0.28;
+        }
+        40% {
+          transform: scale(1);
+          opacity: 0.72;
+        }
+      }
+
+      @keyframes sent-capsule {
+        0% {
+          background: color-mix(in oklab, var(--surface) 98%, transparent);
+          border-color: color-mix(in oklab, var(--line) 92%, transparent);
+          opacity: 0.86;
+        }
+        26% {
+          background: color-mix(in oklab, var(--success-soft) 78%, var(--surface));
+          border-color: color-mix(in oklab, var(--success) 32%, var(--line));
+          opacity: 1;
+        }
+        62% {
+          background: color-mix(in oklab, var(--success-soft) 62%, var(--surface));
+          border-color: color-mix(in oklab, var(--success) 24%, var(--line));
+          opacity: 0.58;
+        }
+        100% {
+          background: color-mix(in oklab, var(--success-soft) 42%, var(--surface));
+          border-color: color-mix(in oklab, var(--success) 18%, var(--line));
+          opacity: 0;
+        }
+      }
+
+      @keyframes sent-dot {
+        0% {
+          transform: scale(0.78);
+          opacity: 0;
+        }
+        26% {
+          transform: scale(1);
+          opacity: 1;
+        }
+        100% {
+          transform: scale(0.82);
+          opacity: 0;
+        }
+      }
+
+      @media (max-width: 720px) {
+        .hud-stage {
+          padding: 16px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="mock-shell">
+      <header class="variant-header">
+        <div class="variant-brand">
+          <div class="variant-brand__eyebrow">Primary surface</div>
+          <div class="variant-brand__title">PTT HUD</div>
+        </div>
+        <nav class="variant-nav" aria-label="Variant navigation">
+          <a class="variant-nav__link" href="../index.html">Overview</a>
+          <a class="variant-nav__link" href="../live-session/focused-flow.html">Focused Flow</a>
+          <a class="variant-nav__link" aria-current="page" href="./ptt-hud.html">PTT HUD</a>
+          <a class="variant-nav__link" href="../history/focused-archive.html">History</a>
+          <a class="variant-nav__link" href="../settings/focused-controls.html">Settings</a>
+        </nav>
+      </header>
+
+      <main class="screen hud-shell">
+        <div class="frame-note">This is the surface the user is most likely to experience during dictation, not the main app window.</div>
+
+        <section class="hud-intro">
+          <h1>The feature should appear only while it matters.</h1>
+          <p>
+            This version pushes the HUD closer to a true system-layer tool. The actual floating object is nearly wordless: motion carries most of the meaning, and text only stays where it materially reduces ambiguity.
+          </p>
+        </section>
+
+        <div class="hud-stack">
+          <section class="hud-demo" aria-label="Recording HUD mockup">
+            <div class="hud-demo__label">
+              <strong>Recording</strong>
+              <span>User is holding the hotkey in another app.</span>
+            </div>
+            <div class="hud-stage">
+              <div class="hud-card hud-card--listening">
+                <div class="hud-motion hud-motion--recording" aria-hidden="true">
+                  <span></span>
+                </div>
+                <div class="hud-card__timer">00:04</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="hud-demo" aria-label="Processing HUD mockup">
+            <div class="hud-demo__label">
+              <strong>Processing</strong>
+              <span>User has released the hotkey, JustSay is transcribing.</span>
+            </div>
+            <div class="hud-stage">
+              <div class="hud-card hud-card--processing">
+                <div class="hud-motion hud-motion--processing" aria-hidden="true">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="hud-demo" aria-label="Sent HUD mockup">
+            <div class="hud-demo__label">
+              <strong>Sent</strong>
+              <span>Very short success feedback before the HUD disappears.</span>
+            </div>
+            <div class="hud-stage">
+                <div class="hud-card hud-card--sent">
+                  <div class="hud-motion hud-motion--sent" aria-hidden="true">
+                    <span></span>
+                  </div>
+                </div>
+              </div>
+          </section>
+
+          <section class="hud-demo" aria-label="Failure recovery strip mockup">
+            <div class="hud-demo__label">
+              <strong>Recovery strip</strong>
+              <span>Default failure state, keep it narrow, suggest the fastest safe recovery.</span>
+            </div>
+            <div class="hud-stage">
+              <div class="hud-strip">
+                <div class="hud-strip__copy">
+                  <div class="hud-strip__title">Couldn’t type automatically</div>
+                  <div class="hud-strip__sub">Copy to clipboard, then paste.</div>
+                </div>
+                <div class="hud-strip__actions">
+                  <div class="hud-strip__button hud-strip__button--primary">Copy</div>
+                  <div class="hud-strip__button hud-strip__button--ghost">Dismiss</div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>
