@@ -161,6 +161,12 @@ export class AppController {
     this.setActiveSection('history')
   }
 
+  clearSelectedHistory(): void {
+    this.setState({
+      selectedHistory: null
+    })
+  }
+
   async setHistoryQuery(query: string): Promise<void> {
     this.setState({
       historyQuery: query

@@ -1,17 +1,19 @@
-import { useEffect, useMemo, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 
 import { createBrowserCaptureSourceManager } from '../capture/browser-capture-source'
 import { CaptureRuntime } from '../capture/capture-runtime'
-import { APP_SECTIONS } from './app-model'
 import { RuntimeStore } from '../features/runtime/runtime-store'
 import { HistoryPage } from '../pages/history-page'
 import { LiveSessionPage } from '../pages/live-session-page'
 import { QuickDictationPage } from '../pages/quick-dictation-page'
 import { SettingsPage } from '../pages/settings-page'
-import { AppController } from './app-controller'
-import type { LocalServiceStatus } from '../../shared/api-types'
 import { Button } from '../ui/controls'
 import { describeLocalServiceStatus } from '../ui/copy'
+import type { AppRuntimeSnapshot, LocalServiceStatus } from '../../shared/api-types'
+import { APP_SECTIONS } from './app-model'
+import { AppController } from './app-controller'
+
+type RetainedLiveSession = NonNullable<AppRuntimeSnapshot['liveSession']>
 
 export function App() {
   if (window.location.hash === '#capture') {
@@ -19,19 +21,6 @@ export function App() {
   }
 
   return <WorkspaceApp />
-}
-
-function serviceColor(status: LocalServiceStatus): string {
-  switch (status) {
-    case 'healthy':
-      return 'var(--success)'
-    case 'degraded':
-      return 'var(--accent)'
-    case 'failed':
-      return 'var(--danger)'
-    default:
-      return 'var(--text-tertiary)'
-  }
 }
 
 function WorkspaceApp() {
@@ -62,6 +51,7 @@ function WorkspaceApp() {
     error,
     busyAction
   } = state
+  const [retainedLiveSession, setRetainedLiveSession] = useState<RetainedLiveSession | null>(null)
 
   useEffect(() => {
     const theme = settings.general.theme
@@ -77,7 +67,16 @@ function WorkspaceApp() {
     return controller.start()
   }, [controller])
 
+  useEffect(() => {
+    if (!runtime.liveSession) {
+      return
+    }
+
+    setRetainedLiveSession(cloneLiveSession(runtime.liveSession))
+  }, [runtime.liveSession])
+
   const liveSession = runtime.liveSession
+  const displayLiveSession = liveSession ?? retainedLiveSession
   const meetingActive = Boolean(liveSession)
   const pttStartDisabled = Boolean(busyAction) || runtime.ptt.status !== 'idle'
   const pttStopDisabled = Boolean(busyAction) || runtime.ptt.status !== 'capturing'
@@ -89,55 +88,73 @@ function WorkspaceApp() {
   return (
     <div className="app-shell">
       <nav className="app-sidebar" aria-label="Workspace sections">
-        <div className="app-sidebar__brand">JustSay</div>
+        <div className="app-sidebar__brand">
+          <div className="app-sidebar__brand-mark">JustSay</div>
+          <div className="app-sidebar__brand-sub">Voice workspace</div>
+        </div>
 
-        {APP_SECTIONS.map((section) => {
-          const isActive = activeSection === section.id
-          return (
-            <button
-              key={section.id}
-              type="button"
-              data-active={isActive ? '' : undefined}
-              onClick={() => controller.setActiveSection(section.id)}
-              className="app-nav-button"
-              aria-current={isActive ? 'page' : undefined}
-            >
-              {section.label}
-            </button>
-          )
-        })}
+        <div className="app-sidebar__nav">
+          {APP_SECTIONS.map((section) => {
+            const isActive = activeSection === section.id
+            return (
+              <button
+                key={section.id}
+                type="button"
+                data-active={isActive ? '' : undefined}
+                onClick={() => controller.setActiveSection(section.id)}
+                className="app-nav-button"
+                aria-current={isActive ? 'page' : undefined}
+              >
+                <span className="app-nav-button__dot" aria-hidden="true" />
+                <span>{section.label}</span>
+              </button>
+            )
+          })}
+        </div>
 
         <div className="app-sidebar__spacer" />
 
-        <div className="app-sidebar__status" role="status" aria-live="polite">
-          <span className="app-sidebar__status-dot" style={{ background: serviceColor(serviceStatus) }} />
-          {serviceLabel}
-        </div>
+        <div className="app-sidebar__utility">
+          <div
+            className={`app-sidebar__status app-sidebar__status--${serviceStatusClass(serviceStatus)}`}
+            role="status"
+            aria-live="polite"
+          >
+            <span className="app-sidebar__status-dot" />
+            {serviceLabel}
+          </div>
 
-        <Button
-          label={busyAction === 'refresh' ? 'Refreshing\u2026' : 'Refresh'}
-          variant="secondary"
-          size="small"
-          disabled={Boolean(busyAction)}
-          className="app-sidebar__refresh"
-          onClick={() => { void controller.refresh() }}
-        />
+          <Button
+            label={busyAction === 'refresh' ? 'Refreshing...' : 'Refresh'}
+            variant="ghost"
+            size="small"
+            disabled={Boolean(busyAction)}
+            className="app-sidebar__refresh"
+            onClick={() => { void controller.refresh() }}
+          />
+        </div>
       </nav>
 
       <main className="app-main">
-        {error ? (
-          <div className="app-banner app-banner--error" role="alert">
-            <strong>Action needed:</strong> {error}
-          </div>
-        ) : null}
+        {error || latestNotification ? (
+          <div className="app-main__notes">
+            {error ? (
+              <div className="app-note app-note--error" role="alert">
+                <strong>Action needed</strong>
+                <span>{error}</span>
+              </div>
+            ) : null}
 
-        {latestNotification ? (
-          <div
-            className="app-banner"
-            role={latestNotification.level === 'error' ? 'alert' : 'status'}
-            aria-live={latestNotification.level === 'error' ? 'assertive' : 'polite'}
-          >
-            <strong>{formatNotificationLevel(latestNotification.level)}:</strong> {latestNotification.message}
+            {latestNotification ? (
+              <div
+                className={`app-note app-note--${latestNotification.level}`}
+                role={latestNotification.level === 'error' ? 'alert' : 'status'}
+                aria-live={latestNotification.level === 'error' ? 'assertive' : 'polite'}
+              >
+                <strong>{formatNotificationLevel(latestNotification.level)}</strong>
+                <span>{latestNotification.message}</span>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -157,7 +174,8 @@ function WorkspaceApp() {
 
         {activeSection === 'live-session' ? (
           <LiveSessionPage
-            runtime={runtime}
+            liveSession={displayLiveSession}
+            activeRuntimeSession={liveSession}
             settings={settings}
             busyAction={busyAction}
             liveSessionMessage={liveSessionMessage}
@@ -189,6 +207,7 @@ function WorkspaceApp() {
             onSourceChange={(source) => { void controller.setHistorySource(source) }}
             onTimeFilterChange={(timeFilter) => { void controller.setHistoryTimeFilter(timeFilter) }}
             onOpen={(id) => { void controller.openHistoryItem(id) }}
+            onCloseDetail={() => { controller.clearSelectedHistory() }}
             onDelete={(id) => { void controller.deleteHistoryItem(id) }}
             onCopy={(id, format) => { void controller.copyHistoryItem(id, format) }}
             onExport={(id, format) => { void controller.exportHistoryItem(id, format) }}
@@ -202,6 +221,7 @@ function WorkspaceApp() {
             profileTests={profileTests}
             diagnosticsMessage={diagnosticsMessage}
             busyAction={busyAction}
+            localServiceStatus={serviceStatus}
             onGeneralLanguageChange={(language) => { void controller.setGeneralLanguage(language) }}
             onThemeChange={(theme) => { void controller.setTheme(theme) }}
             onMinimizeToTrayChange={(minimizeToTray) => { void controller.setMinimizeToTray(minimizeToTray) }}
@@ -254,6 +274,20 @@ function requireApi() {
   return window.justSay
 }
 
+function serviceStatusClass(status: LocalServiceStatus): 'healthy' | 'degraded' | 'failed' {
+  switch (status) {
+    case 'healthy':
+      return 'healthy'
+    case 'degraded':
+    case 'starting':
+      return 'degraded'
+    case 'failed':
+    case 'stopped':
+    default:
+      return 'failed'
+  }
+}
+
 function formatNotificationLevel(level: 'info' | 'warning' | 'error') {
   switch (level) {
     case 'info':
@@ -264,5 +298,29 @@ function formatNotificationLevel(level: 'info' | 'warning' | 'error') {
       return 'Action needed'
     default:
       return level
+  }
+}
+
+function cloneLiveSession(session: RetainedLiveSession): RetainedLiveSession {
+  return {
+    ...session,
+    transcript: {
+      committedBlocks: session.transcript.committedBlocks.map((block) => ({
+        ...block,
+        ...(block.words ? { words: [...block.words] } : {})
+      })),
+      activeDrafts: Object.fromEntries(
+        Object.entries(session.transcript.activeDrafts).map(([source, draft]) => [
+          source,
+          draft
+            ? {
+                ...draft,
+                ...(draft.words ? { words: [...draft.words] } : {})
+              }
+            : draft
+        ])
+      ),
+      revision: session.transcript.revision
+    }
   }
 }

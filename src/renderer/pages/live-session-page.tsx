@@ -1,11 +1,13 @@
-import type { AppSettings, AppRuntimeSnapshot, ExportFormat, MeetingStatus } from '../../shared/api-types'
-import { formatDuration } from '../app/app-model'
-import { selectLiveSessionTimeline } from '../features/runtime/runtime-selectors'
+import type { AppRuntimeSnapshot, AppSettings, ExportFormat, MeetingStatus } from '../../shared/api-types'
+import { selectVisibleTimeline } from '../../core/transcript/transcript-selectors'
 import { Button } from '../ui/controls'
-import { describeCaptureSource, describeTimelineKind } from '../ui/copy'
+import { describeCaptureSource } from '../ui/copy'
+
+type LiveSessionSnapshot = NonNullable<AppRuntimeSnapshot['liveSession']>
 
 export function LiveSessionPage(props: {
-  runtime: AppRuntimeSnapshot
+  liveSession: LiveSessionSnapshot | null
+  activeRuntimeSession: LiveSessionSnapshot | null
   settings: AppSettings
   busyAction: string | null
   liveSessionMessage: string | null
@@ -17,167 +19,258 @@ export function LiveSessionPage(props: {
   onExportLiveSession: (format: ExportFormat) => void
   onOpenHistory: () => void
 }) {
-  const liveSession = props.runtime.liveSession
-  const timeline = selectLiveSessionTimeline(props.runtime)
-  const status = describeStatus(liveSession?.status)
-  const canAct = Boolean(liveSession) && !props.busyAction
-  const isStreaming = liveSession?.status === 'streaming'
+  const session = props.liveSession
+  const timeline = session ? selectVisibleTimeline(session.transcript) : []
+  const activeStatus = props.activeRuntimeSession?.status ?? session?.status
+  const isStreaming = props.activeRuntimeSession?.status === 'streaming'
+  const isSessionActive = Boolean(props.activeRuntimeSession)
+  const hasTranscript = timeline.length > 0
+  const statusCopy = describeStatus(activeStatus, hasTranscript)
+  const sessionTitle = session ? deriveSessionTitle(session) : 'Live Session'
   const sourceSummary = props.settings.input.includeMicrophoneInMeeting ? 'System audio + microphone' : 'System audio only'
-  const translationSummary = liveSession?.translationEnabled ? 'Bilingual transcript on' : 'Original language only'
-  const sessionSummary = liveSession ? `${sourceSummary} · ${translationSummary}` : 'Ready when you are'
+  const translationSummary = session?.translationEnabled ? 'Bilingual transcript on' : 'Original language only'
+  const canUsePostActions = Boolean(session) && !isSessionActive && hasTranscript && !props.busyAction
 
   return (
-    <div className="page">
-      <div className="page-header page-header--wide">
-        <h1 className="page-title">Live Session</h1>
-        {liveSession ? (
-          <span className={`mono-data ${isStreaming ? 'text-accent' : 'text-secondary'}`}>
-            {formatDuration(liveSession.durationSec)}
-          </span>
-        ) : null}
-      </div>
-
-      <div className="status-strip stack-16" role="status" aria-live="polite">
-        <StatusDot active={isStreaming} />
-        <span className="status-strip__title">{status.title}</span>
-        <span className="text-tertiary">{status.description}</span>
-      </div>
-
-      <div className="session-summary stack-12" role="status" aria-live="polite">
-        <div className="session-summary__item">
-          <span className="session-summary__label">Capture</span>
-          <span className="session-summary__value">{sourceSummary}</span>
+    <div className="page page--wide">
+      <header className="surface-header surface-header--session">
+        <div className="surface-header__eyebrow">Live Session</div>
+        <div className="surface-header__row">
+          <div className="surface-header__headline-group">
+            <h1 className="surface-header__title">
+              {isStreaming || !session ? 'Live Session' : sessionTitle}
+            </h1>
+            {!isStreaming && session ? <span className="surface-header__chip">Review</span> : null}
+          </div>
+          {session ? (
+            <div className={`surface-header__time surface-header__time--${describeTimeTone(activeStatus)}`}>
+              {formatSessionDuration(session.durationSec)}
+            </div>
+          ) : null}
         </div>
-        <div className="session-summary__item">
-          <span className="session-summary__label">Output</span>
-          <span className="session-summary__value">{translationSummary}</span>
+        <p className="surface-header__body">{statusCopy.description}</p>
+        <div className="session-facts">
+          <div className="session-facts__item">
+            <span className="session-facts__label">Capture</span>
+            <span className="session-facts__value">{sourceSummary}</span>
+          </div>
+          <div className="session-facts__item">
+            <span className="session-facts__label">Output</span>
+            <span className="session-facts__value">{translationSummary}</span>
+          </div>
+          <div className="session-facts__item">
+            <span className="session-facts__label">State</span>
+            <span className="session-facts__value">{statusCopy.title}</span>
+          </div>
         </div>
-        <div className="session-summary__item">
-          <span className="session-summary__label">Session</span>
-          <span className="session-summary__value">{sessionSummary}</span>
-        </div>
-      </div>
+      </header>
 
       {props.liveSessionMessage ? (
-        <div className="caption-text stack-8" role="status" aria-live="polite">
+        <div className="inline-note inline-note--neutral" role="status" aria-live="polite">
           {props.liveSessionMessage}
         </div>
       ) : null}
 
-      <div className="action-block stack-20">
-        <div className="action-row">
-          <Button
-            label={props.busyAction === 'meeting-start' ? 'Starting\u2026' : 'Start session'}
-            disabled={props.meetingStartDisabled}
-            variant="primary"
-            onClick={props.onStartMeeting}
-          />
-          <Button
-            label={props.busyAction === 'meeting-stop' ? 'Stopping\u2026' : 'Stop session'}
-            disabled={props.meetingStopDisabled}
-            variant="secondary"
-            onClick={props.onStopMeeting}
-          />
-          <Button
-            label={props.busyAction === 'live-session-copy' ? 'Copying\u2026' : 'Copy transcript'}
-            disabled={!canAct}
-            variant="secondary"
-            onClick={props.onCopyLiveSession}
-          />
-          <Button
-            label="Open history"
-            disabled={!canAct}
-            variant="ghost"
-            onClick={props.onOpenHistory}
-          />
-        </div>
-
-        <details className="action-disclosure" open={Boolean(props.liveSessionMessage)}>
-          <summary className="action-disclosure__summary">
-            <span className="action-disclosure__title">Export</span>
-            <span className="action-disclosure__meta">Text or bilingual text</span>
-          </summary>
-          <div className="action-disclosure__body">
-            <Button
-              label={props.busyAction === 'live-session-export:plain_text' ? 'Exporting\u2026' : 'Export text'}
-              disabled={!canAct}
-              size="small"
-              onClick={() => props.onExportLiveSession('plain_text')}
-            />
-            <Button
-              label={props.busyAction === 'live-session-export:bilingual_text' ? 'Exporting\u2026' : 'Export bilingual'}
-              disabled={!canAct}
-              size="small"
-              onClick={() => props.onExportLiveSession('bilingual_text')}
-            />
-          </div>
-        </details>
-      </div>
-
-      <hr className="page-rule" />
-
-      <div className="stack-20">
+      <section className="transcript-canvas" aria-label="Live transcript">
         {timeline.length === 0 ? (
-          <div className="text-tertiary" role="status" aria-live="polite">
-            No transcript yet. Start a session to see live text here.
+          <div className="empty-state empty-state--transcript" role="status" aria-live="polite">
+            <div className="empty-state__title">No transcript yet.</div>
+            <p className="empty-state__body">
+              Start a session when you need a reading surface that stays with the text from the first line through review.
+            </p>
+            <div className="empty-state__actions">
+              <Button
+                label={props.busyAction === 'meeting-start' ? 'Starting...' : 'Start session'}
+                disabled={props.meetingStartDisabled}
+                variant="primary"
+                onClick={props.onStartMeeting}
+              />
+            </div>
           </div>
         ) : (
-          <div className="timeline">
+          <div className="transcript-stack">
             {timeline.map((item) => (
-              <div key={`${item.kind}:${item.id}`} className="timeline-row">
-                <div className="timeline-row__eyebrow">
-                  <span className={item.kind === 'draft' ? 'text-accent' : 'text-tertiary'}>
-                    {describeTimelineKind(item.kind)}
-                  </span>
-                  <span>{describeCaptureSource(item.source)}</span>
-                </div>
-                <div
-                  className={`timeline-row__body ${
-                    item.kind === 'draft' ? 'timeline-row__body--draft' : 'timeline-row__body--committed'
-                  }`}
-                >
-                  {item.primaryText || '\u2026'}
-                </div>
-                {item.secondaryText ? (
-                  <div className="timeline-row__secondary">
-                    {item.secondaryText}
+              <article
+                key={`${item.kind}:${item.id}`}
+                className={`transcript-entry ${item.kind === 'draft' ? 'transcript-entry--draft' : ''}`}
+              >
+                <div className="transcript-entry__time">{formatClockTime(item.startedAt)}</div>
+                <div className="transcript-entry__body">
+                  <div className="transcript-entry__meta">
+                    <span>{item.kind === 'draft' ? 'Draft' : 'Committed'}</span>
+                    <span>{describeCaptureSource(item.source)}</span>
+                    {item.kind === 'draft' ? <strong>Now hearing</strong> : null}
                   </div>
-                ) : null}
-              </div>
+                  <div className="transcript-entry__primary">{item.primaryText || '...'}</div>
+                  {item.secondaryText ? (
+                    <div className="transcript-entry__secondary">{item.secondaryText}</div>
+                  ) : null}
+                </div>
+              </article>
             ))}
           </div>
         )}
-      </div>
+      </section>
+
+      <footer className="session-footer">
+        {isSessionActive ? (
+          <div className="session-footer__actions">
+            <Button
+              label={props.busyAction === 'meeting-stop' ? 'Stopping...' : 'Stop session'}
+              disabled={props.meetingStopDisabled}
+              variant="primary"
+              onClick={props.onStopMeeting}
+            />
+          </div>
+        ) : hasTranscript ? (
+          <div className="session-footer__actions">
+            <Button
+              label={props.busyAction === 'meeting-start' ? 'Starting...' : 'Start new session'}
+              disabled={props.meetingStartDisabled}
+              variant="primary"
+              onClick={props.onStartMeeting}
+            />
+            <Button
+              label={props.busyAction === 'live-session-copy' ? 'Copying...' : 'Copy transcript'}
+              disabled={!canUsePostActions}
+              variant="secondary"
+              onClick={props.onCopyLiveSession}
+            />
+            <Button
+              label={props.busyAction === 'live-session-export:bilingual_text' ? 'Exporting...' : 'Export bilingual'}
+              disabled={!canUsePostActions}
+              variant="secondary"
+              onClick={() => props.onExportLiveSession('bilingual_text')}
+            />
+            <Button
+              label="Open history"
+              disabled={!canUsePostActions}
+              variant="ghost"
+              onClick={props.onOpenHistory}
+            />
+          </div>
+        ) : null}
+
+        {!isSessionActive && hasTranscript ? (
+          <details className="quiet-details">
+            <summary className="quiet-details__summary">
+              <span>More</span>
+              <span>Plain text export</span>
+            </summary>
+            <div className="quiet-details__body">
+              <Button
+                label={props.busyAction === 'live-session-export:plain_text' ? 'Exporting...' : 'Export text'}
+                disabled={!canUsePostActions}
+                size="small"
+                onClick={() => props.onExportLiveSession('plain_text')}
+              />
+            </div>
+          </details>
+        ) : null}
+      </footer>
     </div>
   )
 }
 
-function StatusDot(props: { active: boolean }) {
-  return <span className={`status-dot ${props.active ? 'status-dot--active' : ''}`} />
+function deriveSessionTitle(session: LiveSessionSnapshot): string {
+  const firstCommitted = session.transcript.committedBlocks.find((block) => block.text.trim().length > 0)
+  const firstDraft = Object.values(session.transcript.activeDrafts).find((draft) =>
+    draft ? `${draft.stableText}${draft.previewText}`.trim().length > 0 : false
+  )
+  const sourceText = firstCommitted?.text ?? [firstDraft?.stableText, firstDraft?.previewText].filter(Boolean).join(' ')
+
+  if (!sourceText) {
+    return 'Recent session'
+  }
+
+  return sourceText.length > 64 ? `${sourceText.slice(0, 64).trim()}...` : sourceText
 }
 
-function describeStatus(status: MeetingStatus | undefined) {
+function describeStatus(status: MeetingStatus | undefined, hasTranscript: boolean) {
   switch (status) {
     case 'preparing':
-      return { title: 'Preparing', description: 'Getting the recognizer and audio capture ready.' }
+      return {
+        title: 'Preparing',
+        description: 'Getting the recognizer and capture path ready before the first line lands.'
+      }
     case 'streaming':
-      return { title: 'Streaming', description: 'Live transcript active.' }
+      return {
+        title: 'Streaming',
+        description: 'Stay with the transcript. The only persistent action is stopping the session.'
+      }
     case 'recovering':
-      return { title: 'Recovering', description: 'Reconnecting without ending the session.' }
+      return {
+        title: 'Recovering',
+        description: 'JustSay is reconnecting the session without clearing the transcript you already have.'
+      }
     case 'finishing':
-      return { title: 'Finishing', description: 'Saving the last few lines.' }
     case 'persisting':
-      return { title: 'Saving', description: 'Writing this session to history.' }
+      return {
+        title: 'Saving',
+        description: 'The live session has stopped. JustSay is keeping the transcript on this canvas while it saves.'
+      }
     case 'stopped_unexpectedly':
-      return { title: 'Stopped', description: 'The session ended unexpectedly. Check the latest note above.' }
-    case 'completed':
-      return { title: 'Completed', description: 'Session finished successfully.' }
+      return {
+        title: 'Interrupted',
+        description: hasTranscript
+          ? 'The session ended unexpectedly, but the transcript stays here for review and export.'
+          : 'The session ended unexpectedly before any transcript was committed.'
+      }
     case 'error':
-      return { title: 'Error', description: 'JustSay could not recover from this issue.' }
+      return {
+        title: 'Needs attention',
+        description: hasTranscript
+          ? 'The transcript is still here. Review it, then decide whether to start a fresh session.'
+          : 'JustSay could not continue this session.'
+      }
+    case 'completed':
+      return {
+        title: 'Completed',
+        description: 'The transcript remains in place and post-session actions move in only after capture is done.'
+      }
     case 'idle':
     case undefined:
-      return { title: 'Idle', description: 'No active session.' }
+      return {
+        title: 'Ready',
+        description: hasTranscript
+          ? 'Your latest transcript is still here for review.'
+          : 'A quiet reading surface is ready when you start a session.'
+      }
     default:
-      return { title: String(status), description: 'Updating.' }
+      return {
+        title: String(status),
+        description: 'Session state updated.'
+      }
   }
+}
+
+function describeTimeTone(status: MeetingStatus | undefined): 'live' | 'done' | 'warning' {
+  switch (status) {
+    case 'streaming':
+    case 'recovering':
+    case 'preparing':
+      return 'live'
+    case 'stopped_unexpectedly':
+    case 'error':
+      return 'warning'
+    default:
+      return 'done'
+  }
+}
+
+function formatClockTime(timestamp: number): string {
+  return new Date(timestamp).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  })
+}
+
+function formatSessionDuration(durationSec: number): string {
+  const totalSeconds = Math.max(0, Math.floor(durationSec))
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
