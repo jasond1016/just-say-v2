@@ -54,7 +54,7 @@ export function LiveSessionPage(props: {
             </div>
             <h1 className="cold-start__headline">Ready to record</h1>
             <p className="cold-start__body">
-              Start a session when you need a reading surface that stays with the text from the first line through review.
+              Capture system audio and transcribe in real time.
             </p>
             <div className="cold-start__sources">
               <span className="cold-start__source">System audio</span>

@@ -132,7 +132,7 @@ export function SettingsPage(props: {
     props.onLocalServicePortChange(portValue ? Number.parseInt(portValue, 10) : undefined)
   }
 
-  const selectedSectionMeta = describeSettingsSection(selectedSection, props.localServiceStatus)
+  const selectedSectionMeta = describeSettingsSection(selectedSection)
 
   return (
     <div className="page page--settings">
@@ -163,10 +163,8 @@ export function SettingsPage(props: {
                 {headerState ? (
                   <span className={`status-pill status-pill--${headerState.tone}`}>{headerState.label}</span>
                 ) : null}
-                <span>{selectedSectionMeta.meta}</span>
               </div>
             </div>
-            <p className="surface-header__body">{selectedSectionMeta.body}</p>
           </header>
 
           <div className="settings-sheet">
@@ -481,45 +479,21 @@ const SETTINGS_SECTIONS: Array<{ id: SettingsSectionId; label: string }> = [
   { id: 'advanced', label: 'Advanced' }
 ]
 
-function describeSettingsSection(section: SettingsSectionId, localServiceStatus: LocalServiceStatus) {
+function describeSettingsSection(section: SettingsSectionId) {
   switch (section) {
     case 'workspace':
-      return {
-        title: 'Workspace',
-        meta: 'Appearance and basic app behavior',
-        body: 'Quiet defaults. These are the choices most people should set once, then stop thinking about.'
-      }
+      return { title: 'Workspace' }
     case 'dictation':
-      return {
-        title: 'Dictation',
-        meta: 'Hotkey and delivery defaults',
-        body: 'Quick Dictation should stay invisible during normal use, so the defaults here matter more than page chrome.'
-      }
+      return { title: 'Dictation' }
     case 'meetings':
-      return {
-        title: 'Meetings',
-        meta: 'Capture defaults for Live Session',
-        body: 'These controls shape what gets captured before the transcript-first reading surface takes over.'
-      }
+      return { title: 'Meetings' }
     case 'translation':
-      return {
-        title: 'Translation',
-        meta: 'Bilingual output when needed',
-        body: 'Translation is a secondary layer. Keep it off by default unless the output materially benefits from it.'
-      }
+      return { title: 'Translation' }
     case 'recognition':
-      return {
-        title: 'Recognition',
-        meta: 'Speed and accuracy tradeoff',
-        body: 'The current preset should be obvious at a glance. Alternative presets remain available without competing for attention.'
-      }
+      return { title: 'Recognition' }
     case 'advanced':
     default:
-      return {
-        title: 'Advanced',
-        meta: localServiceStatus === 'healthy' ? 'Connection and diagnostics' : 'Connection and degraded service',
-        body: 'Advanced stays discoverable, but it should read as support territory rather than normal daily configuration.'
-      }
+      return { title: 'Advanced' }
   }
 }
 

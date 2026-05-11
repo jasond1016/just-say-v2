@@ -99,14 +99,6 @@ export function QuickDictationPage(props: {
     <div className="page page--wide">
       <header className="surface-header">
         <div className="surface-header__eyebrow">Quick Dictation</div>
-        <div className="surface-header__row">
-          <div className="surface-header__headline-group">
-            <h1 className="surface-header__title">HUD-first dictation</h1>
-          </div>
-        </div>
-        <p className="surface-header__body">
-          The primary surface is the floating HUD while you work in another app. This page stays quiet and only helps with setup, recovery, and the last result.
-        </p>
       </header>
 
       <section className="hud-preview" aria-label="Quick dictation HUD preview">
@@ -228,9 +220,7 @@ export function QuickDictationPage(props: {
         </div>
 
         <div className={`result-panel__body ${latestText ? '' : 'result-panel__body--empty'}`} role="status" aria-live="polite">
-          {surface === 'recording' || surface === 'processing'
-            ? 'The HUD stays nearly wordless while dictation is in flight. The main window does not show live transcript guesses.'
-            : latestText ?? 'No recent dictation yet.'}
+          {latestText ?? 'No recent dictation yet.'}
         </div>
       </section>
     </div>
@@ -242,28 +232,28 @@ function describeSupportCopy(surface: QuickDictationSurface, status: PttStatus) 
     case 'recording':
       return {
         label: 'Recording',
-        body: 'Keep speaking in the target app. The HUD is the only surface that should stay with you during capture.'
+        body: 'Release the hotkey when you finish speaking.'
       }
     case 'processing':
       return {
         label: 'Processing',
-        body: 'JustSay is transcribing after you released the hotkey. The page stays quiet until text is ready.'
+        body: 'Transcribing your speech...'
       }
     case 'sent':
       return {
         label: 'Sent',
-        body: 'Success feedback stays brief, then the HUD disappears again.'
+        body: 'Text delivered successfully.'
       }
     case 'recovery':
       return {
         label: 'Recovery',
-        body: 'Automatic delivery failed, but the transcript is still available here for the fastest manual fallback.'
+        body: 'Automatic delivery failed. Copy the text below and paste it manually.'
       }
     case 'idle':
     default:
       return {
         label: status === 'idle' ? 'Ready' : 'Standby',
-        body: 'Use this page as a support surface. Day to day, Quick Dictation should feel like a system tool rather than a page.'
+        body: 'Press and hold the hotkey to start dictating.'
       }
   }
 }

@@ -152,9 +152,7 @@ export function HistoryPage(props: {
               ) : null}
             </div>
           </div>
-          <p className="surface-header__body">
-            Retrieve past dictation and meeting transcripts, then open one record as a document. The archive stays about finding and reopening, not monitoring.
-          </p>
+
         </header>
 
         <section className="archive-controls" aria-labelledby={headingId}>
