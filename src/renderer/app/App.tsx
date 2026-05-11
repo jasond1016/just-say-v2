@@ -182,13 +182,10 @@ function WorkspaceApp() {
           <QuickDictationPage
             runtime={runtime}
             settings={settings}
-            busyAction={busyAction}
-            pttStartDisabled={pttStartDisabled}
-            pttStopDisabled={pttStopDisabled}
-            onStartPtt={() => { void controller.startPtt() }}
-            onStopPtt={() => { void controller.stopPtt() }}
-            onCopyLatestText={() => { void controller.copyLatestPttText() }}
-            onOpenLiveSession={() => { controller.openLiveSessionSection() }}
+            localServiceStatus={serviceStatus}
+            recentDictations={history.filter((item) => item.mode === 'ptt').slice(0, 5)}
+            onCopyText={(id) => { void controller.copyHistoryItem(id, 'plain_text') }}
+            onOpenHistory={() => { controller.openHistorySection() }}
           />
         ) : null}
 

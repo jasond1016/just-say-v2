@@ -740,6 +740,152 @@
   color: var(--text-secondary);
 }
 
+/* Quick Dictation: config panel */
+.qd-config {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 20px;
+  border: 1px solid color-mix(in oklab, var(--border) 74%, transparent);
+  border-radius: 18px;
+  background: color-mix(in oklab, var(--bg-surface) 94%, transparent);
+  padding: 22px 26px;
+}
+
+.qd-config__item {
+  display: grid;
+  gap: 4px;
+}
+
+.qd-config__label {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.qd-config__value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.qd-config__value--mono {
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+
+.qd-config__sub {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.qd-state--ready {
+  color: oklch(0.55 0.11 156);
+}
+
+.qd-state--active {
+  color: var(--accent-text);
+}
+
+.qd-state--unavailable {
+  color: var(--danger-text);
+}
+
+/* Quick Dictation: results list */
+.qd-results {
+  border: 1px solid color-mix(in oklab, var(--border) 74%, transparent);
+  border-radius: 18px;
+  background: color-mix(in oklab, var(--bg-surface) 94%, transparent);
+  display: grid;
+}
+
+.qd-results__header {
+  padding: 16px 22px 0;
+}
+
+.qd-results__eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.qd-results__list {
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 10px 0;
+}
+
+.qd-results__empty {
+  padding: 32px 22px;
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.qd-result-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 22px;
+}
+
+.qd-result-row:hover {
+  background: var(--bg-hover);
+}
+
+.qd-result-row__text {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.qd-result-row__copy {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.qd-result-row__copy:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.qd-result-row__copy--done {
+  border-color: color-mix(in oklab, var(--success) 40%, var(--border));
+  color: var(--success);
+}
+
+.qd-results__footer {
+  padding: 12px 22px 16px;
+  border-top: 1px solid color-mix(in oklab, var(--border) 50%, transparent);
+}
+
+.qd-results__history-link {
+  background: none;
+  border: none;
+  font-size: 12px;
+  color: var(--accent-text);
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+}
+
+.qd-results__history-link:hover {
+  text-decoration: underline;
+}
+
 .result-panel {
   display: grid;
   gap: 12px;

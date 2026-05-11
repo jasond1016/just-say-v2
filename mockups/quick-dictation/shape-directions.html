@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quick Dictation – Shape Directions</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; }
+
+    :root {
+      color-scheme: light;
+      --bg-page: oklch(0.952 0.014 84);
+      --bg-surface: oklch(0.986 0.005 84);
+      --bg-elevated: oklch(0.97 0.01 86);
+      --bg-hover: oklch(0.958 0.014 84);
+      --border: oklch(0.86 0.008 74);
+      --border-subtle: oklch(0.92 0.006 76);
+      --text-primary: oklch(0.245 0.015 58);
+      --text-secondary: oklch(0.5 0.012 58);
+      --text-tertiary: oklch(0.63 0.01 60);
+      --accent: oklch(0.57 0.11 40);
+      --accent-muted: oklch(0.925 0.026 40 / 0.78);
+      --accent-text: oklch(0.35 0.07 38);
+      --accent-on: oklch(0.98 0.01 90);
+      --radius: 14px;
+      --font-sans: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+      --font-mono: "Cascadia Mono", Consolas, monospace;
+    }
+
+    html { font-family: var(--font-sans); font-size: 14px; color: var(--text-primary); background: oklch(0.94 0.005 80); }
+    body { padding: 40px; display: grid; gap: 64px; max-width: 1400px; margin: 0 auto; }
+
+    .direction-label {
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin-bottom: 12px;
+    }
+    .direction-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .direction-desc {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      max-width: 60ch;
+      margin-bottom: 24px;
+    }
+
+    /* Shared app shell */
+    .app-shell {
+      display: grid;
+      grid-template-columns: 184px 1fr;
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: var(--bg-surface);
+      min-height: 520px;
+    }
+
+    .sidebar {
+      background: oklch(0.965 0.012 80);
+      border-right: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+      padding: 20px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .sidebar__brand {
+      font-size: 15px;
+      font-weight: 700;
+      padding: 0 10px;
+      margin-bottom: 2px;
+    }
+    .sidebar__sub {
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+      padding: 0 10px;
+      margin-bottom: 14px;
+    }
+
+    .sidebar__link {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      border-radius: 10px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      cursor: default;
+    }
+    .sidebar__link--active {
+      background: color-mix(in oklab, var(--accent-muted) 72%, var(--bg-surface));
+      color: var(--accent-text);
+      font-weight: 600;
+    }
+    .sidebar__link .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 99px;
+      background: var(--accent);
+      opacity: 0;
+    }
+    .sidebar__link--active .dot {
+      opacity: 1;
+    }
+
+    .sidebar__spacer { flex: 1; }
+
+    .sidebar__status {
+      font-size: 11px;
+      color: var(--text-tertiary);
+      padding: 6px 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .sidebar__status .dot-green {
+      width: 6px;
+      height: 6px;
+      border-radius: 99px;
+      background: oklch(0.65 0.14 156);
+    }
+
+    .main-content {
+      padding: 28px 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    /* ===== DIRECTION A: No page, settings-only ===== */
+    .settings-dictation {
+      display: grid;
+      gap: 0;
+    }
+    .settings-dictation__row {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      gap: 18px;
+      align-items: start;
+      padding: 16px 0;
+      border-top: 1px solid color-mix(in oklab, var(--border) 58%, transparent);
+    }
+    .settings-dictation__row:first-child {
+      border-top: none;
+    }
+    .settings-dictation__label {
+      display: grid;
+      gap: 4px;
+    }
+    .settings-dictation__title {
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .settings-dictation__hint {
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+    .settings-dictation__value {
+      font-size: 13px;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .kbd {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .tooltip-mock {
+      position: absolute;
+      top: 80px;
+      left: 60px;
+      background: var(--text-primary);
+      color: var(--bg-surface);
+      font-size: 12px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      max-width: 200px;
+      line-height: 1.5;
+      box-shadow: 0 4px 16px oklch(0 0 0 / 0.12);
+    }
+    .tooltip-mock::after {
+      content: '';
+      position: absolute;
+      top: -5px;
+      left: 20px;
+      width: 10px;
+      height: 10px;
+      background: var(--text-primary);
+      transform: rotate(45deg);
+    }
+
+    /* ===== DIRECTION B: Minimal control panel ===== */
+    .panel {
+      border: 1px solid color-mix(in oklab, var(--border) 74%, transparent);
+      border-radius: 18px;
+      background: color-mix(in oklab, var(--bg-surface) 94%, transparent);
+      padding: 22px 26px;
+    }
+    .panel__grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 20px;
+    }
+    .panel__item-label {
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin-bottom: 6px;
+    }
+    .panel__item-value {
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .panel__item-sub {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+
+    .result-block {
+      border: 1px solid color-mix(in oklab, var(--border) 74%, transparent);
+      border-radius: 18px;
+      background: color-mix(in oklab, var(--bg-surface) 94%, transparent);
+      padding: 18px 22px;
+    }
+    .result-block__eyebrow {
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin-bottom: 10px;
+    }
+    .result-block__text {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text-primary);
+    }
+    .result-block__text--empty {
+      color: var(--text-tertiary);
+      font-style: italic;
+    }
+    .result-block__actions {
+      margin-top: 12px;
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-ghost {
+      padding: 5px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: transparent;
+      font-size: 12px;
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+    .btn-ghost:hover {
+      background: var(--bg-hover);
+    }
+
+    /* ===== DIRECTION C: Sidebar indicator ===== */
+    .sidebar__dictation-strip {
+      margin-top: 8px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: color-mix(in oklab, var(--accent-muted) 40%, transparent);
+      display: grid;
+      gap: 4px;
+    }
+    .sidebar__dictation-strip__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .sidebar__dictation-strip__label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent-text);
+      letter-spacing: 0.04em;
+    }
+    .sidebar__dictation-strip__state {
+      font-size: 10px;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .sidebar__dictation-strip__hotkey {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+    .sidebar__dictation-strip__expand {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid color-mix(in oklab, var(--border) 50%, transparent);
+    }
+    .sidebar__dictation-strip__expand-label {
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin-bottom: 6px;
+    }
+    .sidebar__dictation-strip__expand-text {
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--text-primary);
+    }
+    .sidebar__dictation-strip__expand-actions {
+      margin-top: 8px;
+      display: flex;
+      gap: 6px;
+    }
+    .sidebar__dictation-strip__expand-actions .btn-ghost {
+      font-size: 11px;
+      padding: 3px 8px;
+    }
+
+    .eyebrow {
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+    }
+    .page-title {
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .select-mock {
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-surface);
+      font-size: 13px;
+      color: var(--text-primary);
+      appearance: none;
+      cursor: pointer;
+    }
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .toggle-mock {
+      width: 36px;
+      height: 20px;
+      border-radius: 10px;
+      background: var(--accent);
+      position: relative;
+    }
+    .toggle-mock::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: white;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ============================================================ -->
+<!-- DIRECTION A: Remove page, integrate into Settings → Dictation -->
+<!-- ============================================================ -->
+<section>
+  <div class="direction-label">Direction A</div>
+  <div class="direction-title">No page. Settings-only.</div>
+  <div class="direction-desc">
+    Quick Dictation disappears from sidebar navigation entirely. All configuration lives in Settings → Dictation.
+    First-time awareness via a one-time tooltip after installation.
+  </div>
+
+  <div class="app-shell" style="position: relative;">
+    <nav class="sidebar">
+      <div class="sidebar__brand">JustSay</div>
+      <div class="sidebar__sub">Voice Workspace</div>
+      <a class="sidebar__link"><span class="dot"></span>Live Session</a>
+      <a class="sidebar__link"><span class="dot"></span>History</a>
+      <a class="sidebar__link sidebar__link--active"><span class="dot"></span>Settings</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__status"><span class="dot-green"></span> Service connected</div>
+    </nav>
+    <div class="main-content">
+      <div class="eyebrow">Settings › Dictation</div>
+      <div class="page-title">Dictation</div>
+      <div class="settings-dictation">
+        <div class="settings-dictation__row">
+          <div class="settings-dictation__label">
+            <div class="settings-dictation__title">Push-to-talk hotkey</div>
+            <div class="settings-dictation__hint">Hold this key to start dictating. Release to stop.</div>
+          </div>
+          <div class="settings-dictation__value"><span class="kbd">Right Ctrl</span></div>
+        </div>
+        <div class="settings-dictation__row">
+          <div class="settings-dictation__label">
+            <div class="settings-dictation__title">Delivery method</div>
+            <div class="settings-dictation__hint">How the transcribed text reaches your target app.</div>
+          </div>
+          <div class="settings-dictation__value">
+            <select class="select-mock"><option>Type into the active app</option></select>
+          </div>
+        </div>
+        <div class="settings-dictation__row">
+          <div class="settings-dictation__label">
+            <div class="settings-dictation__title">Translate dictation</div>
+            <div class="settings-dictation__hint">Automatically translate before delivery.</div>
+          </div>
+          <div class="settings-dictation__value">
+            <div class="toggle-row">
+              <div class="toggle-mock"></div>
+              <span style="font-size: 12px; color: var(--text-secondary);">Enabled</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- First-run tooltip (shown once) -->
+    <div class="tooltip-mock">
+      Hold <strong>Right Ctrl</strong> anywhere to dictate. Text lands in your active app.
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- DIRECTION B: Minimal control panel page                      -->
+<!-- ============================================================ -->
+<section>
+  <div class="direction-label">Direction B</div>
+  <div class="direction-title">Minimal control panel</div>
+  <div class="direction-desc">
+    Sidebar keeps Quick Dictation as the default landing. The page is stripped to essentials:
+    current configuration at a glance + last result ready to copy. No HUD preview, no decorative elements.
+  </div>
+
+  <div class="app-shell">
+    <nav class="sidebar">
+      <div class="sidebar__brand">JustSay</div>
+      <div class="sidebar__sub">Voice Workspace</div>
+      <a class="sidebar__link sidebar__link--active"><span class="dot"></span>Quick Dictation</a>
+      <a class="sidebar__link"><span class="dot"></span>Live Session</a>
+      <a class="sidebar__link"><span class="dot"></span>History</a>
+      <a class="sidebar__link"><span class="dot"></span>Settings</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__status"><span class="dot-green"></span> Service connected</div>
+    </nav>
+    <div class="main-content">
+      <div class="eyebrow">Quick Dictation</div>
+
+      <div class="panel">
+        <div class="panel__grid">
+          <div>
+            <div class="panel__item-label">Hotkey</div>
+            <div class="panel__item-value"><span class="kbd">Right Ctrl</span></div>
+            <div class="panel__item-sub">Hold to dictate</div>
+          </div>
+          <div>
+            <div class="panel__item-label">Delivery</div>
+            <div class="panel__item-value">Type into active app</div>
+            <div class="panel__item-sub">Keyboard simulation</div>
+          </div>
+          <div>
+            <div class="panel__item-label">State</div>
+            <div class="panel__item-value" style="color: oklch(0.55 0.11 156);">Ready</div>
+            <div class="panel__item-sub">Service connected</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="result-block">
+        <div class="result-block__eyebrow">Last result</div>
+        <div class="result-block__text">这是上一次语音转写的内容，用户可以在这里快速复制或重试。支持中英文混合内容的展示。</div>
+        <div class="result-block__actions">
+          <button class="btn-ghost">Copy</button>
+          <button class="btn-ghost">Copy as markdown</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- DIRECTION C: Sidebar indicator (no full page)                -->
+<!-- ============================================================ -->
+<section>
+  <div class="direction-label">Direction C</div>
+  <div class="direction-title">Sidebar persistent indicator</div>
+  <div class="direction-desc">
+    Quick Dictation is not a navigable page. Instead, a compact strip in the sidebar always shows the hotkey and state.
+    Click to expand: shows last result inline, with copy action. Default landing is Live Session.
+  </div>
+
+  <div class="app-shell">
+    <nav class="sidebar">
+      <div class="sidebar__brand">JustSay</div>
+      <div class="sidebar__sub">Voice Workspace</div>
+      <a class="sidebar__link sidebar__link--active"><span class="dot"></span>Live Session</a>
+      <a class="sidebar__link"><span class="dot"></span>History</a>
+      <a class="sidebar__link"><span class="dot"></span>Settings</a>
+
+      <!-- Persistent dictation indicator -->
+      <div class="sidebar__dictation-strip">
+        <div class="sidebar__dictation-strip__header">
+          <span class="sidebar__dictation-strip__label">Quick Dictation</span>
+          <span class="sidebar__dictation-strip__state">Ready</span>
+        </div>
+        <div class="sidebar__dictation-strip__hotkey">Right Ctrl — hold to dictate</div>
+
+        <!-- Expanded state (click to toggle) -->
+        <div class="sidebar__dictation-strip__expand">
+          <div class="sidebar__dictation-strip__expand-label">Last result</div>
+          <div class="sidebar__dictation-strip__expand-text">这是上一次语音转写的内容…</div>
+          <div class="sidebar__dictation-strip__expand-actions">
+            <button class="btn-ghost">Copy</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__status"><span class="dot-green"></span> Service connected</div>
+    </nav>
+    <div class="main-content">
+      <div class="eyebrow">Live Session</div>
+      <div class="page-title" style="margin-bottom: 8px;">Ready to record</div>
+      <p style="font-size: 13px; color: var(--text-secondary); max-width: 48ch;">Capture system audio and transcribe in real time.</p>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>
