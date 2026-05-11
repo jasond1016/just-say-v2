@@ -19,9 +19,9 @@ JustSay is a desktop voice workstation that does two things exceptionally well: 
 
 ## Brand Personality
 
-Sharp. Fast. Minimal.
+Calm. Ready. Precise.
 
-The interface communicates through absence: no decoration that doesn't earn its place, no UI chrome that doesn't serve a function. The tool feels like an extension of the keyboard, not an application you "open and use." Confidence comes from speed and reliability, not visual flourish.
+The interface stays out of the way until the moment you need it, then delivers exactly what you expect. Warmth over sharpness: easy on the eyes for hours-long sessions. Reliability over spectacle: always available, never crashing mid-meeting. Accuracy over reduction: every element earns its place by communicating the right information at the right time.
 
 ## Anti-references
 
@@ -36,14 +36,11 @@ The interface communicates through absence: no decoration that doesn't earn its 
 
 1. **Density over decoration.** Every pixel should carry information or afford an action. Whitespace is used for rhythm, not padding.
 2. **State is the interface.** The user should always know what the tool is doing without reading labels. Status is communicated through layout shifts, color changes, and typography weight, not badge-and-banner noise.
-3. **Keyboard-native.** The UI assumes the user's hands are on the keyboard. Mouse is supported but not primary. Hotkey hints are first-class.
-4. **Text is the product.** Typography and text layout are the core design challenge. Transcript readability at long durations matters more than any other visual concern.
-5. **Quiet confidence.** The tool should feel like professional equipment, not consumer software. No onboarding wizards, no "getting started" heroes, no empty-state illustrations.
+3. **Text is the product.** Typography and text layout are the core design challenge. Transcript readability at long durations matters more than any other visual concern.
+4. **Quiet confidence.** The tool should feel like professional equipment, not consumer software. No onboarding wizards, no "getting started" heroes, no empty-state illustrations.
 
 ## Accessibility & Inclusion
 
 - WCAG AA minimum for all text contrast
 - Reduced motion support for all transitions
-- Keyboard-navigable throughout
 - Screen reader landmarks and live regions for transcript updates
-- Support for both light and dark themes (user's system preference respected)

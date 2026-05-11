@@ -6,23 +6,7 @@
     <title>Focused Flow · JustSay Live Session</title>
     <link rel="stylesheet" href="./styles.css" />
     <style>
-      :root {
-        color-scheme: light;
-        --page: oklch(0.952 0.014 84);
-        --surface: oklch(0.986 0.005 84);
-        --surface-2: oklch(0.97 0.01 86);
-        --line: oklch(0.86 0.008 74);
-        --ink: oklch(0.245 0.015 58);
-        --muted: oklch(0.5 0.012 58);
-        --muted-2: oklch(0.63 0.01 60);
-        --accent: oklch(0.57 0.135 40);
-        --accent-soft: oklch(0.925 0.032 40);
-        --success: oklch(0.55 0.11 156);
-        --success-soft: oklch(0.94 0.026 156);
-        --danger: oklch(0.57 0.17 28);
-      }
-
-      body {
+body {
         background:
           radial-gradient(circle at top left, oklch(0.988 0.03 92), transparent 26%),
           linear-gradient(180deg, oklch(0.972 0.015 84), var(--page));
@@ -48,7 +32,7 @@
       .variant-nav__link[aria-current="page"] {
         background: var(--accent-soft);
         border-color: color-mix(in oklab, var(--accent) 28%, var(--line));
-        color: oklch(0.35 0.07 38);
+        color: var(--accent-ink);
       }
 
       .flow-shell {
@@ -108,7 +92,7 @@
       .flow-demo {
         overflow: hidden;
         border: 1px solid var(--line);
-        border-radius: 30px;
+        border-radius: 16px;
         background: color-mix(in oklab, var(--surface) 96%, transparent);
         box-shadow: var(--shadow-soft);
       }
@@ -161,7 +145,7 @@
       }
 
       .workspace-sidebar__eyebrow {
-        font-size: 11px;
+        font-size: 12px;
         letter-spacing: 0.14em;
         text-transform: uppercase;
         color: var(--muted);
@@ -179,7 +163,7 @@
         min-height: 34px;
         padding: 0 10px;
         border: 1px solid transparent;
-        border-radius: 10px;
+        border-radius: 8px;
         color: var(--muted);
         font-size: 12px;
         letter-spacing: 0.01em;
@@ -197,7 +181,7 @@
       .workspace-sidebar__link--active {
         background: color-mix(in oklab, var(--accent-soft) 44%, var(--surface));
         border-color: color-mix(in oklab, var(--accent) 16%, var(--line));
-        color: oklch(0.35 0.07 38);
+        color: var(--accent-ink);
         font-weight: 600;
       }
 
@@ -216,12 +200,12 @@
         display: flex;
         align-items: center;
         gap: 8px;
-        min-height: 30px;
+        min-height: 32px;
         padding: 0 10px;
         border: 1px solid transparent;
-        border-radius: 10px;
+        border-radius: 8px;
         color: var(--muted);
-        font-size: 11px;
+        font-size: 12px;
         line-height: 1.4;
       }
 
@@ -250,7 +234,7 @@
         border: 1px dashed var(--line);
         border-radius: 999px;
         background: color-mix(in oklab, var(--surface) 96%, transparent);
-        font-size: 11px;
+        font-size: 12px;
         color: var(--muted);
       }
 
@@ -279,7 +263,7 @@
       }
 
       .flow-status__eyebrow {
-        font-size: 11px;
+        font-size: 12px;
         letter-spacing: 0.14em;
         text-transform: uppercase;
         color: var(--muted);
@@ -301,12 +285,12 @@
       .flow-status__rename {
         display: inline-flex;
         align-items: center;
-        min-height: 28px;
+        min-height: 32px;
         padding: 0 10px;
         border: 1px solid var(--line);
         border-radius: 999px;
         color: var(--muted);
-        font-size: 11px;
+        font-size: 12px;
         font-weight: 600;
         letter-spacing: 0.12em;
         text-transform: uppercase;
@@ -364,7 +348,7 @@
       .flow-entry--draft {
         padding: 16px 16px 18px;
         border: 1px solid color-mix(in oklab, var(--accent) 22%, var(--line));
-        border-radius: 18px;
+        border-radius: 12px;
         background:
           linear-gradient(180deg, color-mix(in oklab, var(--accent-soft) 88%, transparent), color-mix(in oklab, var(--surface) 96%, transparent));
       }
@@ -386,7 +370,7 @@
         display: flex;
         flex-wrap: wrap;
         gap: 10px;
-        font-size: 11px;
+        font-size: 12px;
         letter-spacing: 0.12em;
         text-transform: uppercase;
         color: var(--muted-2);
@@ -433,7 +417,7 @@
         justify-content: center;
         min-height: 42px;
         padding: 0 14px;
-        border-radius: 14px;
+        border-radius: 10px;
         border: 1px solid var(--line);
         background: color-mix(in oklab, var(--surface) 94%, transparent);
         font-size: 13px;
@@ -442,15 +426,215 @@
       .flow-button--primary {
         background: var(--danger);
         border-color: color-mix(in oklab, var(--danger) 70%, black);
-        color: oklch(0.98 0.01 90);
+        color: var(--on-accent);
         font-weight: 600;
       }
 
       .flow-button--strong {
         background: var(--accent);
         border-color: color-mix(in oklab, var(--accent) 72%, black);
-        color: oklch(0.98 0.01 90);
+        color: var(--on-accent);
         font-weight: 600;
+      }
+
+      .flow-cold {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        min-height: 760px;
+      }
+
+      .flow-cold__status {
+        display: grid;
+        gap: 8px;
+        padding: 24px 28px 18px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .flow-cold__eyebrow {
+        font-size: 12px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .flow-cold__headline {
+        font-size: clamp(28px, 2.8vw, 42px);
+        line-height: 0.98;
+        letter-spacing: -0.05em;
+      }
+
+      .flow-cold__body {
+        display: grid;
+        place-content: center;
+        gap: 16px;
+        padding: 48px 28px;
+        text-align: center;
+      }
+
+      .flow-cold__ready {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        margin: 0 auto;
+        font-size: 13px;
+        color: var(--success-ink);
+      }
+
+      .flow-cold__ready-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        background: var(--success);
+      }
+
+      .flow-cold__copy {
+        max-width: 44ch;
+        margin: 0 auto;
+        font-size: 14px;
+        line-height: 1.68;
+        color: var(--muted);
+      }
+
+      .flow-cold__bottom {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        padding: 16px 20px 20px;
+        border-top: 1px solid var(--line);
+        background: color-mix(in oklab, var(--surface) 94%, transparent);
+      }
+
+      .flow-cold__sources {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .flow-cold__source {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 32px;
+        padding: 0 10px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--surface) 96%, transparent);
+      }
+
+      .flow-cold__source-dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 999px;
+        background: var(--success);
+      }
+
+      .flow-jump {
+        position: sticky;
+        bottom: 12px;
+        z-index: 5;
+        display: flex;
+        justify-content: center;
+        padding: 0 28px;
+        pointer-events: none;
+      }
+
+      .flow-jump__pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 34px;
+        padding: 0 14px;
+        border: 1px solid color-mix(in oklab, var(--accent) 24%, var(--line));
+        border-radius: 999px;
+        background: var(--surface);
+        box-shadow: 0 4px 16px rgba(16, 18, 20, 0.12);
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--accent-ink);
+        pointer-events: auto;
+      }
+
+      .confirm-overlay {
+        position: absolute;
+        inset: 0;
+        z-index: 10;
+        display: grid;
+        place-items: center;
+        background: oklch(0.245 0.015 58 / 0.38);
+        backdrop-filter: blur(6px);
+      }
+
+      .confirm-dialog {
+        width: min(380px, calc(100% - 48px));
+        display: grid;
+        gap: 18px;
+        padding: 28px 24px 22px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--surface);
+        box-shadow: 0 24px 48px oklch(0.18 0.01 58 / 0.22);
+      }
+
+      .confirm-dialog__title {
+        font-size: 20px;
+        line-height: 1.14;
+        letter-spacing: -0.03em;
+        font-weight: 600;
+      }
+
+      .confirm-dialog__body {
+        max-width: 38ch;
+        font-size: 14px;
+        line-height: 1.68;
+        color: var(--muted);
+      }
+
+      .confirm-dialog__meta {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .confirm-dialog__meta strong {
+        font-family: "Cascadia Mono", Consolas, monospace;
+        font-variant-numeric: tabular-nums;
+        color: var(--ink);
+      }
+
+      .confirm-dialog__actions {
+        display: flex;
+        gap: 10px;
+        padding-top: 4px;
+      }
+
+      .confirm-dialog__button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 42px;
+        padding: 0 18px;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        background: color-mix(in oklab, var(--surface) 94%, transparent);
+        font-size: 13px;
+        font-weight: 500;
+      }
+
+      .confirm-dialog__button--danger {
+        background: var(--danger);
+        border-color: color-mix(in oklab, var(--danger) 70%, black);
+        color: var(--on-accent);
+        font-weight: 600;
+      }
+
+      .confirm-dialog__button--cancel {
+        color: var(--muted);
       }
 
       @media (max-width: 920px) {
@@ -536,11 +720,81 @@
         </section>
 
         <div class="flow-anchors" aria-label="State anchors">
+          <a class="flow-anchor" href="#cold-start"><strong>Cold start</strong> ready, no session yet</a>
           <a class="flow-anchor" href="#streaming"><strong>Streaming</strong> minimal live mode</a>
+          <a class="flow-anchor" href="#confirm-stop"><strong>Confirm Stop</strong> safety gate before ending</a>
           <a class="flow-anchor" href="#completed"><strong>Completed</strong> transcript preserved for review</a>
         </div>
 
         <div class="flow-stack">
+          <section class="flow-demo" id="cold-start" aria-label="Cold start state mockup">
+            <div class="flow-demo__label">
+              <strong>Cold start</strong>
+              <span>No session has started yet. The surface is ready, not empty.</span>
+            </div>
+
+            <div class="workspace-preview">
+              <aside class="workspace-sidebar">
+                <div class="workspace-sidebar__brand">
+                  <div class="workspace-sidebar__brand-mark">JustSay</div>
+                  <div class="workspace-sidebar__eyebrow">Voice workspace</div>
+                </div>
+
+                <nav class="workspace-sidebar__nav" aria-label="App sections">
+                  <button class="workspace-sidebar__link">Quick Dictation</button>
+                  <button class="workspace-sidebar__link workspace-sidebar__link--active">Live Session</button>
+                  <button class="workspace-sidebar__link">History</button>
+                  <button class="workspace-sidebar__link">Settings</button>
+                </nav>
+
+                <div></div>
+
+                <div class="workspace-sidebar__utility">
+                  <div class="workspace-sidebar__status workspace-sidebar__status--healthy">
+                    <span class="workspace-sidebar__status-dot"></span>
+                    Local service healthy
+                  </div>
+                  <div class="workspace-sidebar__refresh">Refresh</div>
+                </div>
+              </aside>
+
+              <div class="workspace-main">
+                <div class="flow-cold">
+                  <div class="flow-cold__status">
+                    <div class="flow-cold__eyebrow">Live Session</div>
+                    <div class="flow-cold__headline">Ready to record</div>
+                  </div>
+
+                  <div class="flow-cold__body">
+                    <div class="flow-cold__ready">
+                      <span class="flow-cold__ready-dot"></span>
+                      Recognition service connected
+                    </div>
+                    <div class="flow-cold__copy">
+                      Start a session to capture a meeting or conversation. The transcript will stream here in real time, and you can copy, export, or review it after stopping.
+                    </div>
+                  </div>
+
+                  <div class="flow-cold__bottom">
+                    <div class="flow-cold__sources">
+                      <div class="flow-cold__source">
+                        <span class="flow-cold__source-dot"></span>
+                        System audio
+                      </div>
+                      <div class="flow-cold__source">
+                        <span class="flow-cold__source-dot"></span>
+                        Microphone
+                      </div>
+                    </div>
+                    <div class="flow-actions">
+                      <button class="flow-button flow-button--strong">Start session</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <section class="flow-demo" id="streaming" aria-label="Streaming state mockup">
             <div class="flow-demo__label">
               <strong>Streaming state</strong>
@@ -555,10 +809,10 @@
                 </div>
 
                 <nav class="workspace-sidebar__nav" aria-label="App sections">
-                  <div class="workspace-sidebar__link">Quick Dictation</div>
-                  <div class="workspace-sidebar__link workspace-sidebar__link--active">Live Session</div>
-                  <div class="workspace-sidebar__link">History</div>
-                  <div class="workspace-sidebar__link">Settings</div>
+                  <button class="workspace-sidebar__link">Quick Dictation</button>
+                  <button class="workspace-sidebar__link workspace-sidebar__link--active">Live Session</button>
+                  <button class="workspace-sidebar__link">History</button>
+                  <button class="workspace-sidebar__link">Settings</button>
                 </nav>
 
                 <div></div>
@@ -656,11 +910,115 @@
                 </div>
               </div>
 
+              <div class="flow-jump" aria-label="Scroll control">
+                <button class="flow-jump__pill">↓ Jump to latest</button>
+              </div>
+
               <div class="flow-bottom">
                 <div class="flow-actions">
-                  <div class="flow-button flow-button--primary">Stop session</div>
+                  <button class="flow-button flow-button--primary">Stop session</button>
                 </div>
               </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="flow-demo" id="confirm-stop" aria-label="Confirm stop modal mockup">
+            <div class="flow-demo__label">
+              <strong>Confirm stop</strong>
+              <span>A focused modal prevents accidental session loss.</span>
+            </div>
+
+            <div class="workspace-preview">
+              <aside class="workspace-sidebar">
+                <div class="workspace-sidebar__brand">
+                  <div class="workspace-sidebar__brand-mark">JustSay</div>
+                  <div class="workspace-sidebar__eyebrow">Voice workspace</div>
+                </div>
+
+                <nav class="workspace-sidebar__nav" aria-label="App sections">
+                  <button class="workspace-sidebar__link">Quick Dictation</button>
+                  <button class="workspace-sidebar__link workspace-sidebar__link--active">Live Session</button>
+                  <button class="workspace-sidebar__link">History</button>
+                  <button class="workspace-sidebar__link">Settings</button>
+                </nav>
+
+                <div></div>
+
+                <div class="workspace-sidebar__utility">
+                  <div class="workspace-sidebar__status workspace-sidebar__status--healthy">
+                    <span class="workspace-sidebar__status-dot"></span>
+                    Local service healthy
+                  </div>
+                  <div class="workspace-sidebar__refresh">Refresh</div>
+                </div>
+              </aside>
+
+              <div class="workspace-main" style="position: relative;">
+                <div class="flow-screen" style="filter: blur(1px); opacity: 0.65; pointer-events: none;">
+                  <div class="flow-status">
+                    <div class="flow-status__title">
+                      <div class="flow-status__headline">Live Session</div>
+                    </div>
+                    <div class="flow-time flow-time--live" aria-label="Live session timing">
+                      <div class="flow-time__value">00:34:18</div>
+                    </div>
+                  </div>
+
+                  <div class="flow-transcript">
+                    <div class="flow-transcript__stack">
+                      <article class="flow-entry">
+                        <div class="flow-entry__time">09:42:11</div>
+                        <div class="flow-entry__body">
+                          <div class="flow-entry__meta">
+                            <span>Committed</span>
+                            <span>System audio</span>
+                            <span>Speaker A</span>
+                          </div>
+                          <div class="flow-entry__primary">
+                            如果这是实时转录页面，那它首先应该是一个好的阅读界面，而不是一个功能区再加一条转录流。
+                          </div>
+                        </div>
+                      </article>
+
+                      <article class="flow-entry">
+                        <div class="flow-entry__time">09:42:37</div>
+                        <div class="flow-entry__body">
+                          <div class="flow-entry__meta">
+                            <span>Committed</span>
+                            <span>Microphone</span>
+                            <span>Speaker B</span>
+                          </div>
+                          <div class="flow-entry__primary">
+                            对，而且停止按钮应该离文本很近，因为这是用户在转录过程中最有可能执行的唯一操作。
+                          </div>
+                        </div>
+                      </article>
+                    </div>
+                  </div>
+
+                  <div class="flow-bottom">
+                    <div class="flow-actions">
+                      <button class="flow-button flow-button--primary">Stop session</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="confirm-overlay" role="dialog" aria-modal="true" aria-label="Confirm stop session">
+                  <div class="confirm-dialog">
+                    <div class="confirm-dialog__title">End this session?</div>
+                    <div class="confirm-dialog__body">
+                      Stopping will finalize the transcript. You can still copy, export, and review it afterward.
+                    </div>
+                    <div class="confirm-dialog__meta">
+                      Session duration: <strong>00:34:18</strong>
+                    </div>
+                    <div class="confirm-dialog__actions">
+                      <button class="confirm-dialog__button confirm-dialog__button--danger">End session</button>
+                      <button class="confirm-dialog__button confirm-dialog__button--cancel">Keep recording</button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -680,10 +1038,10 @@
                 </div>
 
                 <nav class="workspace-sidebar__nav" aria-label="App sections">
-                  <div class="workspace-sidebar__link">Quick Dictation</div>
-                  <div class="workspace-sidebar__link workspace-sidebar__link--active">Live Session</div>
-                  <div class="workspace-sidebar__link">History</div>
-                  <div class="workspace-sidebar__link">Settings</div>
+                  <button class="workspace-sidebar__link">Quick Dictation</button>
+                  <button class="workspace-sidebar__link workspace-sidebar__link--active">Live Session</button>
+                  <button class="workspace-sidebar__link">History</button>
+                  <button class="workspace-sidebar__link">Settings</button>
                 </nav>
 
                 <div></div>
@@ -787,10 +1145,10 @@
 
               <div class="flow-bottom">
                 <div class="flow-actions">
-                  <div class="flow-button flow-button--strong">Start new session</div>
-                  <div class="flow-button">Copy transcript</div>
-                  <div class="flow-button">Export bilingual</div>
-                  <div class="flow-button">Open in history</div>
+                  <button class="flow-button flow-button--strong">Start new session</button>
+                  <button class="flow-button">Copy transcript</button>
+                  <button class="flow-button">Export bilingual</button>
+                  <button class="flow-button">Open in history</button>
                 </div>
               </div>
                 </div>

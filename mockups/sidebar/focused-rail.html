@@ -6,28 +6,7 @@
     <title>Focused Rail · JustSay Sidebar</title>
     <link rel="stylesheet" href="../live-session/styles.css" />
     <style>
-      :root {
-        color-scheme: light;
-        --page: oklch(0.952 0.014 84);
-        --surface: oklch(0.986 0.005 84);
-        --surface-2: oklch(0.97 0.01 86);
-        --surface-3: oklch(0.958 0.014 84);
-        --line: oklch(0.86 0.008 74);
-        --line-strong: oklch(0.78 0.012 72);
-        --ink: oklch(0.245 0.015 58);
-        --muted: oklch(0.5 0.012 58);
-        --muted-2: oklch(0.63 0.01 60);
-        --accent: oklch(0.57 0.135 40);
-        --accent-soft: oklch(0.925 0.032 40);
-        --success: oklch(0.55 0.11 156);
-        --success-soft: oklch(0.94 0.026 156);
-        --warning: oklch(0.69 0.13 78);
-        --warning-soft: oklch(0.95 0.03 82);
-        --danger: oklch(0.57 0.17 28);
-        --danger-soft: oklch(0.95 0.028 28);
-      }
-
-      body {
+body {
         margin: 0;
         min-height: 100vh;
         background:
@@ -55,7 +34,7 @@
       .variant-nav__link[aria-current="page"] {
         background: var(--accent-soft);
         border-color: color-mix(in oklab, var(--accent) 28%, var(--line));
-        color: oklch(0.35 0.07 38);
+        color: var(--accent-ink);
       }
 
       .rail-shell {
@@ -111,7 +90,7 @@
       .rail-demo {
         overflow: hidden;
         border: 1px solid var(--line);
-        border-radius: 30px;
+        border-radius: 16px;
         background: color-mix(in oklab, var(--surface) 96%, transparent);
         box-shadow: var(--shadow-soft);
       }
@@ -164,7 +143,7 @@
       }
 
       .app-rail__brand-sub {
-        font-size: 11px;
+        font-size: 12px;
         letter-spacing: 0.14em;
         text-transform: uppercase;
         color: var(--muted);
@@ -182,7 +161,7 @@
         min-height: 34px;
         padding: 0 10px;
         border: 1px solid transparent;
-        border-radius: 10px;
+        border-radius: 8px;
         color: var(--muted);
         font-size: 12px;
         letter-spacing: 0.01em;
@@ -200,7 +179,7 @@
       .app-rail__link--active {
         background: color-mix(in oklab, var(--accent-soft) 44%, var(--surface));
         border-color: color-mix(in oklab, var(--accent) 16%, var(--line));
-        color: oklch(0.35 0.07 38);
+        color: var(--accent-ink);
         font-weight: 600;
       }
 
@@ -219,12 +198,12 @@
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        min-height: 30px;
+        min-height: 32px;
         padding: 0 10px;
         border: 1px solid transparent;
-        border-radius: 10px;
+        border-radius: 8px;
         color: var(--muted);
-        font-size: 11px;
+        font-size: 12px;
         line-height: 1.4;
       }
 
@@ -247,7 +226,7 @@
       .app-rail__status--degraded {
         background: color-mix(in oklab, var(--warning-soft) 40%, var(--surface));
         border-color: color-mix(in oklab, var(--warning) 18%, var(--line));
-        color: oklch(0.47 0.08 82);
+        color: var(--warning-ink);
       }
 
       .app-rail__status--degraded .app-rail__status-dot {
@@ -257,11 +236,57 @@
       .app-rail__status--failed {
         background: color-mix(in oklab, var(--danger-soft) 40%, var(--surface));
         border-color: color-mix(in oklab, var(--danger) 18%, var(--line));
-        color: oklch(0.44 0.09 28);
+        color: var(--danger-ink);
       }
 
       .app-rail__status--failed .app-rail__status-dot {
         background: var(--danger);
+      }
+
+      .app-rail__status-expand {
+        display: grid;
+        gap: 8px;
+        padding: 10px 10px 12px;
+        border: 1px solid color-mix(in oklab, var(--warning) 18%, var(--line));
+        border-radius: 8px;
+        background: color-mix(in oklab, var(--warning-soft) 40%, var(--surface));
+      }
+
+      .app-rail__status-expand__head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--warning-ink);
+      }
+
+      .app-rail__status-expand__head-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        background: var(--warning);
+        flex-shrink: 0;
+      }
+
+      .app-rail__status-expand__body {
+        font-size: 12px;
+        line-height: 1.5;
+        color: var(--muted);
+      }
+
+      .app-rail__status-expand__action {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 32px;
+        padding: 0 10px;
+        border: 1px solid color-mix(in oklab, var(--warning) 24%, var(--line));
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--surface) 96%, transparent);
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--warning-ink);
       }
 
       .app-rail__refresh {
@@ -273,7 +298,7 @@
         border: 1px dashed var(--line);
         border-radius: 999px;
         background: color-mix(in oklab, var(--surface) 96%, transparent);
-        font-size: 11px;
+        font-size: 12px;
         color: var(--muted);
       }
 
@@ -291,7 +316,7 @@
       }
 
       .content-head__eyebrow {
-        font-size: 11px;
+        font-size: 12px;
         letter-spacing: 0.14em;
         text-transform: uppercase;
         color: var(--muted);
@@ -387,10 +412,10 @@
                 </div>
 
                 <nav class="app-rail__nav" aria-label="Workspace sections">
-                  <div class="app-rail__link">Quick Dictation</div>
-                  <div class="app-rail__link app-rail__link--active">Live Session</div>
-                  <div class="app-rail__link">History</div>
-                  <div class="app-rail__link">Settings</div>
+                  <button class="app-rail__link">Quick Dictation</button>
+                  <button class="app-rail__link app-rail__link--active">Live Session</button>
+                  <button class="app-rail__link">History</button>
+                  <button class="app-rail__link">Settings</button>
                 </nav>
 
                 <div></div>
@@ -400,7 +425,7 @@
                     <span class="app-rail__status-dot"></span>
                     Local service healthy
                   </div>
-                  <div class="app-rail__refresh">Refresh</div>
+                  <button class="app-rail__refresh">Refresh</button>
                 </div>
               </aside>
 
@@ -434,10 +459,10 @@
                 </div>
 
                 <nav class="app-rail__nav" aria-label="Workspace sections">
-                  <div class="app-rail__link">Quick Dictation</div>
-                  <div class="app-rail__link">Live Session</div>
-                  <div class="app-rail__link app-rail__link--active">History</div>
-                  <div class="app-rail__link">Settings</div>
+                  <button class="app-rail__link">Quick Dictation</button>
+                  <button class="app-rail__link">Live Session</button>
+                  <button class="app-rail__link app-rail__link--active">History</button>
+                  <button class="app-rail__link">Settings</button>
                 </nav>
 
                 <div></div>
@@ -447,7 +472,7 @@
                     <span class="app-rail__status-dot"></span>
                     Local service healthy
                   </div>
-                  <div class="app-rail__refresh">Refresh</div>
+                  <button class="app-rail__refresh">Refresh</button>
                 </div>
               </aside>
 
@@ -481,20 +506,26 @@
                 </div>
 
                 <nav class="app-rail__nav" aria-label="Workspace sections">
-                  <div class="app-rail__link">Quick Dictation</div>
-                  <div class="app-rail__link">Live Session</div>
-                  <div class="app-rail__link">History</div>
-                  <div class="app-rail__link app-rail__link--active">Settings</div>
+                  <button class="app-rail__link">Quick Dictation</button>
+                  <button class="app-rail__link">Live Session</button>
+                  <button class="app-rail__link">History</button>
+                  <button class="app-rail__link app-rail__link--active">Settings</button>
                 </nav>
 
                 <div></div>
 
                 <div class="app-rail__utility">
-                  <div class="app-rail__status app-rail__status--degraded">
-                    <span class="app-rail__status-dot"></span>
-                    Local service degraded
+                  <div class="app-rail__status-expand">
+                    <div class="app-rail__status-expand__head">
+                      <span class="app-rail__status-expand__head-dot"></span>
+                      Local service degraded
+                    </div>
+                    <div class="app-rail__status-expand__body">
+                      The speech service is responding slowly. Recognition may fall back to a lower-quality model.
+                    </div>
+                    <button class="app-rail__status-expand__action">Restart service</button>
                   </div>
-                  <div class="app-rail__refresh">Refresh</div>
+                  <button class="app-rail__refresh">Refresh</button>
                 </div>
               </aside>
 

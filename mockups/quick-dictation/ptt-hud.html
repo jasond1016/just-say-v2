@@ -6,22 +6,7 @@
     <title>PTT HUD · JustSay Quick Dictation</title>
     <link rel="stylesheet" href="../live-session/styles.css" />
     <style>
-      :root {
-        color-scheme: light;
-        --page: oklch(0.952 0.014 84);
-        --surface: oklch(0.986 0.005 84);
-        --surface-2: oklch(0.97 0.01 86);
-        --line: oklch(0.86 0.008 74);
-        --ink: oklch(0.245 0.015 58);
-        --muted: oklch(0.5 0.012 58);
-        --muted-2: oklch(0.63 0.01 60);
-        --accent: oklch(0.57 0.135 40);
-        --accent-soft: oklch(0.925 0.032 40);
-        --success: oklch(0.55 0.11 156);
-        --success-soft: oklch(0.94 0.026 156);
-      }
-
-      body {
+body {
         margin: 0;
         min-height: 100vh;
         background:
@@ -49,7 +34,7 @@
       .variant-nav__link[aria-current="page"] {
         background: var(--accent-soft);
         border-color: color-mix(in oklab, var(--accent) 28%, var(--line));
-        color: oklch(0.35 0.07 38);
+        color: var(--accent-ink);
       }
 
       .hud-shell {
@@ -86,7 +71,7 @@
       .hud-demo {
         overflow: hidden;
         border: 1px solid var(--line);
-        border-radius: 30px;
+        border-radius: 16px;
         background: color-mix(in oklab, var(--surface) 96%, transparent);
         box-shadow: var(--shadow-soft);
       }
@@ -126,7 +111,7 @@
         min-height: 56px;
         padding: 8px 12px;
         border: 1px solid var(--line);
-        border-radius: 14px;
+        border-radius: 10px;
         background: color-mix(in oklab, var(--surface) 98%, transparent);
         box-shadow: 0 10px 24px rgba(31, 34, 38, 0.08);
       }
@@ -215,7 +200,7 @@
         min-height: 56px;
         padding: 8px 10px 8px 14px;
         border: 1px solid color-mix(in oklab, var(--accent) 18%, var(--line));
-        border-radius: 14px;
+        border-radius: 10px;
         background: color-mix(in oklab, var(--surface) 98%, transparent);
         box-shadow: 0 10px 24px rgba(31, 34, 38, 0.08);
       }
@@ -234,7 +219,7 @@
       }
 
       .hud-strip__sub {
-        font-size: 11px;
+        font-size: 12px;
         line-height: 1.4;
         color: var(--muted);
       }
@@ -252,7 +237,7 @@
         justify-content: center;
         min-height: 36px;
         padding: 0 12px;
-        border-radius: 10px;
+        border-radius: 8px;
         border: 1px solid var(--line);
         background: color-mix(in oklab, var(--surface) 96%, transparent);
         font-size: 12px;
@@ -262,7 +247,7 @@
       .hud-strip__button--primary {
         background: var(--accent);
         border-color: color-mix(in oklab, var(--accent) 72%, black);
-        color: oklch(0.98 0.01 90);
+        color: var(--on-accent);
         font-weight: 600;
       }
 
@@ -428,8 +413,8 @@
                   <div class="hud-strip__sub">Copy to clipboard, then paste.</div>
                 </div>
                 <div class="hud-strip__actions">
-                  <div class="hud-strip__button hud-strip__button--primary">Copy</div>
-                  <div class="hud-strip__button hud-strip__button--ghost">Dismiss</div>
+                  <button class="hud-strip__button hud-strip__button--primary">Copy</button>
+                  <button class="hud-strip__button hud-strip__button--ghost">Dismiss</button>
                 </div>
               </div>
             </div>

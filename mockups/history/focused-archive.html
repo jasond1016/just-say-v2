@@ -6,23 +6,7 @@
     <title>Focused Archive · JustSay History</title>
     <link rel="stylesheet" href="../live-session/styles.css" />
     <style>
-      :root {
-        color-scheme: light;
-        --page: oklch(0.952 0.014 84);
-        --surface: oklch(0.986 0.005 84);
-        --surface-2: oklch(0.97 0.01 86);
-        --surface-3: oklch(0.958 0.014 84);
-        --line: oklch(0.86 0.008 74);
-        --ink: oklch(0.245 0.015 58);
-        --muted: oklch(0.5 0.012 58);
-        --muted-2: oklch(0.63 0.01 60);
-        --accent: oklch(0.57 0.135 40);
-        --accent-soft: oklch(0.925 0.032 40);
-        --success: oklch(0.55 0.11 156);
-        --danger: oklch(0.57 0.17 28);
-      }
-
-      body {
+body {
         margin: 0;
         min-height: 100vh;
         background:
@@ -50,7 +34,7 @@
       .variant-nav__link[aria-current="page"] {
         background: var(--accent-soft);
         border-color: color-mix(in oklab, var(--accent) 28%, var(--line));
-        color: oklch(0.35 0.07 38);
+        color: var(--accent-ink);
       }
 
       .archive-shell {
@@ -106,7 +90,7 @@
       .archive-demo {
         overflow: hidden;
         border: 1px solid var(--line);
-        border-radius: 30px;
+        border-radius: 16px;
         background: color-mix(in oklab, var(--surface) 96%, transparent);
         box-shadow: var(--shadow-soft);
       }
@@ -159,7 +143,7 @@
       }
 
       .workspace-sidebar__eyebrow {
-        font-size: 11px;
+        font-size: 12px;
         letter-spacing: 0.14em;
         text-transform: uppercase;
         color: var(--muted);
@@ -177,7 +161,7 @@
         min-height: 34px;
         padding: 0 10px;
         border: 1px solid transparent;
-        border-radius: 10px;
+        border-radius: 8px;
         color: var(--muted);
         font-size: 12px;
         letter-spacing: 0.01em;
@@ -195,7 +179,7 @@
       .workspace-sidebar__link--active {
         background: color-mix(in oklab, var(--accent-soft) 44%, var(--surface));
         border-color: color-mix(in oklab, var(--accent) 16%, var(--line));
-        color: oklch(0.35 0.07 38);
+        color: var(--accent-ink);
         font-weight: 600;
       }
 
@@ -214,12 +198,12 @@
         display: flex;
         align-items: center;
         gap: 8px;
-        min-height: 30px;
+        min-height: 32px;
         padding: 0 10px;
         border: 1px solid transparent;
-        border-radius: 10px;
+        border-radius: 8px;
         color: var(--muted);
-        font-size: 11px;
+        font-size: 12px;
         line-height: 1.4;
       }
 
@@ -248,7 +232,7 @@
         border: 1px dashed var(--line);
         border-radius: 999px;
         background: color-mix(in oklab, var(--surface) 96%, transparent);
-        font-size: 11px;
+        font-size: 12px;
         color: var(--muted);
       }
 
@@ -287,7 +271,7 @@
 
       .history-header__eyebrow,
       .detail-back {
-        font-size: 11px;
+        font-size: 12px;
         letter-spacing: 0.14em;
         text-transform: uppercase;
         color: var(--muted);
@@ -336,7 +320,7 @@
         min-height: 42px;
         padding: 0 14px;
         border: 1px solid var(--line);
-        border-radius: 14px;
+        border-radius: 10px;
         background: color-mix(in oklab, var(--surface) 98%, transparent);
         color: var(--ink);
         font: inherit;
@@ -363,7 +347,7 @@
       .history-chip--active {
         background: var(--accent-soft);
         border-color: color-mix(in oklab, var(--accent) 24%, var(--line));
-        color: oklch(0.35 0.07 38);
+        color: var(--accent-ink);
         font-weight: 600;
       }
 
@@ -396,7 +380,7 @@
 
       .history-row__time {
         color: var(--muted-2);
-        font-size: 11px;
+        font-size: 12px;
         white-space: nowrap;
       }
 
@@ -523,7 +507,7 @@
       .detail-tab--active {
         background: var(--accent-soft);
         border-color: color-mix(in oklab, var(--accent) 24%, var(--line));
-        color: oklch(0.35 0.07 38);
+        color: var(--accent-ink);
         font-weight: 600;
       }
 
@@ -549,7 +533,7 @@
       .view-action--primary {
         background: var(--accent-soft);
         border-color: color-mix(in oklab, var(--accent) 24%, var(--line));
-        color: oklch(0.35 0.07 38);
+        color: var(--accent-ink);
         font-weight: 600;
       }
 
@@ -583,7 +567,7 @@
         min-height: 38px;
         padding: 0 12px;
         border: 1px solid var(--line);
-        border-radius: 12px;
+        border-radius: 8px;
         background: color-mix(in oklab, var(--surface) 98%, transparent);
         color: var(--ink);
         font: inherit;
@@ -633,7 +617,7 @@
         flex-wrap: wrap;
         gap: 10px;
         color: var(--muted-2);
-        font-size: 11px;
+        font-size: 12px;
         letter-spacing: 0.12em;
         text-transform: uppercase;
       }
@@ -692,7 +676,7 @@
       }
 
       .notes-card__eyebrow {
-        font-size: 11px;
+        font-size: 12px;
         letter-spacing: 0.14em;
         text-transform: uppercase;
         color: var(--muted);
@@ -738,7 +722,7 @@
       }
 
       .notes-state__eyebrow {
-        font-size: 11px;
+        font-size: 12px;
         letter-spacing: 0.14em;
         text-transform: uppercase;
         color: var(--muted);
@@ -776,7 +760,7 @@
       .notes-state__button--primary {
         background: var(--accent-soft);
         border-color: color-mix(in oklab, var(--accent) 24%, var(--line));
-        color: oklch(0.35 0.07 38);
+        color: var(--accent-ink);
         font-weight: 600;
       }
 
@@ -799,6 +783,130 @@
 
       .notes-state__dots span:nth-child(3) {
         opacity: 0.45;
+      }
+
+      .history-empty {
+        display: grid;
+        place-content: center;
+        gap: 18px;
+        min-height: 340px;
+        padding: 48px 28px;
+        text-align: center;
+      }
+
+      .history-empty__title {
+        font-size: 20px;
+        line-height: 1.18;
+        letter-spacing: -0.02em;
+        font-weight: 600;
+      }
+
+      .history-empty__body {
+        max-width: 42ch;
+        margin: 0 auto;
+        font-size: 14px;
+        line-height: 1.68;
+        color: var(--muted);
+      }
+
+      .history-empty__actions {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        padding-top: 4px;
+      }
+
+      .history-empty__button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 38px;
+        padding: 0 16px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: color-mix(in oklab, var(--surface) 96%, transparent);
+        font-size: 13px;
+      }
+
+      .history-empty__button--primary {
+        background: var(--accent-soft);
+        border-color: color-mix(in oklab, var(--accent) 24%, var(--line));
+        color: var(--accent-ink);
+        font-weight: 600;
+      }
+
+      .history-bulk-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        padding: 12px 28px;
+        border-bottom: 1px solid color-mix(in oklab, var(--accent) 18%, var(--line));
+        background: color-mix(in oklab, var(--accent-soft) 38%, var(--surface));
+      }
+
+      .history-bulk-bar__info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 13px;
+        color: var(--accent-ink);
+        font-weight: 600;
+      }
+
+      .history-bulk-bar__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .history-bulk-bar__button {
+        display: inline-flex;
+        align-items: center;
+        min-height: 34px;
+        padding: 0 12px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--surface) 96%, transparent);
+        font-size: 12px;
+      }
+
+      .history-bulk-bar__button--danger {
+        border-color: color-mix(in oklab, var(--danger) 24%, var(--line));
+        color: var(--danger-ink);
+      }
+
+      .history-bulk-bar__button--cancel {
+        border-style: dashed;
+        color: var(--muted);
+      }
+
+      .history-row--selectable {
+        grid-template-columns: 24px minmax(0, 1fr);
+      }
+
+      .history-row__check {
+        display: flex;
+        align-items: flex-start;
+        padding-top: 4px;
+      }
+
+      .history-row__checkbox {
+        width: 18px;
+        height: 18px;
+        border: 1.5px solid var(--line-strong);
+        border-radius: 4px;
+        background: var(--surface);
+        flex-shrink: 0;
+      }
+
+      .history-row__checkbox--checked {
+        background: var(--accent);
+        border-color: var(--accent);
+      }
+
+      .history-row--selected {
+        background: color-mix(in oklab, var(--accent-soft) 28%, transparent);
       }
 
       @media (max-width: 1160px) {
@@ -904,6 +1012,8 @@
 
         <div class="archive-anchors">
           <div class="archive-anchor"><strong>Overview</strong> Find the right record fast.</div>
+          <div class="archive-anchor"><strong>Bulk select</strong> Multi-select for export and cleanup.</div>
+          <div class="archive-anchor"><strong>Empty states</strong> First-run and no-results.</div>
           <div class="archive-anchor"><strong>Detail</strong> Open one transcript and work inside it.</div>
           <div class="archive-anchor"><strong>States</strong> Notes covers idle, loading, and failure.</div>
         </div>
@@ -923,10 +1033,10 @@
                 </div>
 
                 <nav class="workspace-sidebar__nav" aria-label="App sections">
-                  <div class="workspace-sidebar__link">Quick Dictation</div>
-                  <div class="workspace-sidebar__link">Live Session</div>
-                  <div class="workspace-sidebar__link workspace-sidebar__link--active">History</div>
-                  <div class="workspace-sidebar__link">Settings</div>
+                  <button class="workspace-sidebar__link">Quick Dictation</button>
+                  <button class="workspace-sidebar__link">Live Session</button>
+                  <button class="workspace-sidebar__link workspace-sidebar__link--active">History</button>
+                  <button class="workspace-sidebar__link">Settings</button>
                 </nav>
 
                 <div></div>
@@ -947,7 +1057,10 @@
                     <div class="history-header__eyebrow">History</div>
                     <div class="history-header__row">
                       <div class="history-header__title">Archive</div>
-                      <div class="history-header__meta">248 records</div>
+                      <div class="history-header__meta">
+                        <span>248 records</span>
+                        <button class="view-action">Select</button>
+                      </div>
                     </div>
                     <div class="history-header__sub">
                       Search by phrase, filter by mode or source, then open the transcript that matters.
@@ -1031,6 +1144,253 @@
             </div>
           </article>
 
+          <article class="archive-demo" id="bulk-select">
+            <div class="archive-demo__label">
+              <strong>History · Bulk select</strong>
+              <span>Multi-select mode for batch export and cleanup.</span>
+            </div>
+
+            <div class="workspace-preview">
+              <aside class="workspace-sidebar">
+                <div class="workspace-sidebar__brand">
+                  <div class="workspace-sidebar__brand-mark">JustSay</div>
+                  <div class="workspace-sidebar__eyebrow">Voice workspace</div>
+                </div>
+
+                <nav class="workspace-sidebar__nav" aria-label="App sections">
+                  <button class="workspace-sidebar__link">Quick Dictation</button>
+                  <button class="workspace-sidebar__link">Live Session</button>
+                  <button class="workspace-sidebar__link workspace-sidebar__link--active">History</button>
+                  <button class="workspace-sidebar__link">Settings</button>
+                </nav>
+
+                <div></div>
+
+                <div class="workspace-sidebar__utility">
+                  <div class="workspace-sidebar__status workspace-sidebar__status--healthy">
+                    <span class="workspace-sidebar__status-dot"></span>
+                    Local service healthy
+                  </div>
+                  <div class="workspace-sidebar__refresh">Refresh</div>
+                </div>
+              </aside>
+
+              <div class="workspace-main">
+                <section class="history-screen history-screen--overview">
+                  <div class="history-header">
+                    <div class="history-header__eyebrow">History</div>
+                    <div class="history-header__row">
+                      <div class="history-header__title">Archive</div>
+                      <div class="history-header__meta">248 records</div>
+                    </div>
+                  </div>
+
+                  <div class="history-bulk-bar" role="toolbar" aria-label="Bulk actions">
+                    <div class="history-bulk-bar__info">2 selected</div>
+                    <div class="history-bulk-bar__actions">
+                      <button class="history-bulk-bar__button">Export selected</button>
+                      <button class="history-bulk-bar__button history-bulk-bar__button--danger">Delete selected</button>
+                      <button class="history-bulk-bar__button history-bulk-bar__button--cancel">Cancel</button>
+                    </div>
+                  </div>
+
+                  <div class="history-list">
+                    <article class="history-row history-row--selectable history-row--selected">
+                      <div class="history-row__check">
+                        <div class="history-row__checkbox history-row__checkbox--checked"></div>
+                      </div>
+                      <div>
+                        <div class="history-row__head">
+                          <div class="history-row__title">Transcript-first rebuild review</div>
+                          <div class="history-row__time">May 10 · 09:09</div>
+                        </div>
+                        <div class="history-row__meta">
+                          <span>Live session</span>
+                          <span>System + microphone</span>
+                          <span>35m 02s</span>
+                        </div>
+                      </div>
+                    </article>
+
+                    <article class="history-row history-row--selectable">
+                      <div class="history-row__check">
+                        <div class="history-row__checkbox"></div>
+                      </div>
+                      <div>
+                        <div class="history-row__head">
+                          <div class="history-row__title">Clipboard fallback wording</div>
+                          <div class="history-row__time">May 10 · 08:41</div>
+                        </div>
+                        <div class="history-row__meta">
+                          <span>Quick dictation</span>
+                          <span>Microphone</span>
+                          <span>00m 07s</span>
+                        </div>
+                      </div>
+                    </article>
+
+                    <article class="history-row history-row--selectable history-row--selected">
+                      <div class="history-row__check">
+                        <div class="history-row__checkbox history-row__checkbox--checked"></div>
+                      </div>
+                      <div>
+                        <div class="history-row__head">
+                          <div class="history-row__title">Meeting export naming pass</div>
+                          <div class="history-row__time">May 09 · 16:18</div>
+                        </div>
+                        <div class="history-row__meta">
+                          <span>Live session</span>
+                          <span>System audio</span>
+                          <span>22m 14s</span>
+                        </div>
+                      </div>
+                    </article>
+
+                    <article class="history-row history-row--selectable">
+                      <div class="history-row__check">
+                        <div class="history-row__checkbox"></div>
+                      </div>
+                      <div>
+                        <div class="history-row__head">
+                          <div class="history-row__title">Hotkey delivery edge case</div>
+                          <div class="history-row__time">May 09 · 11:03</div>
+                        </div>
+                        <div class="history-row__meta">
+                          <span>Quick dictation</span>
+                          <span>Microphone</span>
+                          <span>00m 09s</span>
+                        </div>
+                      </div>
+                    </article>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </article>
+
+          <article class="archive-demo">
+            <div class="archive-demo__label">
+              <strong>History · First run</strong>
+              <span>No transcripts exist yet. Teach the interface, don't leave it blank.</span>
+            </div>
+
+            <div class="workspace-preview">
+              <aside class="workspace-sidebar">
+                <div class="workspace-sidebar__brand">
+                  <div class="workspace-sidebar__brand-mark">JustSay</div>
+                  <div class="workspace-sidebar__eyebrow">Voice workspace</div>
+                </div>
+
+                <nav class="workspace-sidebar__nav" aria-label="App sections">
+                  <button class="workspace-sidebar__link">Quick Dictation</button>
+                  <button class="workspace-sidebar__link">Live Session</button>
+                  <button class="workspace-sidebar__link workspace-sidebar__link--active">History</button>
+                  <button class="workspace-sidebar__link">Settings</button>
+                </nav>
+
+                <div></div>
+
+                <div class="workspace-sidebar__utility">
+                  <div class="workspace-sidebar__status workspace-sidebar__status--healthy">
+                    <span class="workspace-sidebar__status-dot"></span>
+                    Local service healthy
+                  </div>
+                  <div class="workspace-sidebar__refresh">Refresh</div>
+                </div>
+              </aside>
+
+              <div class="workspace-main">
+                <section class="history-screen history-screen--overview">
+                  <div class="history-header">
+                    <div class="history-header__eyebrow">History</div>
+                    <div class="history-header__row">
+                      <div class="history-header__title">Archive</div>
+                      <div class="history-header__meta">0 records</div>
+                    </div>
+                  </div>
+
+                  <div class="history-empty">
+                    <div class="history-empty__title">No transcripts yet.</div>
+                    <div class="history-empty__body">
+                      Start a live session to capture a meeting, or use quick dictation to speak short notes. Every transcript is saved here automatically.
+                    </div>
+                    <div class="history-empty__actions">
+                      <button class="history-empty__button history-empty__button--primary">Start a live session</button>
+                      <button class="history-empty__button">Try quick dictation</button>
+                    </div>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </article>
+
+          <article class="archive-demo">
+            <div class="archive-demo__label">
+              <strong>History · No search results</strong>
+              <span>Search or filter returned nothing. Suggest the next action.</span>
+            </div>
+
+            <div class="workspace-preview">
+              <aside class="workspace-sidebar">
+                <div class="workspace-sidebar__brand">
+                  <div class="workspace-sidebar__brand-mark">JustSay</div>
+                  <div class="workspace-sidebar__eyebrow">Voice workspace</div>
+                </div>
+
+                <nav class="workspace-sidebar__nav" aria-label="App sections">
+                  <button class="workspace-sidebar__link">Quick Dictation</button>
+                  <button class="workspace-sidebar__link">Live Session</button>
+                  <button class="workspace-sidebar__link workspace-sidebar__link--active">History</button>
+                  <button class="workspace-sidebar__link">Settings</button>
+                </nav>
+
+                <div></div>
+
+                <div class="workspace-sidebar__utility">
+                  <div class="workspace-sidebar__status workspace-sidebar__status--healthy">
+                    <span class="workspace-sidebar__status-dot"></span>
+                    Local service healthy
+                  </div>
+                  <div class="workspace-sidebar__refresh">Refresh</div>
+                </div>
+              </aside>
+
+              <div class="workspace-main">
+                <section class="history-screen history-screen--overview">
+                  <div class="history-header">
+                    <div class="history-header__eyebrow">History</div>
+                    <div class="history-header__row">
+                      <div class="history-header__title">Archive</div>
+                      <div class="history-header__meta">248 records</div>
+                    </div>
+                  </div>
+
+                  <div class="history-controls">
+                    <input class="history-search" value="kubernetes migration" aria-label="Search transcripts" />
+                    <div class="history-filters">
+                      <div class="history-chip history-chip--active">All modes</div>
+                      <div class="history-chip">Live session</div>
+                      <div class="history-chip">Quick dictation</div>
+                      <div class="history-chip">Last 7 days</div>
+                      <div class="history-chip">System audio</div>
+                    </div>
+                  </div>
+
+                  <div class="history-empty">
+                    <div class="history-empty__title">No matches for "kubernetes migration"</div>
+                    <div class="history-empty__body">
+                      Try broader terms, check the spelling, or clear the active filters to search across all records.
+                    </div>
+                    <div class="history-empty__actions">
+                      <button class="history-empty__button history-empty__button--primary">Clear search</button>
+                      <button class="history-empty__button">Clear all filters</button>
+                    </div>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </article>
+
           <article class="archive-demo">
             <div class="archive-demo__label">
               <strong>History Detail · Transcript</strong>
@@ -1045,10 +1405,10 @@
                 </div>
 
                 <nav class="workspace-sidebar__nav" aria-label="App sections">
-                  <div class="workspace-sidebar__link">Quick Dictation</div>
-                  <div class="workspace-sidebar__link">Live Session</div>
-                  <div class="workspace-sidebar__link workspace-sidebar__link--active">History</div>
-                  <div class="workspace-sidebar__link">Settings</div>
+                  <button class="workspace-sidebar__link">Quick Dictation</button>
+                  <button class="workspace-sidebar__link">Live Session</button>
+                  <button class="workspace-sidebar__link workspace-sidebar__link--active">History</button>
+                  <button class="workspace-sidebar__link">Settings</button>
                 </nav>
 
                 <div></div>
@@ -1196,10 +1556,10 @@
                 </div>
 
                 <nav class="workspace-sidebar__nav" aria-label="App sections">
-                  <div class="workspace-sidebar__link">Quick Dictation</div>
-                  <div class="workspace-sidebar__link">Live Session</div>
-                  <div class="workspace-sidebar__link workspace-sidebar__link--active">History</div>
-                  <div class="workspace-sidebar__link">Settings</div>
+                  <button class="workspace-sidebar__link">Quick Dictation</button>
+                  <button class="workspace-sidebar__link">Live Session</button>
+                  <button class="workspace-sidebar__link workspace-sidebar__link--active">History</button>
+                  <button class="workspace-sidebar__link">Settings</button>
                 </nav>
 
                 <div></div>
@@ -1302,10 +1662,10 @@
                 </div>
 
                 <nav class="workspace-sidebar__nav" aria-label="App sections">
-                  <div class="workspace-sidebar__link">Quick Dictation</div>
-                  <div class="workspace-sidebar__link">Live Session</div>
-                  <div class="workspace-sidebar__link workspace-sidebar__link--active">History</div>
-                  <div class="workspace-sidebar__link">Settings</div>
+                  <button class="workspace-sidebar__link">Quick Dictation</button>
+                  <button class="workspace-sidebar__link">Live Session</button>
+                  <button class="workspace-sidebar__link workspace-sidebar__link--active">History</button>
+                  <button class="workspace-sidebar__link">Settings</button>
                 </nav>
 
                 <div></div>

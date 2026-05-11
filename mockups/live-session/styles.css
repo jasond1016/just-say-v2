@@ -1,9 +1,40 @@
 :root {
+  color-scheme: light;
+
+  /* Color tokens — full palette */
+  --page: oklch(0.952 0.014 84);
+  --surface: oklch(0.986 0.005 84);
+  --surface-2: oklch(0.97 0.01 86);
+  --surface-3: oklch(0.958 0.014 84);
+  --line: oklch(0.86 0.008 74);
+  --line-strong: oklch(0.78 0.012 72);
+  --ink: oklch(0.245 0.015 58);
+  --muted: oklch(0.5 0.012 58);
+  --muted-2: oklch(0.52 0.01 60);
+  --accent: oklch(0.57 0.11 40);
+  --accent-soft: oklch(0.925 0.026 40);
+  --accent-ink: oklch(0.35 0.07 38);
+  --on-accent: oklch(0.98 0.01 90);
+  --success: oklch(0.55 0.11 156);
+  --success-soft: oklch(0.94 0.026 156);
+  --success-ink: oklch(0.38 0.08 156);
+  --warning: oklch(0.69 0.13 78);
+  --warning-soft: oklch(0.95 0.03 82);
+  --warning-ink: oklch(0.47 0.08 82);
+  --danger: oklch(0.57 0.17 28);
+  --danger-soft: oklch(0.95 0.028 28);
+  --danger-ink: oklch(0.44 0.09 28);
+
+  /* Elevation */
   --shadow-soft: 0 18px 40px rgba(16, 18, 20, 0.12);
   --shadow-panel: 0 10px 24px rgba(16, 18, 20, 0.08);
-  --radius-sm: 12px;
-  --radius-md: 20px;
-  --radius-lg: 28px;
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  /* Motion */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -30,6 +61,17 @@ a {
 button,
 .mock-button {
   font: inherit;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  text-align: inherit;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .mock-shell {
@@ -45,7 +87,7 @@ button,
   align-items: center;
   gap: 24px;
   padding: 18px 28px;
-  backdrop-filter: blur(14px);
+  background: var(--surface);
 }
 
 .variant-brand {
@@ -54,7 +96,7 @@ button,
 }
 
 .variant-brand__eyebrow {
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
@@ -118,7 +160,7 @@ button,
 }
 
 .index-card__eyebrow {
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -158,18 +200,6 @@ button,
   margin: 0 auto;
 }
 
-.kbd {
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-  padding: 0 8px;
-  border-radius: 7px;
-  border: 1px solid currentColor;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 .sr-only {
   position: absolute;
   width: 1px;
@@ -197,5 +227,16 @@ button,
 
   .screen {
     width: min(100vw - 24px, 1480px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
