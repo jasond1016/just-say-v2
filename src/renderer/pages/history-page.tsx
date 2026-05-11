@@ -37,6 +37,8 @@ export function HistoryPage(props: {
   onOpen: (id: string) => void
   onCloseDetail: () => void
   onDelete: (id: string) => void
+  onDeleteBulk?: (ids: string[]) => void
+  onExportBulk?: (ids: string[], format: ExportFormat) => void
   onCopy: (id: string, format: ExportFormat) => void
   onExport: (id: string, format: ExportFormat) => void
 }) {
@@ -45,6 +47,8 @@ export function HistoryPage(props: {
   const [detailView, setDetailView] = useState<'transcript' | 'notes'>('transcript')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [notesStateById, setNotesStateById] = useState<Record<string, HistoryNotesState>>({})
+  const [bulkMode, setBulkMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const detailHeadingRef = useRef<HTMLDivElement | null>(null)
   const pendingNotesTimers = useRef<number[]>([])
@@ -133,7 +137,20 @@ export function HistoryPage(props: {
             <div className="surface-header__headline-group">
               <h1 className="surface-header__title">Archive</h1>
             </div>
-            <div className="surface-header__meta">{props.total} records</div>
+            <div className="surface-header__meta">
+              <span>{props.total} records</span>
+              {props.items.length > 0 ? (
+                <Button
+                  label={bulkMode ? 'Done' : 'Select'}
+                  variant="ghost"
+                  size="small"
+                  onClick={() => {
+                    setBulkMode(!bulkMode)
+                    setSelectedIds(new Set())
+                  }}
+                />
+              ) : null}
+            </div>
           </div>
           <p className="surface-header__body">
             Retrieve past dictation and meeting transcripts, then open one record as a document. The archive stays about finding and reopening, not monitoring.
@@ -202,6 +219,48 @@ export function HistoryPage(props: {
 
         <section className="archive-list" aria-labelledby={headingId}>
           <div id={headingId} className="sr-only">Archive results</div>
+
+          {bulkMode && selectedIds.size > 0 ? (
+            <div className="archive-bulk-bar" role="toolbar" aria-label="Bulk actions">
+              <div className="archive-bulk-bar__info">{selectedIds.size} selected</div>
+              <div className="archive-bulk-bar__actions">
+                <Button
+                  label="Export selected"
+                  size="small"
+                  variant="secondary"
+                  disabled={Boolean(props.busyAction)}
+                  onClick={() => {
+                    if (props.onExportBulk) {
+                      props.onExportBulk([...selectedIds], 'plain_text')
+                    }
+                  }}
+                />
+                <Button
+                  label="Delete selected"
+                  size="small"
+                  variant="secondary"
+                  danger
+                  disabled={Boolean(props.busyAction)}
+                  onClick={() => {
+                    if (props.onDeleteBulk) {
+                      props.onDeleteBulk([...selectedIds])
+                      setSelectedIds(new Set())
+                    }
+                  }}
+                />
+                <Button
+                  label="Cancel"
+                  size="small"
+                  variant="ghost"
+                  onClick={() => {
+                    setBulkMode(false)
+                    setSelectedIds(new Set())
+                  }}
+                />
+              </div>
+            </div>
+          ) : null}
+
           {props.items.length === 0 ? (
             <div className="empty-state empty-state--archive" role="status" aria-live="polite">
               <div className="empty-state__title">
@@ -220,24 +279,48 @@ export function HistoryPage(props: {
               ) : null}
             </div>
           ) : (
-            props.items.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => props.onOpen(item.id)}
-                className="archive-row"
-              >
-                <div className="archive-row__head">
-                  <div className="archive-row__title">{item.title}</div>
-                  <div className="archive-row__time">{formatArchiveTime(item.startedAt)}</div>
-                </div>
-                <div className="archive-row__meta">
-                  <span>{describeTranscriptSummary(item)}</span>
-                  <span>{formatDurationMs(item.endedAt - item.startedAt)}</span>
-                </div>
-                <div className="archive-row__preview">{item.plainText}</div>
-              </button>
-            ))
+            props.items.map((item) => {
+              const isSelected = selectedIds.has(item.id)
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    if (bulkMode) {
+                      setSelectedIds((prev) => {
+                        const next = new Set(prev)
+                        if (next.has(item.id)) {
+                          next.delete(item.id)
+                        } else {
+                          next.add(item.id)
+                        }
+                        return next
+                      })
+                    } else {
+                      props.onOpen(item.id)
+                    }
+                  }}
+                  className={`archive-row ${bulkMode ? 'archive-row--selectable' : ''} ${isSelected ? 'archive-row--selected' : ''}`}
+                >
+                  {bulkMode ? (
+                    <div className="archive-row__check">
+                      <div className={`archive-row__checkbox ${isSelected ? 'archive-row__checkbox--checked' : ''}`} />
+                    </div>
+                  ) : null}
+                  <div>
+                    <div className="archive-row__head">
+                      <div className="archive-row__title">{item.title}</div>
+                      <div className="archive-row__time">{formatArchiveTime(item.startedAt)}</div>
+                    </div>
+                    <div className="archive-row__meta">
+                      <span>{describeTranscriptSummary(item)}</span>
+                      <span>{formatDurationMs(item.endedAt - item.startedAt)}</span>
+                    </div>
+                    <div className="archive-row__preview">{item.plainText}</div>
+                  </div>
+                </button>
+              )
+            })
           )}
         </section>
       </div>

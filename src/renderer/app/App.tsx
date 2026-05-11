@@ -115,14 +115,34 @@ function WorkspaceApp() {
         <div className="app-sidebar__spacer" />
 
         <div className="app-sidebar__utility">
-          <div
-            className={`app-sidebar__status app-sidebar__status--${serviceStatusClass(serviceStatus)}`}
-            role="status"
-            aria-live="polite"
-          >
-            <span className="app-sidebar__status-dot" />
-            {serviceLabel}
-          </div>
+          {serviceStatus !== 'healthy' && serviceStatus !== 'starting' ? (
+            <div className={`app-sidebar__status-expand ${serviceStatus === 'failed' || serviceStatus === 'stopped' ? 'app-sidebar__status-expand--failed' : ''}`}>
+              <div className="app-sidebar__status-expand__head">
+                <span className="app-sidebar__status-expand__head-dot" />
+                {serviceLabel}
+              </div>
+              <div className="app-sidebar__status-expand__body">
+                {describeDegradedGuidance(serviceStatus)}
+              </div>
+              <button
+                type="button"
+                className="app-sidebar__status-expand__action"
+                disabled={Boolean(busyAction)}
+                onClick={() => { void controller.refresh() }}
+              >
+                {busyAction === 'refresh' ? 'Restarting...' : 'Restart service'}
+              </button>
+            </div>
+          ) : (
+            <div
+              className={`app-sidebar__status app-sidebar__status--${serviceStatusClass(serviceStatus)}`}
+              role="status"
+              aria-live="polite"
+            >
+              <span className="app-sidebar__status-dot" />
+              {serviceLabel}
+            </div>
+          )}
 
           <Button
             label={busyAction === 'refresh' ? 'Refreshing...' : 'Refresh'}
@@ -179,6 +199,7 @@ function WorkspaceApp() {
             settings={settings}
             busyAction={busyAction}
             liveSessionMessage={liveSessionMessage}
+            localServiceStatus={serviceStatus}
             meetingStartDisabled={meetingStartDisabled}
             meetingStopDisabled={meetingStopDisabled}
             onStartMeeting={() => { void controller.startMeeting() }}
@@ -285,6 +306,19 @@ function serviceStatusClass(status: LocalServiceStatus): 'healthy' | 'degraded' 
     case 'stopped':
     default:
       return 'failed'
+  }
+}
+
+function describeDegradedGuidance(status: LocalServiceStatus): string {
+  switch (status) {
+    case 'degraded':
+      return 'The speech service is responding slowly. Recognition may fall back to a lower-quality model.'
+    case 'failed':
+      return 'The speech service is not reachable. Dictation and meeting capture will not work until it recovers.'
+    case 'stopped':
+      return 'The speech service has stopped. Restart it to resume dictation and meeting capture.'
+    default:
+      return 'The speech service needs attention.'
   }
 }
 

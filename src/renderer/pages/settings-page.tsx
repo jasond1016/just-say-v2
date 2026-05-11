@@ -210,7 +210,7 @@ export function SettingsPage(props: {
                   </Segmented>
                 </SettingRow>
 
-                <SettingRow title="Keep JustSay in the tray" hint="Useful if you want dictation and meetings ready without reopening the app.">
+                <SettingRow title="Keep JustSay in the tray" hint="Useful if you want dictation and meetings ready without reopening the app." learnMore>
                   <ToggleButton
                     checked={props.settings.general.minimizeToTray}
                     disabled={disabled}
@@ -398,7 +398,7 @@ export function SettingsPage(props: {
                   </div>
                 </div>
 
-                <SettingRow title="Speech service host" hint="This usually stays on the machine itself.">
+                <SettingRow title="Speech service host" hint="This usually stays on the machine itself." learnMore>
                   <TextInput
                     value={draftHost}
                     disabled={disabled}
@@ -411,7 +411,7 @@ export function SettingsPage(props: {
                   </div>
                 </SettingRow>
 
-                <SettingRow title="Speech service port" hint="A wrong value here can break dictation and meeting capture completely.">
+                <SettingRow title="Speech service port" hint="A wrong value here can break dictation and meeting capture completely." learnMore>
                   <TextInput
                     value={draftPort}
                     disabled={disabled}
@@ -446,6 +446,22 @@ export function SettingsPage(props: {
 
                 <div className="advanced-warning">
                   Advanced stays visible so it can be found quickly, but it should feel lower-confidence than the rest of the page. Change it only when support asks you to, or while debugging a local setup.
+                </div>
+
+                <div className="settings-section__footer">
+                  <button
+                    type="button"
+                    className="settings-reset"
+                    disabled={disabled}
+                    onClick={() => {
+                      setDraftHost('127.0.0.1')
+                      setDraftPort('8765')
+                      props.onLocalServiceHostChange('127.0.0.1')
+                      props.onLocalServicePortChange(8765)
+                    }}
+                  >
+                    Reset to defaults
+                  </button>
                 </div>
               </SettingsSection>
             ) : null}
@@ -511,12 +527,15 @@ function SettingsSection(props: { children: ReactNode }) {
   return <section className="settings-section">{props.children}</section>
 }
 
-function SettingRow(props: { title: string; hint: string; children: ReactNode }) {
+function SettingRow(props: { title: string; hint: string; learnMore?: boolean; children: ReactNode }) {
   return (
     <div className="settings-row">
       <div className="settings-row__label">
         <div className="settings-row__title">{props.title}</div>
-        <div className="settings-row__hint">{props.hint}</div>
+        <div className="settings-row__hint">
+          {props.hint}
+          {props.learnMore ? <> <span className="settings-help">Learn more</span></> : null}
+        </div>
       </div>
       <div className="settings-row__control">{props.children}</div>
     </div>

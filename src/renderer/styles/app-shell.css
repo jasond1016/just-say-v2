@@ -100,6 +100,72 @@
   background: var(--danger);
 }
 
+.app-sidebar__status-expand {
+  display: grid;
+  gap: 8px;
+  padding: 10px 10px 12px;
+  border: 1px solid color-mix(in oklab, var(--warning) 18%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--warning-muted) 40%, var(--bg-surface));
+}
+
+.app-sidebar__status-expand__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--warning-text);
+}
+
+.app-sidebar__status-expand__head-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--warning);
+  flex-shrink: 0;
+}
+
+.app-sidebar__status-expand__body {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.app-sidebar__status-expand__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in oklab, var(--warning) 24%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--bg-surface) 96%, transparent);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--warning-text);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.app-sidebar__status-expand--failed {
+  border-color: color-mix(in oklab, var(--danger) 18%, var(--border));
+  background: color-mix(in oklab, var(--danger-muted) 40%, var(--bg-surface));
+}
+
+.app-sidebar__status-expand--failed .app-sidebar__status-expand__head {
+  color: var(--danger-text);
+}
+
+.app-sidebar__status-expand--failed .app-sidebar__status-expand__head-dot {
+  background: var(--danger);
+}
+
+.app-sidebar__status-expand--failed .app-sidebar__status-expand__action {
+  border-color: color-mix(in oklab, var(--danger) 24%, var(--border));
+  color: var(--danger-text);
+}
+
 .app-sidebar__refresh {
   justify-self: start;
   padding-inline: 12px;

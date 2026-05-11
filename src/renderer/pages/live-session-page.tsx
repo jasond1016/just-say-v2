@@ -1,4 +1,6 @@
-import type { AppRuntimeSnapshot, AppSettings, ExportFormat, MeetingStatus } from '../../shared/api-types'
+import { useCallback, useEffect, useRef, useState } from 'react'
+
+import type { AppRuntimeSnapshot, AppSettings, ExportFormat, LocalServiceStatus, MeetingStatus } from '../../shared/api-types'
 import { selectVisibleTimeline } from '../../core/transcript/transcript-selectors'
 import { Button } from '../ui/controls'
 import { describeCaptureSource } from '../ui/copy'
@@ -11,6 +13,7 @@ export function LiveSessionPage(props: {
   settings: AppSettings
   busyAction: string | null
   liveSessionMessage: string | null
+  localServiceStatus: LocalServiceStatus
   meetingStartDisabled: boolean
   meetingStopDisabled: boolean
   onStartMeeting: () => void
@@ -25,11 +28,53 @@ export function LiveSessionPage(props: {
   const isStreaming = props.activeRuntimeSession?.status === 'streaming'
   const isSessionActive = Boolean(props.activeRuntimeSession)
   const hasTranscript = timeline.length > 0
+  const isColdStart = !session && !hasTranscript
   const statusCopy = describeStatus(activeStatus, hasTranscript)
   const sessionTitle = session ? deriveSessionTitle(session) : 'Live Session'
   const sourceSummary = props.settings.input.includeMicrophoneInMeeting ? 'System audio + microphone' : 'System audio only'
   const translationSummary = session?.translationEnabled ? 'Bilingual transcript on' : 'Original language only'
   const canUsePostActions = Boolean(session) && !isSessionActive && hasTranscript && !props.busyAction
+
+  if (isColdStart) {
+    const serviceReady = props.localServiceStatus === 'healthy' || props.localServiceStatus === 'starting'
+    const serviceDotClass = serviceReady ? 'cold-start__status-dot--ready'
+      : props.localServiceStatus === 'degraded' ? 'cold-start__status-dot--degraded'
+      : 'cold-start__status-dot--failed'
+    const serviceText = serviceReady ? 'Recognition service connected'
+      : props.localServiceStatus === 'degraded' ? 'Recognition service degraded'
+      : 'Recognition service unavailable'
+
+    return (
+      <div className="page page--wide">
+        <section className="transcript-canvas">
+          <div className="cold-start">
+            <div className="cold-start__status">
+              <span className={`cold-start__status-dot ${serviceDotClass}`} />
+              {serviceText}
+            </div>
+            <h1 className="cold-start__headline">Ready to record</h1>
+            <p className="cold-start__body">
+              Start a session when you need a reading surface that stays with the text from the first line through review.
+            </p>
+            <div className="cold-start__sources">
+              <span className="cold-start__source">System audio</span>
+              {props.settings.input.includeMicrophoneInMeeting ? (
+                <span className="cold-start__source">Microphone</span>
+              ) : null}
+            </div>
+            <div className="cold-start__actions">
+              <Button
+                label={props.busyAction === 'meeting-start' ? 'Starting...' : 'Start session'}
+                disabled={props.meetingStartDisabled}
+                variant="primary"
+                onClick={props.onStartMeeting}
+              />
+            </div>
+          </div>
+        </section>
+      </div>
+    )
+  }
 
   return (
     <div className="page page--wide">
@@ -71,46 +116,13 @@ export function LiveSessionPage(props: {
         </div>
       ) : null}
 
-      <section className="transcript-canvas" aria-label="Live transcript">
-        {timeline.length === 0 ? (
-          <div className="empty-state empty-state--transcript" role="status" aria-live="polite">
-            <div className="empty-state__title">No transcript yet.</div>
-            <p className="empty-state__body">
-              Start a session when you need a reading surface that stays with the text from the first line through review.
-            </p>
-            <div className="empty-state__actions">
-              <Button
-                label={props.busyAction === 'meeting-start' ? 'Starting...' : 'Start session'}
-                disabled={props.meetingStartDisabled}
-                variant="primary"
-                onClick={props.onStartMeeting}
-              />
-            </div>
-          </div>
-        ) : (
-          <div className="transcript-stack">
-            {timeline.map((item) => (
-              <article
-                key={`${item.kind}:${item.id}`}
-                className={`transcript-entry ${item.kind === 'draft' ? 'transcript-entry--draft' : ''}`}
-              >
-                <div className="transcript-entry__time">{formatClockTime(item.startedAt)}</div>
-                <div className="transcript-entry__body">
-                  <div className="transcript-entry__meta">
-                    <span>{item.kind === 'draft' ? 'Draft' : 'Committed'}</span>
-                    <span>{describeCaptureSource(item.source)}</span>
-                    {item.kind === 'draft' ? <strong>Now hearing</strong> : null}
-                  </div>
-                  <div className="transcript-entry__primary">{item.primaryText || '...'}</div>
-                  {item.secondaryText ? (
-                    <div className="transcript-entry__secondary">{item.secondaryText}</div>
-                  ) : null}
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
+      <TranscriptWithJump
+        timeline={timeline}
+        isStreaming={isStreaming}
+        meetingStartDisabled={props.meetingStartDisabled}
+        busyAction={props.busyAction}
+        onStartMeeting={props.onStartMeeting}
+      />
 
       <footer className="session-footer">
         {isSessionActive ? (
@@ -169,6 +181,118 @@ export function LiveSessionPage(props: {
         ) : null}
       </footer>
     </div>
+  )
+}
+
+function TranscriptWithJump(props: {
+  timeline: ReturnType<typeof selectVisibleTimeline>
+  isStreaming: boolean
+  meetingStartDisabled: boolean
+  busyAction: string | null
+  onStartMeeting: () => void
+}) {
+  const canvasRef = useRef<HTMLElement | null>(null)
+  const bottomRef = useRef<HTMLDivElement | null>(null)
+  const [userScrolledAway, setUserScrolledAway] = useState(false)
+  const isAutoScrolling = useRef(false)
+
+  const checkIfAtBottom = useCallback(() => {
+    const el = canvasRef.current
+    if (!el) return true
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 48
+  }, [])
+
+  useEffect(() => {
+    const el = canvasRef.current
+    if (!el) return
+
+    const handleScroll = () => {
+      if (isAutoScrolling.current) return
+      setUserScrolledAway(!checkIfAtBottom())
+    }
+
+    el.addEventListener('scroll', handleScroll, { passive: true })
+    return () => el.removeEventListener('scroll', handleScroll)
+  }, [checkIfAtBottom])
+
+  useEffect(() => {
+    if (userScrolledAway || !props.isStreaming) return
+
+    const el = canvasRef.current
+    if (!el) return
+
+    isAutoScrolling.current = true
+    el.scrollTop = el.scrollHeight
+    requestAnimationFrame(() => {
+      isAutoScrolling.current = false
+    })
+  }, [props.timeline.length, props.isStreaming, userScrolledAway])
+
+  const jumpToLatest = () => {
+    const el = canvasRef.current
+    if (!el) return
+    isAutoScrolling.current = true
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+    setUserScrolledAway(false)
+    setTimeout(() => { isAutoScrolling.current = false }, 400)
+  }
+
+  return (
+    <section
+      ref={canvasRef}
+      className="transcript-canvas"
+      aria-label="Live transcript"
+    >
+      {props.timeline.length === 0 ? (
+        <div className="empty-state" role="status" aria-live="polite">
+          <div className="empty-state__title">No transcript yet.</div>
+          <p className="empty-state__body">
+            Start a session when you need a reading surface that stays with the text from the first line through review.
+          </p>
+          <div className="empty-state__actions">
+            <Button
+              label={props.busyAction === 'meeting-start' ? 'Starting...' : 'Start session'}
+              disabled={props.meetingStartDisabled}
+              variant="primary"
+              onClick={props.onStartMeeting}
+            />
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="transcript-stack">
+            {props.timeline.map((item) => (
+              <article
+                key={`${item.kind}:${item.id}`}
+                className={`transcript-entry ${item.kind === 'draft' ? 'transcript-entry--draft' : ''}`}
+              >
+                <div className="transcript-entry__time">{formatClockTime(item.startedAt)}</div>
+                <div className="transcript-entry__body">
+                  <div className="transcript-entry__meta">
+                    <span>{item.kind === 'draft' ? 'Draft' : 'Committed'}</span>
+                    <span>{describeCaptureSource(item.source)}</span>
+                    {item.kind === 'draft' ? <strong>Now hearing</strong> : null}
+                  </div>
+                  <div className="transcript-entry__primary">{item.primaryText || '...'}</div>
+                  {item.secondaryText ? (
+                    <div className="transcript-entry__secondary">{item.secondaryText}</div>
+                  ) : null}
+                </div>
+              </article>
+            ))}
+            <div ref={bottomRef} />
+          </div>
+
+          {userScrolledAway ? (
+            <div className="jump-to-latest">
+              <button type="button" className="jump-to-latest__pill" onClick={jumpToLatest}>
+                ↓ Jump to latest
+              </button>
+            </div>
+          ) : null}
+        </>
+      )}
+    </section>
   )
 }
 
