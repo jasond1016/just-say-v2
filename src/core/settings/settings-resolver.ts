@@ -90,6 +90,8 @@ export function resolveRuntimeConfig(input: ResolveRuntimeConfigInput): Resolved
             provider: settings.translation.provider,
             targetLanguage: settings.translation.targetLanguage,
             sourceLanguage: settings.speech.language,
+            ...(settings.translation.endpoint ? { endpoint: settings.translation.endpoint } : {}),
+            ...(settings.translation.model ? { model: settings.translation.model } : {}),
             credentials: {
               translationApiKey: input.credentials!.translationApiKey!
             }

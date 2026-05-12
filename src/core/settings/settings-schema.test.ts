@@ -33,7 +33,10 @@ describe('settings-schema', () => {
       },
       translation: {
         targetLanguage: '   ',
-        provider: 'unknown' as never
+        provider: 'unknown' as never,
+        endpoint: '  https://example.test/v1/  ',
+        model: '  demo-model  ',
+        apiKeyConfigured: true
       },
       advanced: {
         localServiceHost: '   ',
@@ -49,6 +52,9 @@ describe('settings-schema', () => {
     expect(normalized.output.method).toBe(DEFAULT_SETTINGS.output.method)
     expect(normalized.translation.targetLanguage).toBe(DEFAULT_SETTINGS.translation.targetLanguage)
     expect(normalized.translation.provider).toBe(DEFAULT_SETTINGS.translation.provider)
+    expect(normalized.translation.endpoint).toBe('https://example.test/v1/')
+    expect(normalized.translation.model).toBe('demo-model')
+    expect(normalized.translation.apiKeyConfigured).toBe(true)
     expect(normalized.advanced.localServiceHost).toBeUndefined()
     expect(normalized.advanced.localServicePort).toBe(8765)
     expect(normalized.advanced.experimentalFlags).toEqual(['alpha', 'beta'])

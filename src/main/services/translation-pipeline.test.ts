@@ -77,6 +77,49 @@ describe('TranslationPipeline', () => {
       })
     )
   })
+
+  it('prefers runtime endpoint and model over environment defaults', async () => {
+    const fetchFn = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        choices: [
+          {
+            message: {
+              content: 'translated from runtime config'
+            }
+          }
+        ]
+      })
+    }))
+
+    const createProvider = createTranslationProviderFromEnvironment(
+      {
+        JUSTSAY_TRANSLATION_BASE_URL: 'https://env.example/v1',
+        JUSTSAY_TRANSLATION_MODEL: 'env-model'
+      },
+      {
+        fetchFn: fetchFn as unknown as typeof fetch
+      }
+    )
+    const provider = createProvider({
+      ...createRuntimeConfig().translationConfig!,
+      endpoint: 'https://runtime.example/v1',
+      model: 'runtime-model'
+    })
+
+    await provider.translateText({
+      text: 'hello world',
+      sourceLanguage: 'auto',
+      targetLanguage: 'ja'
+    })
+
+    expect(fetchFn).toHaveBeenCalledWith(
+      'https://runtime.example/v1/chat/completions',
+      expect.objectContaining({
+        body: expect.stringContaining('"model":"runtime-model"')
+      })
+    )
+  })
 })
 
 describe('OpenAiCompatibleTranslationProvider', () => {

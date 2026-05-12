@@ -1,13 +1,19 @@
-import { app, BrowserWindow, desktopCapturer, ipcMain, Menu, session, Tray } from 'electron'
+import { app, BrowserWindow, desktopCapturer, ipcMain, Menu, safeStorage, session, Tray } from 'electron'
 import path from 'node:path'
 import { profileCatalog } from '../core/settings/profile-catalog'
-import type { SettingsPatch } from '../shared/api-types'
+import type {
+  AppSettings,
+  ResolvedRuntimeConfig,
+  SettingsPatch,
+  TranslationCredentialsInput
+} from '../shared/api-types'
 import { resolveAppPaths } from './app-paths'
 import { createApp } from './bootstrap/create-app'
 import { wireAppLifecycle } from './bootstrap/lifecycle'
 import { createRecognitionEngine } from './engines/create-recognition-engine'
 import { createElectronIpcRegistrar } from './ipc/electron-ipc'
 import { FileTranscriptExporter } from './persistence/file-transcript-exporter'
+import { FileCredentialsRepository } from './persistence/credentials-repository'
 import { FileSettingsRepository } from './persistence/settings-repository'
 import { openSqliteDatabase } from './persistence/sqlite'
 import { SqliteTranscriptRepository } from './persistence/sqlite-transcript-repository'
@@ -34,6 +40,7 @@ import { SettingsService } from './services/settings-service'
 import { SpeechService } from './services/speech-service'
 import { PythonLocalServiceController } from './services/python-local-service-controller'
 import { TranslationPipeline } from './services/translation-pipeline'
+import type { ResolverCredentials } from '../core/settings/settings-resolver'
 
 const remoteDebuggingPort = process.env.JUSTSAY_REMOTE_DEBUGGING_PORT
 if (remoteDebuggingPort) {
@@ -53,26 +60,76 @@ void wireAppLifecycle(app, {
       path.join(userDataPath, 'exports')
     )
     const settingsRepository = new FileSettingsRepository(path.join(userDataPath, 'settings.json'))
+    const credentialsRepository = new FileCredentialsRepository(
+      path.join(userDataPath, 'translation-credentials.bin'),
+      {
+        isEncryptionAvailable: () => safeStorage.isEncryptionAvailable(),
+        encryptString: (value) => safeStorage.encryptString(value),
+        decryptString: (value) => safeStorage.decryptString(value)
+      }
+    )
+    let cachedStoredCredentials = (await credentialsRepository.get()) ?? {}
+    const getRuntimeCredentials = (): ResolverCredentials | undefined => {
+      const environmentCredentials = getEnvironmentCredentials()
+      const merged: ResolverCredentials = {
+        ...(environmentCredentials ?? {}),
+        ...cachedStoredCredentials
+      }
+
+      return merged.cloudApiKey || merged.translationApiKey ? merged : undefined
+    }
     const baseSettingsService = new SettingsService(settingsRepository, {
-      credentialsProvider: () => getEnvironmentCredentials()
+      credentialsProvider: getRuntimeCredentials
+    })
+    const settingsListeners = new Set<(settings: AppSettings) => void>()
+    baseSettingsService.onChanged((settings) => {
+      for (const listener of settingsListeners) {
+        listener(settings)
+      }
     })
     let cachedSettings = await baseSettingsService.getSettings()
-    let cachedRuntimeConfigs = {
-      ptt: await baseSettingsService.resolveRuntimeConfig('ptt'),
-      meeting: await baseSettingsService.resolveRuntimeConfig('meeting')
-    }
+    let cachedRuntimeConfigs: Partial<Record<'ptt' | 'meeting', ResolvedRuntimeConfig>> = {}
+    let cachedRuntimeConfigErrors: Partial<Record<'ptt' | 'meeting', Error>> = {}
 
     const refreshSettingsCache = async (): Promise<void> => {
       cachedSettings = await baseSettingsService.getSettings()
-      cachedRuntimeConfigs = {
-        ptt: await baseSettingsService.resolveRuntimeConfig('ptt'),
-        meeting: await baseSettingsService.resolveRuntimeConfig('meeting')
+
+      const nextRuntimeConfigs: Partial<Record<'ptt' | 'meeting', ResolvedRuntimeConfig>> = {}
+      const nextRuntimeConfigErrors: Partial<Record<'ptt' | 'meeting', Error>> = {}
+
+      for (const mode of ['ptt', 'meeting'] as const) {
+        try {
+          nextRuntimeConfigs[mode] = await baseSettingsService.resolveRuntimeConfig(mode)
+        } catch (errorLike) {
+          nextRuntimeConfigErrors[mode] =
+            errorLike instanceof Error ? errorLike : new Error(`Could not resolve ${mode} runtime config`)
+        }
       }
+
+      cachedRuntimeConfigs = nextRuntimeConfigs
+      cachedRuntimeConfigErrors = nextRuntimeConfigErrors
+    }
+    await refreshSettingsCache()
+
+    const resolveCachedRuntimeConfig = (mode: 'ptt' | 'meeting'): ResolvedRuntimeConfig => {
+      const error = cachedRuntimeConfigErrors[mode]
+
+      if (error) {
+        throw error
+      }
+
+      const runtimeConfig = cachedRuntimeConfigs[mode]
+
+      if (!runtimeConfig) {
+        throw new Error(`Runtime config for ${mode} is unavailable`)
+      }
+
+      return runtimeConfig
     }
 
     const settingsProvider = {
       getSettings: () => cachedSettings,
-      resolveRuntimeConfig: (mode: 'ptt' | 'meeting') => cachedRuntimeConfigs[mode]
+      resolveRuntimeConfig: (mode: 'ptt' | 'meeting') => resolveCachedRuntimeConfig(mode)
     }
     const settingsService = {
       getSettings: async () => baseSettingsService.getSettings(),
@@ -81,8 +138,28 @@ void wireAppLifecycle(app, {
         await refreshSettingsCache()
         return updated
       },
-      onChanged: (listener: (settings: Awaited<ReturnType<typeof baseSettingsService.getSettings>>) => void) =>
-        baseSettingsService.onChanged(listener)
+      saveTranslationCredentials: async (input: TranslationCredentialsInput) => {
+        await credentialsRepository.save({
+          ...cachedStoredCredentials,
+          translationApiKey: input.apiKey
+        })
+        cachedStoredCredentials = (await credentialsRepository.get()) ?? {}
+        await refreshSettingsCache()
+        const settings = await baseSettingsService.getSettings()
+
+        for (const listener of settingsListeners) {
+          listener(settings)
+        }
+
+        return settings
+      },
+      onChanged: (listener: (settings: Awaited<ReturnType<typeof baseSettingsService.getSettings>>) => void) => {
+        settingsListeners.add(listener)
+
+        return () => {
+          settingsListeners.delete(listener)
+        }
+      }
     }
     const localServiceHost = cachedSettings.advanced.localServiceHost ?? '127.0.0.1'
     const localServicePort = cachedSettings.advanced.localServicePort ?? 8765

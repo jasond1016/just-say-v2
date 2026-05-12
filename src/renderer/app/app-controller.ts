@@ -404,6 +404,32 @@ export class AppController {
     })
   }
 
+  async setTranslationEndpoint(endpoint: string): Promise<void> {
+    await this.updateSettings('settings:translation-endpoint', {
+      translation: {
+        endpoint
+      }
+    })
+  }
+
+  async setTranslationModel(model: string): Promise<void> {
+    await this.updateSettings('settings:translation-model', {
+      translation: {
+        model
+      }
+    })
+  }
+
+  async saveTranslationCredentials(apiKey: string): Promise<void> {
+    await this.runAction('settings:translation-api-key', async () => {
+      const updated = await this.deps.api.saveTranslationCredentials({ apiKey })
+
+      this.setState({
+        settings: updated
+      })
+    })
+  }
+
   async setLocalServiceHost(localServiceHost: string): Promise<void> {
     await this.updateSettings('settings:local-service-host', {
       advanced: {

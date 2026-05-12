@@ -158,8 +158,8 @@ export function createTranslationProviderFromEnvironment(
       case 'openai-compatible':
         return new OpenAiCompatibleTranslationProvider({
           apiKey: config.credentials.translationApiKey,
-          ...(baseUrl ? { baseUrl } : {}),
-          ...(model ? { model } : {}),
+          ...(config.endpoint ? { baseUrl: config.endpoint } : baseUrl ? { baseUrl } : {}),
+          ...(config.model ? { model: config.model } : model ? { model } : {}),
           ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
           ...(options.fetchFn ? { fetchFn: options.fetchFn } : {})
         })

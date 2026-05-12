@@ -92,6 +92,7 @@ describe('RuntimeStore', () => {
           experimentalFlags: []
         }
       }),
+      saveTranslationCredentials: async () => createSettings(),
       listSpeechProfiles: async () => [],
       testSpeechProfile: async () => ({
         ok: true,
@@ -143,6 +144,7 @@ describe('RuntimeStore', () => {
       getSettings: async () => createSettings(),
       onSettingsChanged: () => () => {},
       updateSettings: async () => createSettings(),
+      saveTranslationCredentials: async () => createSettings(),
       listSpeechProfiles: async () => [],
       testSpeechProfile: async () => ({ ok: true, profileId: 'local-fast' }),
       prewarmSession: async () => undefined,

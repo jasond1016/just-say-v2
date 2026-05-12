@@ -50,6 +50,7 @@ export const TextInput = forwardRef<HTMLInputElement, {
   value: string
   disabled?: boolean | undefined
   placeholder?: string | undefined
+  type?: 'text' | 'password' | undefined
   inputMode?: 'text' | 'numeric' | undefined
   className?: string | undefined
   onChange: (e: ChangeEvent<HTMLInputElement>) => void
@@ -60,6 +61,7 @@ export const TextInput = forwardRef<HTMLInputElement, {
       id={props.id}
       aria-label={props.ariaLabel}
       aria-describedby={props.ariaDescribedBy}
+      type={props.type ?? 'text'}
       value={props.value}
       disabled={props.disabled}
       placeholder={props.placeholder}

@@ -12,7 +12,8 @@ import type {
   SavedTranscript,
   StartMeetingCommand,
   SettingsPatch,
-  RuntimeNotification
+  RuntimeNotification,
+  TranslationCredentialsInput
 } from '../shared/api-types'
 import type { SessionMode } from '../shared/primitive-types'
 import { IPC_CHANNELS } from '../main/ipc/channels'
@@ -24,6 +25,7 @@ export type AppApi = {
   getSettings: () => Promise<AppSettings>
   onSettingsChanged: (listener: (settings: AppSettings) => void) => () => void
   updateSettings: (patch: SettingsPatch) => Promise<AppSettings>
+  saveTranslationCredentials: (input: TranslationCredentialsInput) => Promise<AppSettings>
   listSpeechProfiles: () => Promise<EngineProfile[]>
   testSpeechProfile: (profileId: string) => Promise<ProfileTestResult>
   prewarmSession: (mode: SessionMode) => Promise<void>
@@ -69,6 +71,8 @@ export function createAppApi(invoke: IpcInvoke, events?: IpcEventSource): AppApi
       })
     },
     updateSettings: async (patch) => invoke<AppSettings>(IPC_CHANNELS.settingsUpdate, patch),
+    saveTranslationCredentials: async (input) =>
+      invoke<AppSettings>(IPC_CHANNELS.settingsSaveTranslationCredentials, input),
     listSpeechProfiles: async () => invoke<EngineProfile[]>(IPC_CHANNELS.speechListProfiles),
     testSpeechProfile: async (profileId) =>
       invoke<ProfileTestResult>(IPC_CHANNELS.speechTestProfile, profileId),

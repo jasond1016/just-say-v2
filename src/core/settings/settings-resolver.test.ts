@@ -41,7 +41,9 @@ describe('resolveRuntimeConfig', () => {
         translation: {
           ...DEFAULT_SETTINGS.translation,
           enabledForMeeting: true,
-          targetLanguage: 'ja'
+          targetLanguage: 'ja',
+          endpoint: 'https://example.test/v1',
+          model: 'demo-model'
         }
       },
       mode: 'meeting',
@@ -54,6 +56,8 @@ describe('resolveRuntimeConfig', () => {
       provider: 'openai-compatible',
       targetLanguage: 'ja',
       sourceLanguage: 'auto',
+      endpoint: 'https://example.test/v1',
+      model: 'demo-model',
       credentials: {
         translationApiKey: 'translation-secret'
       }

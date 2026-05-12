@@ -18,6 +18,10 @@ export type OutputMethod = 'simulate_input' | 'clipboard' | 'popup'
 
 export type TranslationProvider = 'openai-compatible'
 
+export type TranslationCredentialsInput = {
+  apiKey: string
+}
+
 export type DeepPartial<T> = {
   [Key in keyof T]?: T[Key] extends readonly (infer Item)[]
     ? Item[]
@@ -194,6 +198,9 @@ export type AppSettings = {
     enabledForMeeting: boolean
     targetLanguage: string
     provider: TranslationProvider
+    endpoint?: string
+    model?: string
+    apiKeyConfigured?: boolean
   }
   advanced: {
     localServiceHost?: string
@@ -209,6 +216,8 @@ export type TranslationRuntimeConfig = {
   provider: TranslationProvider
   targetLanguage: string
   sourceLanguage: SpeechLanguage
+  endpoint?: string
+  model?: string
   credentials: {
     translationApiKey: string
   }

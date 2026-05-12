@@ -24,6 +24,9 @@ describe('createAppApi', () => {
         theme: 'light'
       }
     })
+    await api.saveTranslationCredentials({
+      apiKey: 'translation-secret'
+    })
     await api.listSpeechProfiles()
     await api.testSpeechProfile('local-fast')
     await api.prewarmSession('meeting')
@@ -58,6 +61,12 @@ describe('createAppApi', () => {
           general: {
             theme: 'light'
           }
+        }
+      ],
+      [
+        IPC_CHANNELS.settingsSaveTranslationCredentials,
+        {
+          apiKey: 'translation-secret'
         }
       ],
       [IPC_CHANNELS.speechListProfiles],

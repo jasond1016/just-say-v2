@@ -1,6 +1,7 @@
 export const IPC_CHANNELS = {
   settingsGet: 'settings.get',
   settingsUpdate: 'settings.update',
+  settingsSaveTranslationCredentials: 'settings.saveTranslationCredentials',
   captureCommand: 'capture.command',
   captureEvent: 'capture.event',
   captureReady: 'capture.ready',

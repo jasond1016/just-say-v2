@@ -21,6 +21,7 @@ export type CreateAppServices = {
   speechService: SpeechHandlerService
   historyService: HistoryHandlerService
   settingsService: SettingsHandlerService & {
+    saveTranslationCredentials?(input: { apiKey: string }): Promise<AppSettings>
     onChanged?(listener: (settings: AppSettings) => void): () => void
   }
   diagnosticsService: DiagnosticsHandlerService

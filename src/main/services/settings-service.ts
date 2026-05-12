@@ -29,12 +29,12 @@ export class SettingsService {
   async getSettings(): Promise<AppSettings> {
     const stored = await this.repository.get()
     const normalized = stored ? normalizeSettings(stored) : createDefaultSettings()
-    return normalizeExposedSettings(normalized)
+    return this.applyCredentialState(normalizeExposedSettings(normalized))
   }
 
   async updateSettings(patch: SettingsPatch): Promise<AppSettings> {
     const current = await this.getSettings()
-    const next = normalizeExposedSettings(applySettingsPatch(current, patch))
+    const next = this.applyCredentialState(normalizeExposedSettings(applySettingsPatch(current, patch)))
     await this.repository.save(next)
     this.emitChanged(next)
     return next
@@ -84,6 +84,18 @@ export class SettingsService {
       ...(credentials ? { credentials } : {}),
       ...(platform ? { platform } : {})
     })
+  }
+
+  private applyCredentialState(settings: AppSettings): AppSettings {
+    const credentials = this.options.credentialsProvider?.()
+
+    return {
+      ...settings,
+      translation: {
+        ...settings.translation,
+        apiKeyConfigured: Boolean(credentials?.translationApiKey)
+      }
+    }
   }
 
   private emitChanged(settings: AppSettings): void {

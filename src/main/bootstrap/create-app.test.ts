@@ -79,6 +79,7 @@ describe('createApp', () => {
     const settingsService = {
       getSettings: vi.fn().mockResolvedValue(changedSettings),
       updateSettings: vi.fn().mockResolvedValue(undefined),
+      saveTranslationCredentials: vi.fn().mockResolvedValue(changedSettings),
       onChanged: vi.fn().mockImplementation((listener) => {
         listener(changedSettings)
         return () => {}
@@ -141,6 +142,7 @@ describe('createApp', () => {
       'history.export',
       'settings.get',
       'settings.update',
+      'settings.saveTranslationCredentials',
       'diagnostics.export'
     ])
     expect(app.windows.mainWindow).toBeDefined()

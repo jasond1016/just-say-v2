@@ -43,6 +43,14 @@ describe('createSettingsHandlers', () => {
           launchAtLogin: false,
           minimizeToTray: true
         }
+      }),
+      saveTranslationCredentials: vi.fn().mockResolvedValue({
+        general: {
+          language: 'zh-CN',
+          theme: 'system',
+          launchAtLogin: false,
+          minimizeToTray: true
+        }
       })
     }
 
@@ -55,6 +63,9 @@ describe('createSettingsHandlers', () => {
         theme: 'light'
       }
     })
+    await handlers[IPC_CHANNELS.settingsSaveTranslationCredentials]({
+      apiKey: 'translation-secret'
+    })
 
     expect(settingsService.getSettings).toHaveBeenCalled()
     expect(settingsService.updateSettings).toHaveBeenCalledWith({
@@ -62,6 +73,9 @@ describe('createSettingsHandlers', () => {
         language: 'en-US',
         theme: 'light'
       }
+    })
+    expect(settingsService.saveTranslationCredentials).toHaveBeenCalledWith({
+      apiKey: 'translation-secret'
     })
   })
 })

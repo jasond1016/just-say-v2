@@ -239,6 +239,8 @@ describe('AppController', () => {
     await controller.setTranslationEnabledForMeeting(true)
     await controller.setTranslationTargetLanguage('fr')
     await controller.setTranslationProvider('openai-compatible')
+    await controller.setTranslationEndpoint('https://example.test/v1')
+    await controller.setTranslationModel('gpt-4o-mini')
     await controller.setLocalServiceHost('10.0.0.8')
     await controller.setLocalServicePort(9001)
 
@@ -253,6 +255,8 @@ describe('AppController', () => {
     expect(updateSettings).toHaveBeenCalledWith({ translation: { enabledForMeeting: true } })
     expect(updateSettings).toHaveBeenCalledWith({ translation: { targetLanguage: 'fr' } })
     expect(updateSettings).toHaveBeenCalledWith({ translation: { provider: 'openai-compatible' } })
+    expect(updateSettings).toHaveBeenCalledWith({ translation: { endpoint: 'https://example.test/v1' } })
+    expect(updateSettings).toHaveBeenCalledWith({ translation: { model: 'gpt-4o-mini' } })
     expect(updateSettings).toHaveBeenCalledWith({ advanced: { localServiceHost: '10.0.0.8' } })
     expect(updateSettings).toHaveBeenCalledWith({ advanced: { localServicePort: 9001 } })
     expect(controller.getSnapshot().settings).toMatchObject({
@@ -275,13 +279,49 @@ describe('AppController', () => {
         enabledForPtt: true,
         enabledForMeeting: true,
         targetLanguage: 'fr',
-        provider: 'openai-compatible'
+        provider: 'openai-compatible',
+        endpoint: 'https://example.test/v1',
+        model: 'gpt-4o-mini'
       },
       advanced: {
         localServiceHost: '10.0.0.8',
         localServicePort: 9001
       }
     })
+
+    dispose()
+  })
+
+  it('saves translation credentials through the API and refreshes local settings state', async () => {
+    let settings = createSettings()
+    const saveTranslationCredentials = vi.fn(async ({ apiKey }: { apiKey: string }) => {
+      expect(apiKey).toBe('translation-secret')
+      settings = {
+        ...settings,
+        translation: {
+          ...settings.translation,
+          apiKeyConfigured: true
+        }
+      }
+      return settings
+    })
+    const controller = new AppController({
+      api: createApi({
+        getSettings: vi.fn(async () => settings),
+        saveTranslationCredentials
+      }),
+      runtimeStore: new RuntimeStore()
+    })
+
+    const dispose = controller.start()
+    await flushPromises()
+
+    await controller.saveTranslationCredentials('translation-secret')
+
+    expect(saveTranslationCredentials).toHaveBeenCalledWith({
+      apiKey: 'translation-secret'
+    })
+    expect(controller.getSnapshot().settings.translation.apiKeyConfigured).toBe(true)
 
     dispose()
   })
@@ -383,6 +423,8 @@ function createApi(overrides: Partial<AppApi> & {
     getSettings: overrides.getSettings ?? vi.fn(async () => settings),
     onSettingsChanged: overrides.onSettingsChanged ?? (() => () => {}),
     updateSettings: overrides.updateSettings ?? vi.fn(async () => settings),
+    saveTranslationCredentials:
+      overrides.saveTranslationCredentials ?? vi.fn(async () => settings),
     listSpeechProfiles: overrides.listSpeechProfiles ?? vi.fn(async () => []),
     testSpeechProfile: overrides.testSpeechProfile ?? vi.fn(async (profileId) => ({ ok: true, profileId })),
     prewarmSession: overrides.prewarmSession ?? vi.fn(async () => undefined),

@@ -32,7 +32,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
     enabledForPtt: false,
     enabledForMeeting: false,
     targetLanguage: 'en',
-    provider: 'openai-compatible'
+    provider: 'openai-compatible',
+    apiKeyConfigured: false
   },
   advanced: {
     diagnosticsEnabled: true,
@@ -68,6 +69,8 @@ export function normalizeSettings(patch?: SettingsPatch): AppSettings {
     merged.translation.targetLanguage,
     DEFAULT_SETTINGS.translation.targetLanguage
   )
+  const translationEndpoint = normalizeOptionalString(merged.translation.endpoint)
+  const translationModel = normalizeOptionalString(merged.translation.model)
   const localServiceHost = normalizeOptionalString(merged.advanced.localServiceHost)
   const localServicePort = normalizePort(merged.advanced.localServicePort)
 
@@ -106,7 +109,10 @@ export function normalizeSettings(patch?: SettingsPatch): AppSettings {
       targetLanguage,
       provider: TRANSLATION_PROVIDERS.has(merged.translation.provider)
         ? merged.translation.provider
-        : DEFAULT_SETTINGS.translation.provider
+        : DEFAULT_SETTINGS.translation.provider,
+      ...(translationEndpoint !== undefined ? { endpoint: translationEndpoint } : {}),
+      ...(translationModel !== undefined ? { model: translationModel } : {}),
+      apiKeyConfigured: merged.translation.apiKeyConfigured === true
     },
     advanced: {
       diagnosticsEnabled: merged.advanced.diagnosticsEnabled,

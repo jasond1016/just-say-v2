@@ -48,6 +48,9 @@ export function SettingsPage(props: {
   onTranslateMeetingChange: (enabled: boolean) => void
   onTranslationTargetLanguageChange: (targetLanguage: string) => void
   onTranslationProviderChange: (provider: TranslationProvider) => void
+  onTranslationEndpointChange: (endpoint: string) => void
+  onTranslationModelChange: (model: string) => void
+  onSaveTranslationApiKey: (apiKey: string) => Promise<void>
   onLocalServiceHostChange: (host: string) => void
   onLocalServicePortChange: (port: number | undefined) => void
   onExportDiagnostics: () => void
@@ -56,11 +59,15 @@ export function SettingsPage(props: {
   const [selectedSection, setSelectedSection] = useState<SettingsSectionId>('workspace')
   const [draftHost, setDraftHost] = useState(props.settings.advanced.localServiceHost ?? '')
   const [draftPort, setDraftPort] = useState(props.settings.advanced.localServicePort?.toString() ?? '')
+  const [draftTranslationEndpoint, setDraftTranslationEndpoint] = useState(props.settings.translation.endpoint ?? '')
+  const [draftTranslationModel, setDraftTranslationModel] = useState(props.settings.translation.model ?? '')
+  const [draftTranslationApiKey, setDraftTranslationApiKey] = useState('')
   const [showSavedState, setShowSavedState] = useState(false)
   const previousSettingsSignature = useRef<string | null>(null)
   const isCheckingProfile = props.busyAction?.startsWith('profile-test:') ?? false
   const disabled = Boolean(props.busyAction)
   const translationEnabled = props.settings.translation.enabledForPtt || props.settings.translation.enabledForMeeting
+  const translationApiKeyConfigured = Boolean(props.settings.translation.apiKeyConfigured)
   const portValue = draftPort.trim()
   const invalidPort = portValue.length > 0 && !/^\d+$/.test(portValue)
   const selectedProfile = props.profiles.find((profile) => profile.id === props.settings.speech.selectedProfileId) ?? null
@@ -69,6 +76,11 @@ export function SettingsPage(props: {
     setDraftHost(props.settings.advanced.localServiceHost ?? '')
     setDraftPort(props.settings.advanced.localServicePort?.toString() ?? '')
   }, [props.settings.advanced.localServiceHost, props.settings.advanced.localServicePort])
+
+  useEffect(() => {
+    setDraftTranslationEndpoint(props.settings.translation.endpoint ?? '')
+    setDraftTranslationModel(props.settings.translation.model ?? '')
+  }, [props.settings.translation.endpoint, props.settings.translation.model])
 
   useEffect(() => {
     const signature = JSON.stringify(props.settings)
@@ -130,6 +142,33 @@ export function SettingsPage(props: {
     }
 
     props.onLocalServicePortChange(portValue ? Number.parseInt(portValue, 10) : undefined)
+  }
+
+  const commitTranslationEndpoint = () => {
+    if (draftTranslationEndpoint === (props.settings.translation.endpoint ?? '')) {
+      return
+    }
+
+    props.onTranslationEndpointChange(draftTranslationEndpoint.trim())
+  }
+
+  const commitTranslationModel = () => {
+    if (draftTranslationModel === (props.settings.translation.model ?? '')) {
+      return
+    }
+
+    props.onTranslationModelChange(draftTranslationModel.trim())
+  }
+
+  const commitTranslationApiKey = async () => {
+    const apiKey = draftTranslationApiKey.trim()
+
+    if (!apiKey) {
+      return
+    }
+
+    await props.onSaveTranslationApiKey(apiKey)
+    setDraftTranslationApiKey('')
   }
 
   const selectedSectionMeta = describeSettingsSection(selectedSection)
@@ -329,6 +368,56 @@ export function SettingsPage(props: {
                   >
                     <option value="openai-compatible">OpenAI-compatible</option>
                   </SelectField>
+                </SettingRow>
+
+                <SettingRow title="Endpoint" hint="Use the API base URL for your OpenAI-compatible provider.">
+                  <TextInput
+                    value={draftTranslationEndpoint}
+                    disabled={disabled}
+                    placeholder="https://api.openai.com/v1"
+                    onChange={(event) => setDraftTranslationEndpoint(event.target.value)}
+                    className="field-input--wide"
+                  />
+                  <div className="field-action-row">
+                    <Button label="Save endpoint" size="small" disabled={disabled} onClick={commitTranslationEndpoint} />
+                  </div>
+                </SettingRow>
+
+                <SettingRow title="Model" hint="Leave blank to use the default translation model.">
+                  <TextInput
+                    value={draftTranslationModel}
+                    disabled={disabled}
+                    placeholder="gpt-4o-mini"
+                    onChange={(event) => setDraftTranslationModel(event.target.value)}
+                    className="field-input--wide"
+                  />
+                  <div className="field-action-row">
+                    <Button label="Save model" size="small" disabled={disabled} onClick={commitTranslationModel} />
+                  </div>
+                </SettingRow>
+
+                <SettingRow title="API key" hint="Saved locally with device encryption and never written into settings.json.">
+                  <TextInput
+                    type="password"
+                    value={draftTranslationApiKey}
+                    disabled={disabled}
+                    placeholder={translationApiKeyConfigured ? 'Saved locally. Enter a new key to replace it.' : 'sk-...'}
+                    onChange={(event) => setDraftTranslationApiKey(event.target.value)}
+                    className="field-input--wide"
+                  />
+                  <div className="field-action-row">
+                    <Button
+                      label={translationApiKeyConfigured ? 'Replace key' : 'Save key'}
+                      size="small"
+                      disabled={disabled || draftTranslationApiKey.trim().length === 0}
+                      onClick={() => { void commitTranslationApiKey() }}
+                    />
+                  </div>
+                  <div className="field-note">
+                    {translationApiKeyConfigured
+                      ? 'Translation credentials are configured.'
+                      : 'No translation API key is saved yet. Meeting translation will fail until you save one.'}
+                  </div>
                 </SettingRow>
               </SettingsSection>
             ) : null}

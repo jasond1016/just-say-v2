@@ -253,6 +253,9 @@ function WorkspaceApp() {
             onTranslateMeetingChange={(enabled) => { void controller.setTranslationEnabledForMeeting(enabled) }}
             onTranslationTargetLanguageChange={(targetLanguage) => { void controller.setTranslationTargetLanguage(targetLanguage) }}
             onTranslationProviderChange={(provider) => { void controller.setTranslationProvider(provider) }}
+            onTranslationEndpointChange={(endpoint) => { void controller.setTranslationEndpoint(endpoint) }}
+            onTranslationModelChange={(model) => { void controller.setTranslationModel(model) }}
+            onSaveTranslationApiKey={(apiKey) => controller.saveTranslationCredentials(apiKey)}
             onLocalServiceHostChange={(host) => { void controller.setLocalServiceHost(host) }}
             onLocalServicePortChange={(port) => { void controller.setLocalServicePort(port) }}
             onExportDiagnostics={() => { void controller.exportDiagnostics() }}

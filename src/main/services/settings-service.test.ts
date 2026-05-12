@@ -120,4 +120,18 @@ describe('SettingsService', () => {
       }
     })
   })
+
+  it('marks translation credentials as configured when the provider supplies an API key', async () => {
+    const service = new SettingsService(new InMemorySettingsRepository(), {
+      credentialsProvider: () => ({
+        translationApiKey: 'translation-secret'
+      })
+    })
+
+    await expect(service.getSettings()).resolves.toMatchObject({
+      translation: {
+        apiKeyConfigured: true
+      }
+    })
+  })
 })
