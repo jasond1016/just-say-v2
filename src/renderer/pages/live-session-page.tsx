@@ -31,6 +31,7 @@ export function LiveSessionPage(props: {
   const isColdStart = !session && !hasTranscript
   const statusCopy = describeStatus(activeStatus, hasTranscript)
   const sessionTitle = session ? deriveSessionTitle(session) : 'Live Session'
+  const displayedDurationSec = useDisplayedSessionDuration(session, activeStatus)
   const sourceSummary = props.settings.input.includeMicrophoneInMeeting ? 'System audio + microphone' : 'System audio only'
   const translationSummary = session?.translationEnabled ? 'Bilingual transcript on' : 'Original language only'
   const canUsePostActions = Boolean(session) && !isSessionActive && hasTranscript && !props.busyAction
@@ -89,7 +90,7 @@ export function LiveSessionPage(props: {
           </div>
           {session ? (
             <div className={`surface-header__time surface-header__time--${describeTimeTone(activeStatus)}`}>
-              {formatSessionDuration(session.durationSec)}
+              {formatSessionDuration(displayedDurationSec)}
             </div>
           ) : null}
         </div>
@@ -310,6 +311,60 @@ function deriveSessionTitle(session: LiveSessionSnapshot): string {
   return sourceText.length > 64 ? `${sourceText.slice(0, 64).trim()}...` : sourceText
 }
 
+function useDisplayedSessionDuration(
+  session: LiveSessionSnapshot | null,
+  status: MeetingStatus | undefined
+): number {
+  const [nowMs, setNowMs] = useState(() => Date.now())
+  const isLiveTicker = shouldTickSessionDuration(status) && session?.startedAt !== null
+
+  useEffect(() => {
+    const startedAt = session?.startedAt
+
+    if (!isLiveTicker || startedAt === null || startedAt === undefined) {
+      return
+    }
+
+    let intervalId: number | undefined
+    const updateClock = () => setNowMs(Date.now())
+    const elapsedMs = Math.max(0, Date.now() - startedAt)
+    const nextTickDelay = 1000 - (elapsedMs % 1000 || 1000)
+
+    updateClock()
+
+    const timeoutId: number = window.setTimeout(() => {
+      updateClock()
+      intervalId = window.setInterval(updateClock, 1000)
+    }, nextTickDelay)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+      if (intervalId !== undefined) {
+        window.clearInterval(intervalId)
+      }
+    }
+  }, [isLiveTicker, session?.sessionId, session?.startedAt])
+
+  return getDisplayedSessionDurationSec(session, status, nowMs)
+}
+
+export function getDisplayedSessionDurationSec(
+  session: LiveSessionSnapshot | null,
+  status: MeetingStatus | undefined,
+  nowMs: number
+): number {
+  if (!session) {
+    return 0
+  }
+
+  if (!shouldTickSessionDuration(status) || session.startedAt === null) {
+    return session.durationSec
+  }
+
+  const elapsedSec = Math.max(0, Math.floor((nowMs - session.startedAt) / 1000))
+  return Math.max(session.durationSec, elapsedSec)
+}
+
 function describeStatus(status: MeetingStatus | undefined, hasTranscript: boolean) {
   switch (status) {
     case 'preparing':
@@ -380,6 +435,10 @@ function describeTimeTone(status: MeetingStatus | undefined): 'live' | 'done' | 
     default:
       return 'done'
   }
+}
+
+function shouldTickSessionDuration(status: MeetingStatus | undefined): boolean {
+  return status === 'preparing' || status === 'streaming' || status === 'recovering'
 }
 
 function formatClockTime(timestamp: number): string {
