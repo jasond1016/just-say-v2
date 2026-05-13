@@ -68,6 +68,7 @@ describe('createApp', () => {
       list: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 0 }),
       search: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 0 }),
       get: vi.fn().mockResolvedValue(null),
+      getAudioPlayback: vi.fn().mockResolvedValue(null),
       delete: vi.fn().mockResolvedValue(false),
       copy: vi.fn().mockResolvedValue(undefined),
       export: vi.fn().mockResolvedValue({ ok: false, error: 'not implemented' })
@@ -137,6 +138,7 @@ describe('createApp', () => {
       'history.list',
       'history.search',
       'history.get',
+      'history.getAudioPlayback',
       'history.delete',
       'history.copy',
       'history.export',

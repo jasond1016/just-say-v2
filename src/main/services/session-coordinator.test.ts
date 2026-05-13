@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type {
+  AudioChunk,
   AppRuntimeSnapshot,
   AppSettings,
   CaptureCommand,
@@ -479,6 +480,128 @@ describe('SessionCoordinator + PTTCoordinator', () => {
     unsubscribe()
   })
 
+  it('persists meeting audio metadata when the recorder finalizes successfully', async () => {
+    const meetingAudioRecorder = new FakeMeetingAudioRecorder({
+      relativePath: 'meetings\\2026\\meeting-1.wav',
+      status: 'complete'
+    })
+    const harness = createHarness({
+      meetingAudioRecorder
+    })
+    const chunk = new Uint8Array([4, 3, 2, 1])
+
+    await harness.sessionCoordinator.startMeeting()
+    harness.meetingCaptureTransport.emit({
+      type: 'audio-chunk',
+      requestId: 'meeting-1',
+      chunk: {
+        source: 'system',
+        data: chunk,
+        sampleRate: 16000,
+        channels: 1,
+        timestamp: 3333
+      }
+    })
+    harness.meetingEngine.emit({
+      type: 'session-ready'
+    })
+    harness.meetingEngine.emit({
+      type: 'block-committed',
+      payload: {
+        block: {
+          id: 'block-1',
+          source: 'system',
+          text: 'hello world',
+          startedAt: 1000,
+          endedAt: 1200
+        }
+      }
+    })
+
+    const stopPromise = harness.sessionCoordinator.stopMeeting()
+    harness.meetingEngine.emit({
+      type: 'session-ended'
+    })
+    await stopPromise
+
+    expect(meetingAudioRecorder.appendedChunks).toEqual([
+      {
+        source: 'system',
+        data: chunk,
+        sampleRate: 16000,
+        channels: 1,
+        timestamp: 3333
+      }
+    ])
+    expect(meetingAudioRecorder.finalizeStatuses).toEqual(['complete'])
+    expect(harness.transcriptRepository.savedTranscripts[0]?.metadata.audio).toMatchObject({
+      relativePath: 'meetings\\2026\\meeting-1.wav',
+      status: 'complete'
+    })
+  })
+
+  it('saves a partial meeting record when streaming stops unexpectedly', async () => {
+    const meetingAudioRecorder = new FakeMeetingAudioRecorder({
+      relativePath: 'meetings\\2026\\meeting-1.wav',
+      status: 'partial'
+    })
+    const harness = createHarness({
+      meetingAudioRecorder
+    })
+
+    await harness.sessionCoordinator.startMeeting()
+    harness.meetingCaptureTransport.emit({
+      type: 'audio-chunk',
+      requestId: 'meeting-1',
+      chunk: {
+        source: 'system',
+        data: new Uint8Array([1, 2, 3, 4]),
+        sampleRate: 16000,
+        channels: 1,
+        timestamp: 3333
+      }
+    })
+    harness.meetingEngine.emit({
+      type: 'session-ready'
+    })
+    harness.meetingEngine.emit({
+      type: 'block-committed',
+      payload: {
+        block: {
+          id: 'block-1',
+          source: 'system',
+          text: 'hello world',
+          startedAt: 1000,
+          endedAt: 1200
+        }
+      }
+    })
+    harness.meetingEngine.emit({
+      type: 'error',
+      payload: {
+        code: 'E_ENGINE_TIMEOUT',
+        message: 'Engine timed out',
+        retryable: true
+      }
+    })
+    await flushAsyncWork()
+
+    expect(harness.sessionCoordinator.getRuntimeSnapshot().liveSession).toMatchObject({
+      sessionId: 'meeting-1',
+      status: 'stopped_unexpectedly'
+    })
+    expect(meetingAudioRecorder.finalizeStatuses).toEqual(['partial'])
+    expect(harness.transcriptRepository.savedTranscripts[0]).toMatchObject({
+      id: 'meeting-1',
+      metadata: {
+        audio: {
+          relativePath: 'meetings\\2026\\meeting-1.wav',
+          status: 'partial'
+        }
+      }
+    })
+  })
+
   it('applies meeting start overrides without mutating settings defaults', async () => {
     const harness = createHarness({
       settings: {
@@ -764,6 +887,7 @@ type HarnessOptions = {
   translationResults?: Record<string, string>
   disableTranslationPipeline?: boolean
   meetingEngines?: FakeRecognitionEngine[]
+  meetingAudioRecorder?: FakeMeetingAudioRecorder
   recoveryTimeoutMs?: number
 }
 
@@ -839,6 +963,12 @@ function createHarness(options: HarnessOptions = {}) {
     captureWindowService: meetingCaptureWindowService,
     transcriptRepository,
     ...(translationPipeline ? { translationPipeline } : {}),
+    ...(options.meetingAudioRecorder
+      ? {
+          audioRecorderFactory: () => options.meetingAudioRecorder!,
+          deletePersistedAudio: async () => undefined
+        }
+      : {}),
     now: () => 4000,
     createSessionId: () => 'meeting-1',
     ...(options.recoveryTimeoutMs !== undefined ? { recoveryTimeoutMs: options.recoveryTimeoutMs } : {})
@@ -855,6 +985,7 @@ function createHarness(options: HarnessOptions = {}) {
     captureWindowService,
     meetingCaptureTransport,
     meetingCaptureWindowService,
+    meetingAudioRecorder: options.meetingAudioRecorder,
     transcriptRepository,
     outputDispatcher,
     diagnostics,
@@ -1028,6 +1159,50 @@ class FakeTranslationPipeline {
       blockId: input.block.id,
       translatedText: this.results[input.block.id] ?? `translated:${input.block.text}`
     }
+  }
+}
+
+class FakeMeetingAudioRecorder {
+  readonly appendedChunks: AudioChunk[] = []
+  readonly finalizeStatuses: Array<'complete' | 'partial'> = []
+  discardCalls = 0
+
+  constructor(
+    private readonly output: {
+      relativePath: string
+      status: 'complete' | 'partial'
+    } | null,
+    private readonly finalizeFailure?: Error
+  ) {}
+
+  appendChunk(chunk: AudioChunk): void {
+    this.appendedChunks.push(chunk)
+  }
+
+  async finalize(status: 'complete' | 'partial') {
+    this.finalizeStatuses.push(status)
+
+    if (this.finalizeFailure) {
+      throw this.finalizeFailure
+    }
+
+    if (!this.output) {
+      return null
+    }
+
+    return {
+      relativePath: this.output.relativePath,
+      format: 'wav' as const,
+      sampleRate: 16000,
+      channels: 1 as const,
+      status,
+      durationMs: 1200,
+      byteLength: 38444
+    }
+  }
+
+  async discard(): Promise<void> {
+    this.discardCalls += 1
   }
 }
 

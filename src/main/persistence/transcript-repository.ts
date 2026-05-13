@@ -159,7 +159,8 @@ function cloneSavedTranscript(transcript: SavedTranscript): SavedTranscript {
       ...(block.words ? { words: [...block.words] } : {})
     })),
     metadata: {
-      ...transcript.metadata
+      ...transcript.metadata,
+      ...(transcript.metadata.audio ? { audio: { ...transcript.metadata.audio } } : {})
     }
   }
 }

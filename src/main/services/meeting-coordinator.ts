@@ -1,10 +1,12 @@
 import type {
+  AudioChunk,
   AppErrorPayload,
   DiagnosticEvent,
   MeetingStatus,
   ResolvedRuntimeConfig,
   RuntimeNotification,
   StartMeetingCommand,
+  TranscriptAudioMetadata,
   TranscriptState
 } from '../../shared/api-types'
 import type { RecognitionEngine, RecognitionEvent } from '../../core/contracts/engine'
@@ -14,6 +16,7 @@ import { selectPlainText, selectTranslatedPlainText } from '../../core/transcrip
 import type { TranscriptEvent } from '../../core/transcript/transcript-types'
 import type { CaptureWindowService } from '../platform/capture-window-service'
 import type { SettingsProvider, TranscriptRepositoryLike } from './ptt-coordinator'
+import type { MeetingAudioRecorderLike } from './meeting-audio-storage'
 import type { TranslationPipeline } from './translation-pipeline'
 
 export type MeetingRuntimeSnapshot = {
@@ -33,6 +36,8 @@ export type MeetingCoordinatorDependencies = {
   captureWindowService: CaptureWindowService
   transcriptRepository: TranscriptRepositoryLike
   translationPipeline?: Pick<TranslationPipeline, 'translateBlock'>
+  audioRecorderFactory?: (input: { sessionId: string; chunkMs: number }) => MeetingAudioRecorderLike
+  deletePersistedAudio?: (relativePath: string) => Promise<void>
   diagnostics?: {
     record(event: DiagnosticEvent): void
   }
@@ -49,6 +54,7 @@ type MeetingSessionContext = {
   engine: RecognitionEngine
   transcript: TranscriptState
   pendingTranslations: Set<Promise<void>>
+  audioRecorder: MeetingAudioRecorderLike | undefined
   completion: {
     promise: Promise<void>
     settle: () => void
@@ -137,6 +143,10 @@ export class MeetingCoordinator {
       engine,
       transcript: INITIAL_TRANSCRIPT_STATE,
       pendingTranslations: new Set(),
+      audioRecorder: this.dependencies.audioRecorderFactory?.({
+        sessionId,
+        chunkMs: runtimeConfig.captureConfig.chunkMs
+      }),
       completion: createCompletionSignal()
     }
     this.dependencies.diagnostics?.record({
@@ -300,6 +310,7 @@ export class MeetingCoordinator {
     switch (event.type) {
       case 'audio-chunk':
         session.engine.pushAudio(event.chunk)
+        session.audioRecorder?.appendChunk(event.chunk)
         return
       case 'capture-error':
         await this.fail(event.error)
@@ -325,30 +336,16 @@ export class MeetingCoordinator {
     const endedAt = this.now()
     const plainText = selectPlainText(session.transcript)
     const translatedPlainText = selectTranslatedPlainText(session.transcript)
+    const audioMetadata = await this.finalizeSessionAudio(session, 'complete')
 
     try {
-      await this.dependencies.transcriptRepository.save({
-        id: session.sessionId,
-        mode: 'meeting',
-        title: `Live Session ${new Date(session.startedAt).toISOString()}`,
-        startedAt: session.startedAt,
-        endedAt,
-        language: String(session.runtimeConfig.engineConfig.language),
-        plainText,
-        blocks: session.transcript.committedBlocks.map((block) => ({ ...block })),
-        metadata: {
-          engineProfileId: session.runtimeConfig.engineProfile.id,
-          includeMicrophone: session.includeMicrophone,
-          translationEnabled: Boolean(session.runtimeConfig.translationConfig)
-        },
-        ...(session.runtimeConfig.translationConfig
-          ? {
-              targetLanguage: String(session.runtimeConfig.translationConfig.targetLanguage),
-              ...(translatedPlainText ? { translatedPlainText } : {})
-            }
-          : {})
-      })
+      await this.dependencies.transcriptRepository.save(
+        buildSavedTranscript(session, endedAt, plainText, translatedPlainText, audioMetadata)
+      )
     } catch (error) {
+      if (audioMetadata) {
+        await this.cleanupPersistedAudio(audioMetadata)
+      }
       throw normalizeStorageErrorPayload(error)
     }
 
@@ -401,6 +398,15 @@ export class MeetingCoordinator {
       await this.dependencies.captureWindowService.abortCapture(session?.sessionId)
     } catch {
       // best effort cleanup
+    }
+
+    if (session && this.status === 'stopped_unexpectedly') {
+      await this.persistInterruptedSession(session)
+    } else {
+      await session?.audioRecorder?.discard()
+      if (session) {
+        session.audioRecorder = undefined
+      }
     }
 
     this.terminalSnapshot = session ? this.createSnapshotForSession(session) : this.terminalSnapshot
@@ -638,10 +644,132 @@ export class MeetingCoordinator {
       })
     }
   }
+
+  private async persistInterruptedSession(session: MeetingSessionContext): Promise<void> {
+    await Promise.allSettled([...session.pendingTranslations])
+    const endedAt = this.now()
+    const plainText = selectPlainText(session.transcript)
+    const translatedPlainText = selectTranslatedPlainText(session.transcript)
+    const audioMetadata = await this.finalizeSessionAudio(session, 'partial')
+    const hasTranscriptContent =
+      plainText.trim().length > 0 || session.transcript.committedBlocks.length > 0
+
+    if (!hasTranscriptContent && !audioMetadata) {
+      return
+    }
+
+    try {
+      await this.dependencies.transcriptRepository.save(
+        buildSavedTranscript(session, endedAt, plainText, translatedPlainText, audioMetadata)
+      )
+      this.dependencies.diagnostics?.record({
+        type: 'session-persisted',
+        timestamp: endedAt,
+        sessionId: session.sessionId,
+        blockCount: session.transcript.committedBlocks.length
+      })
+    } catch (error) {
+      if (audioMetadata) {
+        await this.cleanupPersistedAudio(audioMetadata)
+      }
+
+      this.notify({
+        level: 'warning',
+        message: error instanceof Error
+          ? `Live session ended unexpectedly and could not be saved to history: ${error.message}`
+          : 'Live session ended unexpectedly and could not be saved to history.'
+      })
+    }
+  }
+
+  private async finalizeSessionAudio(
+    session: MeetingSessionContext,
+    status: TranscriptAudioMetadata['status']
+  ): Promise<TranscriptAudioMetadata | null> {
+    if (!session.audioRecorder) {
+      return null
+    }
+
+    const recorder = session.audioRecorder
+    session.audioRecorder = undefined
+
+    try {
+      const audioMetadata = await recorder.finalize(status)
+
+      if (audioMetadata) {
+        this.dependencies.diagnostics?.record({
+          type: 'audio-persisted',
+          timestamp: this.now(),
+          sessionId: session.sessionId,
+          relativePath: audioMetadata.relativePath,
+          byteLength: audioMetadata.byteLength,
+          partial: status === 'partial'
+        })
+      }
+
+      return audioMetadata
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown audio persistence failure'
+      this.dependencies.diagnostics?.record({
+        type: 'audio-persist-failed',
+        timestamp: this.now(),
+        sessionId: session.sessionId,
+        reason: message
+      })
+      this.notify({
+        level: 'warning',
+        message: 'Meeting audio could not be stored.'
+      })
+      return null
+    }
+  }
+
+  private async cleanupPersistedAudio(audioMetadata: TranscriptAudioMetadata): Promise<void> {
+    if (!this.dependencies.deletePersistedAudio) {
+      return
+    }
+
+    try {
+      await this.dependencies.deletePersistedAudio(audioMetadata.relativePath)
+    } catch {
+      // best effort cleanup of orphaned audio
+    }
+  }
 }
 
 function reduceTranscript(state: TranscriptState, event: TranscriptEvent): TranscriptState {
   return transcriptReducer(state, event)
+}
+
+function buildSavedTranscript(
+  session: MeetingSessionContext,
+  endedAt: number,
+  plainText: string,
+  translatedPlainText: string | undefined,
+  audioMetadata: TranscriptAudioMetadata | null
+) {
+  return {
+    id: session.sessionId,
+    mode: 'meeting' as const,
+    title: `Live Session ${new Date(session.startedAt).toISOString()}`,
+    startedAt: session.startedAt,
+    endedAt,
+    language: String(session.runtimeConfig.engineConfig.language),
+    plainText,
+    blocks: session.transcript.committedBlocks.map((block) => ({ ...block })),
+    metadata: {
+      engineProfileId: session.runtimeConfig.engineProfile.id,
+      includeMicrophone: session.includeMicrophone,
+      translationEnabled: Boolean(session.runtimeConfig.translationConfig),
+      ...(audioMetadata ? { audio: { ...audioMetadata } } : {})
+    },
+    ...(session.runtimeConfig.translationConfig
+      ? {
+          targetLanguage: String(session.runtimeConfig.translationConfig.targetLanguage),
+          ...(translatedPlainText ? { translatedPlainText } : {})
+        }
+      : {})
+  }
 }
 
 function applyMeetingOverrides(

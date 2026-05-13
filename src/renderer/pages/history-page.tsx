@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 
-import type { ExportFormat, SavedTranscript } from '../../shared/api-types'
+import type { ExportFormat, HistoryAudioPlayback, SavedTranscript } from '../../shared/api-types'
 import type { CaptureSource } from '../../shared/primitive-types'
 import { Button, TextInput } from '../ui/controls'
 import { describeCaptureSource, describeProfileId, describeSessionMode, describeTranscriptSummary } from '../ui/copy'
@@ -26,6 +26,7 @@ export function HistoryPage(props: {
   selectedSource: 'all' | CaptureSource
   selectedTimeFilter: HistoryTimeFilter
   selectedTranscript: SavedTranscript | null
+  selectedAudio: HistoryAudioPlayback | null
   exportMessage: string | null
   busyAction: string | null
   onOpenQuickDictation: () => void
@@ -350,16 +351,37 @@ export function HistoryPage(props: {
         </p>
       </header>
 
-      <section className="session-span" aria-label="Transcript timing">
-        <div className="session-span__button" aria-hidden="true">●</div>
-        <div className="session-span__track">
-          <div className="session-span__meta">
-            <span>Session span</span>
-            <span>{formatDurationMs(selectedTranscript.endedAt - selectedTranscript.startedAt)}</span>
+      {selectedTranscript.mode === 'meeting' && selectedTranscript.metadata.audio ? (
+        <section className="history-audio" aria-label="Meeting audio">
+          <div className="history-audio__meta">
+            <div className="history-audio__eyebrow">Meeting audio</div>
+            <div className="history-audio__row">
+              <span className={`status-pill ${props.selectedAudio ? 'status-pill--saved' : 'status-pill--warning'}`}>
+                {props.selectedAudio
+                  ? selectedTranscript.metadata.audio.status === 'partial'
+                    ? 'Partial audio'
+                    : 'Complete audio'
+                  : 'Audio unavailable'}
+              </span>
+              <span>{formatDurationMs(selectedTranscript.metadata.audio.durationMs)}</span>
+              <span>{formatAudioSpec(selectedTranscript.metadata.audio.sampleRate, selectedTranscript.metadata.audio.channels)}</span>
+            </div>
           </div>
-          <div className="session-span__bar" />
-        </div>
-      </section>
+
+          {props.selectedAudio ? (
+            <audio
+              className="history-audio__player"
+              controls
+              preload="metadata"
+              src={props.selectedAudio.url}
+            />
+          ) : (
+            <p className="history-audio__body">
+              The transcript record still exists, but the saved meeting audio file is no longer available on disk.
+            </p>
+          )}
+        </section>
+      ) : null}
 
       <section className="detail-toolbar">
         <div className="detail-tabs" role="tablist" aria-label="Record views">
@@ -690,6 +712,11 @@ function formatDurationMs(durationMs: number): string {
   }
 
   return `${minutes}m ${seconds}s`
+}
+
+function formatAudioSpec(sampleRate: number, channels: number): string {
+  const channelLabel = channels === 1 ? 'Mono' : `${channels}ch`
+  return `${sampleRate / 1000} kHz · ${channelLabel}`
 }
 
 function formatRelativeTime(timestamp: number): string {

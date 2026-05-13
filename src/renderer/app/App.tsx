@@ -39,6 +39,7 @@ function WorkspaceApp() {
     history,
     historyTotal,
     selectedHistory,
+    selectedHistoryAudio,
     exportMessage,
     liveSessionMessage,
     diagnosticsMessage,
@@ -216,6 +217,7 @@ function WorkspaceApp() {
             selectedSource={historySource}
             selectedTimeFilter={historyTimeFilter}
             selectedTranscript={selectedHistory}
+            selectedAudio={selectedHistoryAudio}
             exportMessage={exportMessage}
             busyAction={busyAction}
             onOpenQuickDictation={() => { controller.setActiveSection('quick-dictation') }}

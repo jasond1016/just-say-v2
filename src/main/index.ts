@@ -32,6 +32,7 @@ import { HistoryService } from './services/history-service'
 import { ConfigurableLocalServiceController } from './services/configurable-local-service-controller'
 import { LocalServiceSupervisor } from './services/local-service-supervisor'
 import { LiveSessionActionsService } from './services/live-session-actions-service'
+import { MeetingAudioStorage } from './services/meeting-audio-storage'
 import { MeetingCoordinator } from './services/meeting-coordinator'
 import { OutputDispatcher } from './services/output-dispatcher'
 import { PttCoordinator } from './services/ptt-coordinator'
@@ -59,6 +60,8 @@ void wireAppLifecycle(app, {
       transcriptRepository,
       path.join(userDataPath, 'exports')
     )
+    const meetingAudioStorage = new MeetingAudioStorage(path.join(userDataPath, 'audio'))
+    await meetingAudioStorage.cleanupTemp()
     const settingsRepository = new FileSettingsRepository(path.join(userDataPath, 'settings.json'))
     const credentialsRepository = new FileCredentialsRepository(
       path.join(userDataPath, 'translation-credentials.bin'),
@@ -196,7 +199,12 @@ void wireAppLifecycle(app, {
     const hotkeyService = new HotkeyService({
       windowsHelperPath: path.join(resourcesPath, 'windows-hotkey-helper', 'JustSayHotkeyHelper.exe')
     })
-    const historyService = new HistoryService(transcriptRepository, transcriptExporter, clipboardService)
+    const historyService = new HistoryService(
+      transcriptRepository,
+      transcriptExporter,
+      clipboardService,
+      meetingAudioStorage
+    )
     const diagnosticsService = new DiagnosticsService({
       exportDir: path.join(userDataPath, 'diagnostics'),
       appVersion: app.getVersion(),
@@ -222,6 +230,9 @@ void wireAppLifecycle(app, {
       captureWindowService,
       transcriptRepository,
       translationPipeline,
+      audioRecorderFactory: ({ sessionId, chunkMs }) =>
+        meetingAudioStorage.createRecorder({ sessionId, chunkMs }),
+      deletePersistedAudio: (relativePath) => meetingAudioStorage.deleteRelativePath(relativePath),
       diagnostics: diagnosticsService
     })
     const sessionCoordinator = new SessionCoordinator(pttCoordinator, meetingCoordinator)

@@ -1,6 +1,7 @@
 import type {
   ExportFormat,
   ExportResult,
+  HistoryAudioPlayback,
   HistoryListQuery,
   HistorySearchQuery,
   PaginatedHistoryResult,
@@ -14,6 +15,10 @@ export class HistoryService {
     private readonly exporter?: TranscriptExporter,
     private readonly clipboard?: {
       writeText(text: string): Promise<void>
+    },
+    private readonly audioStorage?: {
+      getPlayback(transcript: SavedTranscript): Promise<HistoryAudioPlayback | null>
+      deleteForTranscript(transcript: SavedTranscript): Promise<void>
     }
   ) {}
 
@@ -30,7 +35,21 @@ export class HistoryService {
   }
 
   async delete(id: string): Promise<boolean> {
-    return this.repository.delete(id)
+    const transcript = await this.repository.getById(id)
+    const deleted = await this.repository.delete(id)
+
+    if (deleted && transcript && this.audioStorage) {
+      try {
+        await this.audioStorage.deleteForTranscript(transcript)
+      } catch (error) {
+        console.warn(
+          '[history] Failed to delete stored meeting audio',
+          error instanceof Error ? error.message : error
+        )
+      }
+    }
+
+    return deleted
   }
 
   async export(id: string, format: ExportFormat): Promise<ExportResult> {
@@ -63,5 +82,19 @@ export class HistoryService {
           : transcript.plainText
 
     await this.clipboard.writeText(text)
+  }
+
+  async getAudioPlayback(id: string): Promise<HistoryAudioPlayback | null> {
+    if (!this.audioStorage) {
+      return null
+    }
+
+    const transcript = await this.repository.getById(id)
+
+    if (!transcript) {
+      return null
+    }
+
+    return this.audioStorage.getPlayback(transcript)
   }
 }

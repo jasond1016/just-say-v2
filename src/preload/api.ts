@@ -5,6 +5,7 @@ import type {
   EngineProfile,
   ExportFormat,
   ExportResult,
+  HistoryAudioPlayback,
   HistoryListQuery,
   HistorySearchQuery,
   PaginatedHistoryResult,
@@ -39,6 +40,7 @@ export type AppApi = {
   listHistory: (query?: HistoryListQuery) => Promise<PaginatedHistoryResult>
   searchHistory: (query: HistorySearchQuery) => Promise<PaginatedHistoryResult>
   getHistory: (id: string) => Promise<SavedTranscript | null>
+  getHistoryAudioPlayback: (id: string) => Promise<HistoryAudioPlayback | null>
   deleteHistory: (id: string) => Promise<boolean>
   copyHistory: (id: string, format: ExportFormat) => Promise<void>
   exportHistory: (id: string, format: ExportFormat) => Promise<ExportResult>
@@ -90,6 +92,8 @@ export function createAppApi(invoke: IpcInvoke, events?: IpcEventSource): AppApi
     searchHistory: async (query) =>
       invoke<PaginatedHistoryResult>(IPC_CHANNELS.historySearch, query),
     getHistory: async (id) => invoke<SavedTranscript | null>(IPC_CHANNELS.historyGet, id),
+    getHistoryAudioPlayback: async (id) =>
+      invoke<HistoryAudioPlayback | null>(IPC_CHANNELS.historyGetAudioPlayback, id),
     deleteHistory: async (id) => invoke<boolean>(IPC_CHANNELS.historyDelete, id),
     copyHistory: async (id, format) => invoke<void>(IPC_CHANNELS.historyCopy, id, format),
     exportHistory: async (id, format) =>

@@ -91,6 +91,48 @@ describe('SqliteTranscriptRepository', () => {
       rmSync(tempDir, { recursive: true, force: true })
     }
   })
+
+  it('round-trips audio metadata stored inside transcript metadata_json', async () => {
+    const tempDir = mkdtempSync(path.join(tmpdir(), 'justsay-sqlite-'))
+    const database = openSqliteDatabase(path.join(tempDir, 'history.db'))
+
+    try {
+      const repository = new SqliteTranscriptRepository(database, () => 5000)
+      await repository.save(
+        createTranscript({
+          id: 'tx-audio',
+          metadata: {
+            engineProfileId: 'local-fast',
+            includeMicrophone: true,
+            translationEnabled: false,
+            audio: {
+              relativePath: 'meetings\\2026\\tx-audio.wav',
+              format: 'wav',
+              sampleRate: 16000,
+              channels: 1,
+              status: 'partial',
+              durationMs: 2400,
+              byteLength: 80444
+            }
+          }
+        })
+      )
+
+      await expect(repository.getById('tx-audio')).resolves.toMatchObject({
+        id: 'tx-audio',
+        metadata: {
+          audio: {
+            relativePath: 'meetings\\2026\\tx-audio.wav',
+            status: 'partial',
+            byteLength: 80444
+          }
+        }
+      })
+    } finally {
+      database.close()
+      rmSync(tempDir, { recursive: true, force: true })
+    }
+  })
 })
 
 function createTranscript(overrides: Partial<SavedTranscript> & Pick<SavedTranscript, 'id'>): SavedTranscript {

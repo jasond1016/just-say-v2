@@ -317,7 +317,7 @@
 .result-panel,
 .hud-preview,
 .archive-controls,
-.session-span,
+.history-audio,
 .detail-toolbar,
 .detail-search,
 .settings-layout {
@@ -1102,53 +1102,42 @@
   color: var(--text-tertiary);
 }
 
-.session-span {
+.history-audio {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
   gap: 14px;
-  padding: 14px 18px;
+  padding: 16px 18px;
 }
 
-.session-span__button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  color: var(--accent-text);
-}
-
-.session-span__track {
+.history-audio__meta {
   display: grid;
   gap: 8px;
 }
 
-.session-span__meta {
+.history-audio__eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.history-audio__row {
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 12px;
   font-size: 12px;
   color: var(--text-secondary);
 }
 
-.session-span__bar {
-  position: relative;
-  height: 6px;
-  border-radius: 999px;
-  background: color-mix(in oklab, var(--border) 76%, transparent);
-  overflow: hidden;
+.history-audio__player {
+  width: 100%;
 }
 
-.session-span__bar::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 38%;
-  border-radius: inherit;
-  background: color-mix(in oklab, var(--accent) 38%, var(--border));
+.history-audio__body {
+  max-width: 62ch;
+  font-size: 13px;
+  line-height: 1.66;
+  color: var(--text-secondary);
 }
 
 .detail-toolbar {
@@ -1538,8 +1527,7 @@
   .detail-search,
   .archive-row__head,
   .preset-card__row,
-  .advanced-summary,
-  .session-span__meta {
+  .advanced-summary {
     flex-direction: column;
     align-items: flex-start;
   }
@@ -1552,7 +1540,7 @@
   .transcript-canvas,
   .archive-controls,
   .archive-list,
-  .session-span,
+  .history-audio,
   .detail-toolbar,
   .detail-search,
   .notes-canvas,

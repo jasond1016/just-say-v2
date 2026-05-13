@@ -256,7 +256,23 @@ export type SavedTranscript = {
     engineProfileId: string
     includeMicrophone: boolean
     translationEnabled: boolean
+    audio?: TranscriptAudioMetadata
   }
+}
+
+export type TranscriptAudioMetadata = {
+  relativePath: string
+  format: 'wav'
+  sampleRate: number
+  channels: 1
+  status: 'complete' | 'partial'
+  durationMs: number
+  byteLength: number
+}
+
+export type HistoryAudioPlayback = {
+  url: string
+  status: TranscriptAudioMetadata['status']
 }
 
 export type HistoryListQuery = {
@@ -374,6 +390,20 @@ export type DiagnosticEvent =
       timestamp: number
       sessionId: string
       blockCount: number
+    }
+  | {
+      type: 'audio-persisted'
+      timestamp: number
+      sessionId: string
+      relativePath: string
+      byteLength: number
+      partial: boolean
+    }
+  | {
+      type: 'audio-persist-failed'
+      timestamp: number
+      sessionId: string
+      reason: string
     }
   | {
       type: 'output-delivered'

@@ -356,6 +356,43 @@ describe('AppController', () => {
     dispose()
   })
 
+  it('loads history audio playback when opening a meeting record with saved audio', async () => {
+    const transcript = createHistoryItem('meeting-audio', 'meeting')
+    transcript.metadata.audio = {
+      relativePath: 'meetings\\2026\\meeting-audio.wav',
+      format: 'wav',
+      sampleRate: 16000,
+      channels: 1,
+      status: 'partial',
+      durationMs: 1800,
+      byteLength: 58444
+    }
+    const getHistoryAudioPlayback = vi.fn(async () => ({
+      url: 'file:///C:/audio/meeting-audio.wav',
+      status: 'partial' as const
+    }))
+    const controller = new AppController({
+      api: createApi({
+        getHistory: vi.fn(async () => transcript),
+        getHistoryAudioPlayback
+      }),
+      runtimeStore: new RuntimeStore()
+    })
+
+    const dispose = controller.start()
+    await flushPromises()
+
+    await controller.openHistoryItem('meeting-audio')
+
+    expect(getHistoryAudioPlayback).toHaveBeenCalledWith('meeting-audio')
+    expect(controller.getSnapshot().selectedHistoryAudio).toEqual({
+      url: 'file:///C:/audio/meeting-audio.wav',
+      status: 'partial'
+    })
+
+    dispose()
+  })
+
   it('cancels pending bootstrap work when stopped before startup completes', async () => {
     const firstRuntime = createDeferred<AppRuntimeSnapshot>()
     const firstSettings = createDeferred<AppSettings>()
@@ -453,6 +490,7 @@ function createApi(overrides: Partial<AppApi> & {
       overrides.searchHistory ??
       vi.fn(async () => ({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 0 })),
     getHistory: overrides.getHistory ?? vi.fn(async () => null),
+    getHistoryAudioPlayback: overrides.getHistoryAudioPlayback ?? vi.fn(async () => null),
     deleteHistory: overrides.deleteHistory ?? vi.fn(async () => false),
     copyHistory: overrides.copyHistory ?? vi.fn(async () => undefined),
     exportHistory: overrides.exportHistory ?? vi.fn(async () => ({ ok: false, error: 'not implemented' })),

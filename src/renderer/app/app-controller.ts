@@ -3,6 +3,7 @@ import type {
   AppSettings,
   EngineProfile,
   ExportFormat,
+  HistoryAudioPlayback,
   OutputMethod,
   PaginatedHistoryResult,
   PttHotkey,
@@ -37,6 +38,7 @@ export type AppControllerState = {
   history: SavedTranscript[]
   historyTotal: number
   selectedHistory: SavedTranscript | null
+  selectedHistoryAudio: HistoryAudioPlayback | null
   exportMessage: string | null
   liveSessionMessage: string | null
   diagnosticsMessage: string | null
@@ -67,6 +69,7 @@ export function createInitialAppControllerState(): AppControllerState {
     history: [],
     historyTotal: 0,
     selectedHistory: null,
+    selectedHistoryAudio: null,
     exportMessage: null,
     liveSessionMessage: null,
     diagnosticsMessage: null,
@@ -163,7 +166,8 @@ export class AppController {
 
   clearSelectedHistory(): void {
     this.setState({
-      selectedHistory: null
+      selectedHistory: null,
+      selectedHistoryAudio: null
     })
   }
 
@@ -264,9 +268,10 @@ export class AppController {
 
   async openHistoryItem(id: string): Promise<void> {
     await this.runAction(`open:${id}`, async () => {
-      const transcript = await this.deps.api.getHistory(id)
+      const { transcript, audioPlayback } = await this.loadHistoryDetail(id)
       this.setState({
-        selectedHistory: transcript
+        selectedHistory: transcript,
+        selectedHistoryAudio: audioPlayback
       })
     })
   }
@@ -277,7 +282,8 @@ export class AppController {
 
       if (this.state.selectedHistory?.id === id) {
         this.setState({
-          selectedHistory: null
+          selectedHistory: null,
+          selectedHistoryAudio: null
         })
       }
 
@@ -610,10 +616,19 @@ export class AppController {
         return
       }
 
+      const nextSelectedHistoryAudio = nextSelectedHistory
+        ? await this.loadHistoryAudioPlayback(nextSelectedHistory)
+        : null
+
+      if (!this.isLifecycleCurrent(lifecycleToken) || requestId !== this.historyRequestId) {
+        return
+      }
+
       this.setState({
         history: historyPage.items,
         historyTotal: historyPage.total,
-        selectedHistory: nextSelectedHistory
+        selectedHistory: nextSelectedHistory,
+        selectedHistoryAudio: nextSelectedHistoryAudio
       })
     } catch (error) {
       if (!this.isLifecycleCurrent(lifecycleToken) || requestId !== this.historyRequestId) {
@@ -645,6 +660,28 @@ export class AppController {
     }
 
     return this.deps.api.getHistory(selectedHistory.id)
+  }
+
+  private async loadHistoryDetail(id: string): Promise<{
+    transcript: SavedTranscript | null
+    audioPlayback: HistoryAudioPlayback | null
+  }> {
+    const transcript = await this.deps.api.getHistory(id)
+
+    return {
+      transcript,
+      audioPlayback: transcript ? await this.loadHistoryAudioPlayback(transcript) : null
+    }
+  }
+
+  private async loadHistoryAudioPlayback(
+    transcript: SavedTranscript
+  ): Promise<HistoryAudioPlayback | null> {
+    if (!transcript.metadata.audio) {
+      return null
+    }
+
+    return this.deps.api.getHistoryAudioPlayback(transcript.id)
   }
 
   private async runAction(label: string, action: () => Promise<void>): Promise<void> {
