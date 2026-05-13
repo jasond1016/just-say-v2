@@ -45,6 +45,9 @@ const DEFAULT_CAPTURE_CONFIG: ResolvedRuntimeConfig['captureConfig'] = {
   chunkMs: 100
 }
 
+const DEFAULT_LOCAL_SERVICE_HOST = '127.0.0.1'
+const DEFAULT_LOCAL_SERVICE_PORT = 8765
+
 export function resolveRuntimeConfig(input: ResolveRuntimeConfigInput): ResolvedRuntimeConfig {
   const settings = normalizeSettings(input.settings)
   const platform = {
@@ -69,12 +72,7 @@ export function resolveRuntimeConfig(input: ResolveRuntimeConfigInput): Resolved
       diagnosticsEnabled: settings.advanced.diagnosticsEnabled,
       experimentalFlags: [...settings.advanced.experimentalFlags],
       ...(engineProfile.capabilities.requiresLocalService
-        ? {
-            localService: {
-              host: settings.advanced.localServiceHost ?? '127.0.0.1',
-              port: settings.advanced.localServicePort ?? 8765
-            }
-          }
+        ? { localService: resolveLocalServiceConfig(settings) }
         : {}),
       ...(engineProfile.capabilities.requiresNetwork && input.credentials?.cloudApiKey
         ? {
@@ -102,6 +100,36 @@ export function resolveRuntimeConfig(input: ResolveRuntimeConfigInput): Resolved
     outputConfig: {
       method: settings.output.method
     }
+  }
+}
+
+function resolveLocalServiceConfig(settings: AppSettings) {
+  if (settings.advanced.localServiceMode === 'remote-service') {
+    const host = settings.advanced.remoteServiceHost?.trim()
+
+    if (!host) {
+      throw createSettingsResolverError(
+        'E_INVALID_SETTINGS',
+        'Remote speech service host is required when remote service mode is enabled',
+        false,
+        {
+          localServiceMode: settings.advanced.localServiceMode,
+          missingField: 'advanced.remoteServiceHost'
+        }
+      )
+    }
+
+    return {
+      mode: settings.advanced.localServiceMode,
+      host,
+      port: settings.advanced.remoteServicePort ?? DEFAULT_LOCAL_SERVICE_PORT
+    }
+  }
+
+  return {
+    mode: settings.advanced.localServiceMode,
+    host: settings.advanced.localServiceHost ?? DEFAULT_LOCAL_SERVICE_HOST,
+    port: settings.advanced.localServicePort ?? DEFAULT_LOCAL_SERVICE_PORT
   }
 }
 

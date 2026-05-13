@@ -39,8 +39,11 @@ describe('settings-schema', () => {
         apiKeyConfigured: true
       },
       advanced: {
+        localServiceMode: 'remote-service',
         localServiceHost: '   ',
         localServicePort: 99999,
+        remoteServiceHost: ' 10.0.0.8 ',
+        remoteServicePort: 9100,
         experimentalFlags: [' alpha ', '', 'alpha', ' beta ']
       }
     })
@@ -55,8 +58,11 @@ describe('settings-schema', () => {
     expect(normalized.translation.endpoint).toBe('https://example.test/v1/')
     expect(normalized.translation.model).toBe('demo-model')
     expect(normalized.translation.apiKeyConfigured).toBe(true)
+    expect(normalized.advanced.localServiceMode).toBe('remote-service')
     expect(normalized.advanced.localServiceHost).toBeUndefined()
     expect(normalized.advanced.localServicePort).toBe(8765)
+    expect(normalized.advanced.remoteServiceHost).toBe('10.0.0.8')
+    expect(normalized.advanced.remoteServicePort).toBe(9100)
     expect(normalized.advanced.experimentalFlags).toEqual(['alpha', 'beta'])
   })
 

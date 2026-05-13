@@ -256,8 +256,11 @@ function WorkspaceApp() {
             onTranslationEndpointChange={(endpoint) => { void controller.setTranslationEndpoint(endpoint) }}
             onTranslationModelChange={(model) => { void controller.setTranslationModel(model) }}
             onSaveTranslationApiKey={(apiKey) => controller.saveTranslationCredentials(apiKey)}
+            onLocalServiceModeChange={(mode) => { void controller.setLocalServiceMode(mode) }}
             onLocalServiceHostChange={(host) => { void controller.setLocalServiceHost(host) }}
             onLocalServicePortChange={(port) => { void controller.setLocalServicePort(port) }}
+            onRemoteServiceHostChange={(host) => { void controller.setRemoteServiceHost(host) }}
+            onRemoteServicePortChange={(port) => { void controller.setRemoteServicePort(port) }}
             onExportDiagnostics={() => { void controller.exportDiagnostics() }}
           />
         ) : null}

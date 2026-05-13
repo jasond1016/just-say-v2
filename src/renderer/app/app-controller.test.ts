@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import type { AppApi } from '../../preload/api'
+import { applySettingsPatch } from '../../core/settings/settings-schema'
 import type { AppRuntimeSnapshot, AppSettings, SavedTranscript, SettingsPatch } from '../../shared/api-types'
 import { RuntimeStore } from '../features/runtime/runtime-store'
 import { AppController } from './app-controller'
@@ -241,8 +242,11 @@ describe('AppController', () => {
     await controller.setTranslationProvider('openai-compatible')
     await controller.setTranslationEndpoint('https://example.test/v1')
     await controller.setTranslationModel('gpt-4o-mini')
+    await controller.setLocalServiceMode('remote-service')
     await controller.setLocalServiceHost('10.0.0.8')
     await controller.setLocalServicePort(9001)
+    await controller.setRemoteServiceHost('10.0.0.42')
+    await controller.setRemoteServicePort(8765)
 
     expect(updateSettings).toHaveBeenCalledWith({ general: { language: 'en-US' } })
     expect(updateSettings).toHaveBeenCalledWith({ general: { theme: 'dark' } })
@@ -257,8 +261,11 @@ describe('AppController', () => {
     expect(updateSettings).toHaveBeenCalledWith({ translation: { provider: 'openai-compatible' } })
     expect(updateSettings).toHaveBeenCalledWith({ translation: { endpoint: 'https://example.test/v1' } })
     expect(updateSettings).toHaveBeenCalledWith({ translation: { model: 'gpt-4o-mini' } })
+    expect(updateSettings).toHaveBeenCalledWith({ advanced: { localServiceMode: 'remote-service' } })
     expect(updateSettings).toHaveBeenCalledWith({ advanced: { localServiceHost: '10.0.0.8' } })
     expect(updateSettings).toHaveBeenCalledWith({ advanced: { localServicePort: 9001 } })
+    expect(updateSettings).toHaveBeenCalledWith({ advanced: { remoteServiceHost: '10.0.0.42' } })
+    expect(updateSettings).toHaveBeenCalledWith({ advanced: { remoteServicePort: 8765 } })
     expect(controller.getSnapshot().settings).toMatchObject({
       general: {
         language: 'en-US',
@@ -284,8 +291,11 @@ describe('AppController', () => {
         model: 'gpt-4o-mini'
       },
       advanced: {
+        localServiceMode: 'remote-service',
         localServiceHost: '10.0.0.8',
-        localServicePort: 9001
+        localServicePort: 9001,
+        remoteServiceHost: '10.0.0.42',
+        remoteServicePort: 8765
       }
     })
 
@@ -546,6 +556,7 @@ function createSettings(): AppSettings {
       provider: 'openai-compatible'
     },
     advanced: {
+      localServiceMode: 'managed-local',
       diagnosticsEnabled: true,
       experimentalFlags: []
     }
@@ -582,35 +593,7 @@ function createDeferred<T>() {
 }
 
 function mergeSettings(settings: AppSettings, patch: SettingsPatch): AppSettings {
-  return {
-    general: {
-      ...settings.general,
-      ...patch.general
-    },
-    speech: {
-      ...settings.speech,
-      ...patch.speech
-    },
-    input: {
-      ...settings.input,
-      ...patch.input
-    },
-    output: {
-      ...settings.output,
-      ...patch.output
-    },
-    translation: {
-      ...settings.translation,
-      ...patch.translation
-    },
-    advanced: {
-      ...settings.advanced,
-      ...patch.advanced,
-      experimentalFlags: patch.advanced?.experimentalFlags
-        ? [...patch.advanced.experimentalFlags]
-        : [...settings.advanced.experimentalFlags]
-    }
-  }
+  return applySettingsPatch(settings, patch)
 }
 
 async function flushPromises(): Promise<void> {

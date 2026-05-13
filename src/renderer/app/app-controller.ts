@@ -430,6 +430,14 @@ export class AppController {
     })
   }
 
+  async setLocalServiceMode(localServiceMode: AppSettings['advanced']['localServiceMode']): Promise<void> {
+    await this.updateSettings('settings:local-service-mode', {
+      advanced: {
+        localServiceMode
+      }
+    })
+  }
+
   async setLocalServiceHost(localServiceHost: string): Promise<void> {
     await this.updateSettings('settings:local-service-host', {
       advanced: {
@@ -445,6 +453,25 @@ export class AppController {
           ? {}
           : {
               localServicePort
+            }
+    })
+  }
+
+  async setRemoteServiceHost(remoteServiceHost: string): Promise<void> {
+    await this.updateSettings('settings:remote-service-host', {
+      advanced: {
+        remoteServiceHost
+      }
+    })
+  }
+
+  async setRemoteServicePort(remoteServicePort: number | undefined): Promise<void> {
+    await this.updateSettings('settings:remote-service-port', {
+      advanced:
+        remoteServicePort === undefined
+          ? {}
+          : {
+              remoteServicePort
             }
     })
   }

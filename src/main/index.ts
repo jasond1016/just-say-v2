@@ -29,6 +29,7 @@ import { DiagnosticsService } from './services/diagnostics-service'
 import { EngineRegistry } from './services/engine-registry'
 import { getEnvironmentCredentials } from './services/environment-credentials-provider'
 import { HistoryService } from './services/history-service'
+import { ConfigurableLocalServiceController } from './services/configurable-local-service-controller'
 import { LocalServiceSupervisor } from './services/local-service-supervisor'
 import { LiveSessionActionsService } from './services/live-session-actions-service'
 import { MeetingCoordinator } from './services/meeting-coordinator'
@@ -38,7 +39,6 @@ import { PttHotkeyController } from './services/ptt-hotkey-controller'
 import { SessionCoordinator } from './services/session-coordinator'
 import { SettingsService } from './services/settings-service'
 import { SpeechService } from './services/speech-service'
-import { PythonLocalServiceController } from './services/python-local-service-controller'
 import { TranslationPipeline } from './services/translation-pipeline'
 import type { ResolverCredentials } from '../core/settings/settings-resolver'
 
@@ -131,11 +131,30 @@ void wireAppLifecycle(app, {
       getSettings: () => cachedSettings,
       resolveRuntimeConfig: (mode: 'ptt' | 'meeting') => resolveCachedRuntimeConfig(mode)
     }
+    const getLocalServiceSettingsSignature = (settings: AppSettings) =>
+      JSON.stringify({
+        mode: settings.advanced.localServiceMode,
+        localHost: settings.advanced.localServiceHost ?? null,
+        localPort: settings.advanced.localServicePort ?? null,
+        remoteHost: settings.advanced.remoteServiceHost ?? null,
+        remotePort: settings.advanced.remoteServicePort ?? null
+      })
+    const localServiceSupervisor = new LocalServiceSupervisor(
+      new ConfigurableLocalServiceController({
+        getSettings: () => cachedSettings,
+        localServicePath,
+        healthTimeoutMs: 60_000
+      })
+    )
     const settingsService = {
       getSettings: async () => baseSettingsService.getSettings(),
       updateSettings: async (patch: SettingsPatch) => {
+        const previousLocalServiceSettingsSignature = getLocalServiceSettingsSignature(cachedSettings)
         const updated = await baseSettingsService.updateSettings(patch)
         await refreshSettingsCache()
+        if (getLocalServiceSettingsSignature(cachedSettings) !== previousLocalServiceSettingsSignature) {
+          await localServiceSupervisor.stop()
+        }
         return updated
       },
       saveTranslationCredentials: async (input: TranslationCredentialsInput) => {
@@ -161,17 +180,6 @@ void wireAppLifecycle(app, {
         }
       }
     }
-    const localServiceHost = cachedSettings.advanced.localServiceHost ?? '127.0.0.1'
-    const localServicePort = cachedSettings.advanced.localServicePort ?? 8765
-    const localServiceSupervisor = new LocalServiceSupervisor(
-      new PythonLocalServiceController({
-        host: localServiceHost,
-        port: localServicePort,
-        scriptPath: path.join(localServicePath, 'service.py'),
-        workingDirectory: localServicePath,
-        healthTimeoutMs: 60_000
-      })
-    )
     const engineRegistry = new EngineRegistry(profileCatalog, (config) =>
       createRecognitionEngine(config, { localServiceSupervisor })
     )

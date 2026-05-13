@@ -1,5 +1,6 @@
 import type {
   AppSettings,
+  LocalServiceMode,
   OutputMethod,
   PttHotkey,
   SettingsPatch,
@@ -36,6 +37,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     apiKeyConfigured: false
   },
   advanced: {
+    localServiceMode: 'managed-local',
     diagnosticsEnabled: true,
     experimentalFlags: []
   }
@@ -49,6 +51,7 @@ const SPEECH_LANGUAGES = new Set<SpeechLanguage>(['auto', 'zh', 'en', 'ja', 'ko'
 const PTT_HOTKEYS = new Set<PttHotkey>(['RCtrl', 'RAlt'])
 const OUTPUT_METHODS = new Set<OutputMethod>(['simulate_input', 'clipboard', 'popup'])
 const TRANSLATION_PROVIDERS = new Set<TranslationProvider>(['openai-compatible'])
+const LOCAL_SERVICE_MODES = new Set<LocalServiceMode>(['managed-local', 'remote-service'])
 const DEFAULT_LOCAL_SERVICE_PORT = 8765
 
 export function createDefaultSettings(): AppSettings {
@@ -71,8 +74,13 @@ export function normalizeSettings(patch?: SettingsPatch): AppSettings {
   )
   const translationEndpoint = normalizeOptionalString(merged.translation.endpoint)
   const translationModel = normalizeOptionalString(merged.translation.model)
+  const localServiceMode = LOCAL_SERVICE_MODES.has(merged.advanced.localServiceMode)
+    ? merged.advanced.localServiceMode
+    : DEFAULT_SETTINGS.advanced.localServiceMode
   const localServiceHost = normalizeOptionalString(merged.advanced.localServiceHost)
   const localServicePort = normalizePort(merged.advanced.localServicePort)
+  const remoteServiceHost = normalizeOptionalString(merged.advanced.remoteServiceHost)
+  const remoteServicePort = normalizePort(merged.advanced.remoteServicePort)
 
   return {
     general: {
@@ -115,10 +123,13 @@ export function normalizeSettings(patch?: SettingsPatch): AppSettings {
       apiKeyConfigured: merged.translation.apiKeyConfigured === true
     },
     advanced: {
+      localServiceMode,
       diagnosticsEnabled: merged.advanced.diagnosticsEnabled,
       experimentalFlags: normalizeExperimentalFlags(merged.advanced.experimentalFlags),
       ...(localServiceHost !== undefined ? { localServiceHost } : {}),
-      ...(localServicePort !== undefined ? { localServicePort } : {})
+      ...(localServicePort !== undefined ? { localServicePort } : {}),
+      ...(remoteServiceHost !== undefined ? { remoteServiceHost } : {}),
+      ...(remoteServicePort !== undefined ? { remoteServicePort } : {})
     }
   }
 }
@@ -134,28 +145,54 @@ function mergeSettings(base: AppSettings, patch?: SettingsPatch): AppSettings {
 
   return {
     general: {
-      ...base.general,
-      ...patch.general
+      language: patch.general?.language ?? base.general.language,
+      theme: patch.general?.theme ?? base.general.theme,
+      launchAtLogin: patch.general?.launchAtLogin ?? base.general.launchAtLogin,
+      minimizeToTray: patch.general?.minimizeToTray ?? base.general.minimizeToTray
     },
     speech: {
-      ...base.speech,
-      ...patch.speech
+      selectedProfileId: patch.speech?.selectedProfileId ?? base.speech.selectedProfileId,
+      language: patch.speech?.language ?? base.speech.language
     },
     input: {
-      ...base.input,
-      ...patch.input
+      pttHotkey: patch.input?.pttHotkey ?? base.input.pttHotkey,
+      includeMicrophoneInMeeting:
+        patch.input?.includeMicrophoneInMeeting ?? base.input.includeMicrophoneInMeeting,
+      microphoneDeviceId: patch.input?.microphoneDeviceId ?? base.input.microphoneDeviceId
     },
     output: {
-      ...base.output,
-      ...patch.output
+      method: patch.output?.method ?? base.output.method
     },
     translation: {
-      ...base.translation,
-      ...patch.translation
+      enabledForPtt: patch.translation?.enabledForPtt ?? base.translation.enabledForPtt,
+      enabledForMeeting: patch.translation?.enabledForMeeting ?? base.translation.enabledForMeeting,
+      targetLanguage: patch.translation?.targetLanguage ?? base.translation.targetLanguage,
+      provider: patch.translation?.provider ?? base.translation.provider,
+      ...(patch.translation?.endpoint !== undefined || base.translation.endpoint !== undefined
+        ? { endpoint: patch.translation?.endpoint ?? base.translation.endpoint }
+        : {}),
+      ...(patch.translation?.model !== undefined || base.translation.model !== undefined
+        ? { model: patch.translation?.model ?? base.translation.model }
+        : {}),
+      ...(patch.translation?.apiKeyConfigured !== undefined || base.translation.apiKeyConfigured !== undefined
+        ? { apiKeyConfigured: patch.translation?.apiKeyConfigured ?? base.translation.apiKeyConfigured }
+        : {})
     },
     advanced: {
-      ...base.advanced,
-      ...patch.advanced,
+      localServiceMode: patch.advanced?.localServiceMode ?? base.advanced.localServiceMode,
+      diagnosticsEnabled: patch.advanced?.diagnosticsEnabled ?? base.advanced.diagnosticsEnabled,
+      ...(patch.advanced?.localServiceHost !== undefined || base.advanced.localServiceHost !== undefined
+        ? { localServiceHost: patch.advanced?.localServiceHost ?? base.advanced.localServiceHost }
+        : {}),
+      ...(patch.advanced?.localServicePort !== undefined || base.advanced.localServicePort !== undefined
+        ? { localServicePort: patch.advanced?.localServicePort ?? base.advanced.localServicePort }
+        : {}),
+      ...(patch.advanced?.remoteServiceHost !== undefined || base.advanced.remoteServiceHost !== undefined
+        ? { remoteServiceHost: patch.advanced?.remoteServiceHost ?? base.advanced.remoteServiceHost }
+        : {}),
+      ...(patch.advanced?.remoteServicePort !== undefined || base.advanced.remoteServicePort !== undefined
+        ? { remoteServicePort: patch.advanced?.remoteServicePort ?? base.advanced.remoteServicePort }
+        : {}),
       experimentalFlags: patch.advanced?.experimentalFlags
         ? [...patch.advanced.experimentalFlags]
         : [...base.advanced.experimentalFlags]

@@ -176,7 +176,7 @@ export class PythonLocalServiceController implements LocalServiceController {
   }
 
   private getServiceUrl(): string {
-    return `ws://${this.options.host}:${this.options.port}`
+    return createLocalServiceUrl(this.options.host, this.options.port)
   }
 
   private attachChildLogging(child: SpawnedLocalServiceProcess): void {
@@ -291,7 +291,7 @@ export function getDefaultLocalServiceCapabilities(): EngineCapabilities {
   }
 }
 
-async function sendLocalServiceRequest(
+export async function sendLocalServiceRequest(
   webSocketFactory: (url: string) => WebSocketLike,
   url: string,
   message: LocalServiceClientMessage,
@@ -333,8 +333,12 @@ function normalizeSocketError(errorLike: unknown): Error {
   return new Error('Local service websocket request failed')
 }
 
-function defaultWebSocketFactory(url: string): WebSocketLike {
+export function defaultWebSocketFactory(url: string): WebSocketLike {
   return new WebSocket(url) as unknown as WebSocketLike
+}
+
+export function createLocalServiceUrl(host: string, port: number): string {
+  return `ws://${host}:${port}`
 }
 
 export async function terminateWindowsProcessTree(pid: number): Promise<void> {

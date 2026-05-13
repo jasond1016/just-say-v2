@@ -20,6 +20,7 @@ describe('resolveRuntimeConfig', () => {
       language: 'auto',
       diagnosticsEnabled: true,
       localService: {
+        mode: 'managed-local',
         host: '127.0.0.1',
         port: 8765
       }
@@ -77,6 +78,44 @@ describe('resolveRuntimeConfig', () => {
     })
 
     expect(config.translationConfig).toBeUndefined()
+  })
+
+  it('uses the dedicated remote endpoint when remote service mode is selected', () => {
+    const config = resolveRuntimeConfig({
+      settings: {
+        ...DEFAULT_SETTINGS,
+        advanced: {
+          ...DEFAULT_SETTINGS.advanced,
+          localServiceMode: 'remote-service',
+          remoteServiceHost: '10.0.0.8',
+          remoteServicePort: 9001
+        }
+      },
+      mode: 'meeting'
+    })
+
+    expect(config.engineConfig).toMatchObject({
+      localService: {
+        mode: 'remote-service',
+        host: '10.0.0.8',
+        port: 9001
+      }
+    })
+  })
+
+  it('requires a remote host when remote service mode is selected', () => {
+    expect(() =>
+      resolveRuntimeConfig({
+        settings: {
+          ...DEFAULT_SETTINGS,
+          advanced: {
+            ...DEFAULT_SETTINGS.advanced,
+            localServiceMode: 'remote-service'
+          }
+        },
+        mode: 'meeting'
+      })
+    ).toThrowError(SettingsResolverError)
   })
 
   it('requires cloud credentials for cloud profiles', () => {

@@ -18,6 +18,8 @@ export type OutputMethod = 'simulate_input' | 'clipboard' | 'popup'
 
 export type TranslationProvider = 'openai-compatible'
 
+export type LocalServiceMode = 'managed-local' | 'remote-service'
+
 export type TranslationCredentialsInput = {
   apiKey: string
 }
@@ -203,8 +205,11 @@ export type AppSettings = {
     apiKeyConfigured?: boolean
   }
   advanced: {
+    localServiceMode: LocalServiceMode
     localServiceHost?: string
     localServicePort?: number
+    remoteServiceHost?: string
+    remoteServicePort?: number
     diagnosticsEnabled: boolean
     experimentalFlags: string[]
   }

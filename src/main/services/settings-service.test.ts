@@ -23,6 +23,7 @@ describe('SettingsService', () => {
         selectedProfileId: 'missing-profile'
       },
       advanced: {
+        localServiceMode: 'managed-local',
         localServicePort: 99999
       }
     })
@@ -32,6 +33,7 @@ describe('SettingsService', () => {
         selectedProfileId: 'local-fast'
       },
       advanced: {
+        localServiceMode: 'managed-local',
         localServicePort: 8765
       }
     })
@@ -66,6 +68,7 @@ describe('SettingsService', () => {
         provider: 'openai-compatible'
       },
       advanced: {
+        localServiceMode: 'managed-local',
         diagnosticsEnabled: true,
         experimentalFlags: []
       }

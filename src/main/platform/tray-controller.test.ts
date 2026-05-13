@@ -120,6 +120,7 @@ function createHarness(minimizeToTray: boolean) {
         provider: 'openai-compatible'
       },
       advanced: {
+        localServiceMode: 'managed-local',
         diagnosticsEnabled: true,
         experimentalFlags: []
       }

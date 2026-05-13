@@ -57,6 +57,7 @@ describe('RuntimeStore', () => {
           provider: 'openai-compatible'
         },
         advanced: {
+          localServiceMode: 'managed-local',
           diagnosticsEnabled: true,
           experimentalFlags: []
         }
@@ -88,6 +89,7 @@ describe('RuntimeStore', () => {
           provider: 'openai-compatible'
         },
         advanced: {
+          localServiceMode: 'managed-local',
           diagnosticsEnabled: true,
           experimentalFlags: []
         }
@@ -177,7 +179,7 @@ describe('RuntimeStore', () => {
   })
 })
 
-function createSettings() {
+function createSettings(): import('../../../shared/api-types').AppSettings {
   return {
     general: {
       language: 'zh-CN' as const,
@@ -204,6 +206,7 @@ function createSettings() {
       provider: 'openai-compatible' as const
     },
     advanced: {
+      localServiceMode: 'managed-local',
       diagnosticsEnabled: true,
       experimentalFlags: []
     }

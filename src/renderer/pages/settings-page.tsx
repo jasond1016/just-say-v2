@@ -3,6 +3,7 @@ import { useEffect, useId, useMemo, useRef, useState, type ChangeEvent, type Rea
 import type {
   AppSettings,
   EngineProfile,
+  LocalServiceMode,
   LocalServiceStatus,
   OutputMethod,
   ProfileTestResult,
@@ -51,14 +52,23 @@ export function SettingsPage(props: {
   onTranslationEndpointChange: (endpoint: string) => void
   onTranslationModelChange: (model: string) => void
   onSaveTranslationApiKey: (apiKey: string) => Promise<void>
+  onLocalServiceModeChange: (mode: LocalServiceMode) => void
   onLocalServiceHostChange: (host: string) => void
   onLocalServicePortChange: (port: number | undefined) => void
+  onRemoteServiceHostChange: (host: string) => void
+  onRemoteServicePortChange: (port: number | undefined) => void
   onExportDiagnostics: () => void
 }) {
   const sectionId = useId()
   const [selectedSection, setSelectedSection] = useState<SettingsSectionId>('workspace')
-  const [draftHost, setDraftHost] = useState(props.settings.advanced.localServiceHost ?? '')
-  const [draftPort, setDraftPort] = useState(props.settings.advanced.localServicePort?.toString() ?? '')
+  const [draftManagedHost, setDraftManagedHost] = useState(props.settings.advanced.localServiceHost ?? '')
+  const [draftManagedPort, setDraftManagedPort] = useState(
+    props.settings.advanced.localServicePort?.toString() ?? ''
+  )
+  const [draftRemoteHost, setDraftRemoteHost] = useState(props.settings.advanced.remoteServiceHost ?? '')
+  const [draftRemotePort, setDraftRemotePort] = useState(
+    props.settings.advanced.remoteServicePort?.toString() ?? ''
+  )
   const [draftTranslationEndpoint, setDraftTranslationEndpoint] = useState(props.settings.translation.endpoint ?? '')
   const [draftTranslationModel, setDraftTranslationModel] = useState(props.settings.translation.model ?? '')
   const [draftTranslationApiKey, setDraftTranslationApiKey] = useState('')
@@ -68,14 +78,25 @@ export function SettingsPage(props: {
   const disabled = Boolean(props.busyAction)
   const translationEnabled = props.settings.translation.enabledForPtt || props.settings.translation.enabledForMeeting
   const translationApiKeyConfigured = Boolean(props.settings.translation.apiKeyConfigured)
-  const portValue = draftPort.trim()
-  const invalidPort = portValue.length > 0 && !/^\d+$/.test(portValue)
+  const localServiceMode = props.settings.advanced.localServiceMode
+  const managedPortValue = draftManagedPort.trim()
+  const remotePortValue = draftRemotePort.trim()
+  const invalidManagedPort = managedPortValue.length > 0 && !/^\d+$/.test(managedPortValue)
+  const invalidRemotePort = remotePortValue.length > 0 && !/^\d+$/.test(remotePortValue)
+  const invalidPort = localServiceMode === 'managed-local' ? invalidManagedPort : invalidRemotePort
   const selectedProfile = props.profiles.find((profile) => profile.id === props.settings.speech.selectedProfileId) ?? null
 
   useEffect(() => {
-    setDraftHost(props.settings.advanced.localServiceHost ?? '')
-    setDraftPort(props.settings.advanced.localServicePort?.toString() ?? '')
-  }, [props.settings.advanced.localServiceHost, props.settings.advanced.localServicePort])
+    setDraftManagedHost(props.settings.advanced.localServiceHost ?? '')
+    setDraftManagedPort(props.settings.advanced.localServicePort?.toString() ?? '')
+    setDraftRemoteHost(props.settings.advanced.remoteServiceHost ?? '')
+    setDraftRemotePort(props.settings.advanced.remoteServicePort?.toString() ?? '')
+  }, [
+    props.settings.advanced.localServiceHost,
+    props.settings.advanced.localServicePort,
+    props.settings.advanced.remoteServiceHost,
+    props.settings.advanced.remoteServicePort
+  ])
 
   useEffect(() => {
     setDraftTranslationEndpoint(props.settings.translation.endpoint ?? '')
@@ -124,24 +145,49 @@ export function SettingsPage(props: {
   }, [invalidPort, isCheckingProfile, props.localServiceStatus, selectedSection, showSavedState])
 
   const commitAdvancedHost = () => {
-    if (draftHost === (props.settings.advanced.localServiceHost ?? '')) {
+    if (draftManagedHost === (props.settings.advanced.localServiceHost ?? '')) {
       return
     }
 
-    props.onLocalServiceHostChange(draftHost.trim())
+    props.onLocalServiceHostChange(draftManagedHost.trim())
   }
 
   const commitAdvancedPort = () => {
-    if (invalidPort) {
+    if (invalidManagedPort) {
       return
     }
 
     const normalizedCurrent = props.settings.advanced.localServicePort?.toString() ?? ''
-    if (portValue === normalizedCurrent) {
+    if (managedPortValue === normalizedCurrent) {
       return
     }
 
-    props.onLocalServicePortChange(portValue ? Number.parseInt(portValue, 10) : undefined)
+    props.onLocalServicePortChange(
+      managedPortValue ? Number.parseInt(managedPortValue, 10) : undefined
+    )
+  }
+
+  const commitRemoteHost = () => {
+    if (draftRemoteHost === (props.settings.advanced.remoteServiceHost ?? '')) {
+      return
+    }
+
+    props.onRemoteServiceHostChange(draftRemoteHost.trim())
+  }
+
+  const commitRemotePort = () => {
+    if (invalidRemotePort) {
+      return
+    }
+
+    const normalizedCurrent = props.settings.advanced.remoteServicePort?.toString() ?? ''
+    if (remotePortValue === normalizedCurrent) {
+      return
+    }
+
+    props.onRemoteServicePortChange(
+      remotePortValue ? Number.parseInt(remotePortValue, 10) : undefined
+    )
   }
 
   const commitTranslationEndpoint = () => {
@@ -479,41 +525,120 @@ export function SettingsPage(props: {
             {selectedSection === 'advanced' ? (
               <SettingsSection>
                 <div className="advanced-summary">
-                  <div className="advanced-summary__title">Local speech service</div>
+                  <div className="advanced-summary__title">
+                    {localServiceMode === 'remote-service' ? 'Remote speech service' : 'Managed local speech service'}
+                  </div>
                   <div className="advanced-summary__meta">
                     {describeLocalServiceStatus(props.localServiceStatus)}
                   </div>
                 </div>
 
-                <SettingRow title="Speech service host" hint="This usually stays on the machine itself." learnMore>
-                  <TextInput
-                    value={draftHost}
+                <SettingRow
+                  title="Deployment mode"
+                  hint="Choose whether JustSay should launch the Python speech service on this machine or connect to another machine over the LAN."
+                >
+                  <SelectField
+                    value={localServiceMode}
                     disabled={disabled}
-                    placeholder="127.0.0.1"
-                    onChange={(event) => setDraftHost(event.target.value)}
-                    className="field-input--wide"
-                  />
-                  <div className="field-action-row">
-                    <Button label="Save host" size="small" disabled={disabled} onClick={commitAdvancedHost} />
-                  </div>
+                    onChange={(event) => props.onLocalServiceModeChange(event.target.value as LocalServiceMode)}
+                    className="field-select--wide"
+                  >
+                    <option value="managed-local">Managed locally</option>
+                    <option value="remote-service">Remote service</option>
+                  </SelectField>
                 </SettingRow>
 
-                <SettingRow title="Speech service port" hint="A wrong value here can break dictation and meeting capture completely." learnMore>
-                  <TextInput
-                    value={draftPort}
-                    disabled={disabled}
-                    placeholder="8765"
-                    inputMode="numeric"
-                    onChange={(event) => setDraftPort(event.target.value)}
-                    className={`field-input--wide ${invalidPort ? 'field-input--invalid' : ''}`}
-                  />
-                  <div className="field-action-row">
-                    <Button label="Save port" size="small" disabled={disabled || invalidPort} onClick={commitAdvancedPort} />
-                  </div>
-                  {invalidPort ? (
-                    <div className="field-note field-note--danger">Port must be numeric. The current value cannot be used.</div>
-                  ) : null}
-                </SettingRow>
+                {localServiceMode === 'managed-local' ? (
+                  <>
+                    <SettingRow
+                      title="Local bind host"
+                      hint="This is the address the Python service launched by this app listens on. It usually stays on this machine."
+                      learnMore
+                    >
+                      <TextInput
+                        value={draftManagedHost}
+                        disabled={disabled}
+                        placeholder="127.0.0.1"
+                        onChange={(event) => setDraftManagedHost(event.target.value)}
+                        className="field-input--wide"
+                      />
+                      <div className="field-action-row">
+                        <Button label="Save host" size="small" disabled={disabled} onClick={commitAdvancedHost} />
+                      </div>
+                    </SettingRow>
+
+                    <SettingRow
+                      title="Local bind port"
+                      hint="A wrong value here can stop the managed Python speech service from starting."
+                      learnMore
+                    >
+                      <TextInput
+                        value={draftManagedPort}
+                        disabled={disabled}
+                        placeholder="8765"
+                        inputMode="numeric"
+                        onChange={(event) => setDraftManagedPort(event.target.value)}
+                        className={`field-input--wide ${invalidManagedPort ? 'field-input--invalid' : ''}`}
+                      />
+                      <div className="field-action-row">
+                        <Button
+                          label="Save port"
+                          size="small"
+                          disabled={disabled || invalidManagedPort}
+                          onClick={commitAdvancedPort}
+                        />
+                      </div>
+                      {invalidManagedPort ? (
+                        <div className="field-note field-note--danger">Port must be numeric. The current value cannot be used.</div>
+                      ) : null}
+                    </SettingRow>
+                  </>
+                ) : (
+                  <>
+                    <SettingRow
+                      title="Remote service host"
+                      hint="Enter the LAN IP or hostname of the other machine running the speech service."
+                      learnMore
+                    >
+                      <TextInput
+                        value={draftRemoteHost}
+                        disabled={disabled}
+                        placeholder="10.0.0.8"
+                        onChange={(event) => setDraftRemoteHost(event.target.value)}
+                        className="field-input--wide"
+                      />
+                      <div className="field-action-row">
+                        <Button label="Save host" size="small" disabled={disabled} onClick={commitRemoteHost} />
+                      </div>
+                    </SettingRow>
+
+                    <SettingRow
+                      title="Remote service port"
+                      hint="This must match the port exposed by the speech service on the other machine."
+                      learnMore
+                    >
+                      <TextInput
+                        value={draftRemotePort}
+                        disabled={disabled}
+                        placeholder="8765"
+                        inputMode="numeric"
+                        onChange={(event) => setDraftRemotePort(event.target.value)}
+                        className={`field-input--wide ${invalidRemotePort ? 'field-input--invalid' : ''}`}
+                      />
+                      <div className="field-action-row">
+                        <Button
+                          label="Save port"
+                          size="small"
+                          disabled={disabled || invalidRemotePort}
+                          onClick={commitRemotePort}
+                        />
+                      </div>
+                      {invalidRemotePort ? (
+                        <div className="field-note field-note--danger">Port must be numeric. The current value cannot be used.</div>
+                      ) : null}
+                    </SettingRow>
+                  </>
+                )}
 
                 <SettingRow title="Diagnostics recording" hint="Only meaningful while troubleshooting. Keep it off otherwise.">
                   <div className="advanced-actions">
@@ -532,7 +657,7 @@ export function SettingsPage(props: {
                 </SettingRow>
 
                 <div className="advanced-warning">
-                  Advanced stays visible so it can be found quickly, but it should feel lower-confidence than the rest of the page. Change it only when support asks you to, or while debugging a local setup.
+                  Advanced stays visible so it can be found quickly, but it should feel lower-confidence than the rest of the page. Use managed locally for the built-in Python sidecar, or remote service when another LAN machine is hosting transcription for this client.
                 </div>
 
                 <div className="settings-section__footer">
@@ -541,10 +666,15 @@ export function SettingsPage(props: {
                     className="settings-reset"
                     disabled={disabled}
                     onClick={() => {
-                      setDraftHost('127.0.0.1')
-                      setDraftPort('8765')
+                      setDraftManagedHost('127.0.0.1')
+                      setDraftManagedPort('8765')
+                      setDraftRemoteHost('')
+                      setDraftRemotePort('8765')
+                      props.onLocalServiceModeChange('managed-local')
                       props.onLocalServiceHostChange('127.0.0.1')
                       props.onLocalServicePortChange(8765)
+                      props.onRemoteServiceHostChange('')
+                      props.onRemoteServicePortChange(8765)
                     }}
                   >
                     Reset to defaults
