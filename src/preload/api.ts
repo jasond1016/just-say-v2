@@ -7,12 +7,14 @@ import type {
   ExportResult,
   HistoryAudioPlayback,
   HistoryListQuery,
+  HistoryNotesGenerateOptions,
   HistorySearchQuery,
   PaginatedHistoryResult,
   ProfileTestResult,
   SavedTranscript,
   StartMeetingCommand,
   SettingsPatch,
+  TranscriptNotes,
   RuntimeNotification,
   TranslationCredentialsInput
 } from '../shared/api-types'
@@ -40,6 +42,8 @@ export type AppApi = {
   listHistory: (query?: HistoryListQuery) => Promise<PaginatedHistoryResult>
   searchHistory: (query: HistorySearchQuery) => Promise<PaginatedHistoryResult>
   getHistory: (id: string) => Promise<SavedTranscript | null>
+  getHistoryNotes: (id: string) => Promise<TranscriptNotes | null>
+  generateHistoryNotes: (id: string, options?: HistoryNotesGenerateOptions) => Promise<TranscriptNotes>
   getHistoryAudioPlayback: (id: string) => Promise<HistoryAudioPlayback | null>
   deleteHistory: (id: string) => Promise<boolean>
   copyHistory: (id: string, format: ExportFormat) => Promise<void>
@@ -92,6 +96,9 @@ export function createAppApi(invoke: IpcInvoke, events?: IpcEventSource): AppApi
     searchHistory: async (query) =>
       invoke<PaginatedHistoryResult>(IPC_CHANNELS.historySearch, query),
     getHistory: async (id) => invoke<SavedTranscript | null>(IPC_CHANNELS.historyGet, id),
+    getHistoryNotes: async (id) => invoke<TranscriptNotes | null>(IPC_CHANNELS.historyGetNotes, id),
+    generateHistoryNotes: async (id, options = {}) =>
+      invoke<TranscriptNotes>(IPC_CHANNELS.historyGenerateNotes, id, options),
     getHistoryAudioPlayback: async (id) =>
       invoke<HistoryAudioPlayback | null>(IPC_CHANNELS.historyGetAudioPlayback, id),
     deleteHistory: async (id) => invoke<boolean>(IPC_CHANNELS.historyDelete, id),

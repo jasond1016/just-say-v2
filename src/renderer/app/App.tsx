@@ -40,6 +40,9 @@ function WorkspaceApp() {
     historyTotal,
     selectedHistory,
     selectedHistoryAudio,
+    selectedHistoryNotes,
+    selectedHistoryNotesStatus,
+    selectedHistoryNotesError,
     exportMessage,
     liveSessionMessage,
     diagnosticsMessage,
@@ -218,6 +221,17 @@ function WorkspaceApp() {
             selectedTimeFilter={historyTimeFilter}
             selectedTranscript={selectedHistory}
             selectedAudio={selectedHistoryAudio}
+            notesState={
+              selectedHistoryNotesStatus === 'ready' && selectedHistoryNotes
+                ? { status: 'ready', notes: selectedHistoryNotes }
+                : selectedHistoryNotesStatus === 'failed'
+                  ? { status: 'failed', message: selectedHistoryNotesError ?? 'Notes could not be loaded.' }
+                  : selectedHistoryNotesStatus === 'loading'
+                    ? { status: 'loading' }
+                    : selectedHistoryNotesStatus === 'generating'
+                      ? { status: 'generating' }
+                      : { status: 'idle' }
+            }
             exportMessage={exportMessage}
             busyAction={busyAction}
             onOpenQuickDictation={() => { controller.setActiveSection('quick-dictation') }}
@@ -231,6 +245,7 @@ function WorkspaceApp() {
             onDelete={(id) => { void controller.deleteHistoryItem(id) }}
             onCopy={(id, format) => { void controller.copyHistoryItem(id, format) }}
             onExport={(id, format) => { void controller.exportHistoryItem(id, format) }}
+            onGenerateNotes={(id, options) => { void controller.generateHistoryNotes(id, options) }}
           />
         ) : null}
 

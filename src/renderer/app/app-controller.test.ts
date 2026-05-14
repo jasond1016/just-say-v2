@@ -2,7 +2,13 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { AppApi } from '../../preload/api'
 import { applySettingsPatch } from '../../core/settings/settings-schema'
-import type { AppRuntimeSnapshot, AppSettings, SavedTranscript, SettingsPatch } from '../../shared/api-types'
+import type {
+  AppRuntimeSnapshot,
+  AppSettings,
+  SavedTranscript,
+  SettingsPatch,
+  TranscriptNotes
+} from '../../shared/api-types'
 import { RuntimeStore } from '../features/runtime/runtime-store'
 import { AppController } from './app-controller'
 
@@ -358,6 +364,7 @@ describe('AppController', () => {
 
   it('loads history audio playback when opening a meeting record with saved audio', async () => {
     const transcript = createHistoryItem('meeting-audio', 'meeting')
+    const notes = createTranscriptNotes('meeting-audio')
     transcript.metadata.audio = {
       relativePath: 'meetings\\2026\\meeting-audio.wav',
       format: 'wav',
@@ -371,9 +378,11 @@ describe('AppController', () => {
       url: 'file:///C:/audio/meeting-audio.wav',
       status: 'partial' as const
     }))
+    const getHistoryNotes = vi.fn(async () => notes)
     const controller = new AppController({
       api: createApi({
         getHistory: vi.fn(async () => transcript),
+        getHistoryNotes,
         getHistoryAudioPlayback
       }),
       runtimeStore: new RuntimeStore()
@@ -385,10 +394,39 @@ describe('AppController', () => {
     await controller.openHistoryItem('meeting-audio')
 
     expect(getHistoryAudioPlayback).toHaveBeenCalledWith('meeting-audio')
+    expect(getHistoryNotes).toHaveBeenCalledWith('meeting-audio')
     expect(controller.getSnapshot().selectedHistoryAudio).toEqual({
       url: 'file:///C:/audio/meeting-audio.wav',
       status: 'partial'
     })
+    expect(controller.getSnapshot().selectedHistoryNotes).toEqual(notes)
+    expect(controller.getSnapshot().selectedHistoryNotesStatus).toBe('ready')
+
+    dispose()
+  })
+
+  it('generates transcript notes through the API and stores them on the selected history item', async () => {
+    const transcript = createHistoryItem('meeting-notes', 'meeting')
+    const generatedNotes = createTranscriptNotes('meeting-notes')
+    const generateHistoryNotes = vi.fn(async () => generatedNotes)
+    const controller = new AppController({
+      api: createApi({
+        getHistory: vi.fn(async () => transcript),
+        getHistoryNotes: vi.fn(async () => null),
+        generateHistoryNotes
+      }),
+      runtimeStore: new RuntimeStore()
+    })
+
+    const dispose = controller.start()
+    await flushPromises()
+    await controller.openHistoryItem('meeting-notes')
+
+    await controller.generateHistoryNotes('meeting-notes', { force: true })
+
+    expect(generateHistoryNotes).toHaveBeenCalledWith('meeting-notes', { force: true })
+    expect(controller.getSnapshot().selectedHistoryNotes).toEqual(generatedNotes)
+    expect(controller.getSnapshot().selectedHistoryNotesStatus).toBe('ready')
 
     dispose()
   })
@@ -490,6 +528,8 @@ function createApi(overrides: Partial<AppApi> & {
       overrides.searchHistory ??
       vi.fn(async () => ({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 0 })),
     getHistory: overrides.getHistory ?? vi.fn(async () => null),
+    getHistoryNotes: overrides.getHistoryNotes ?? vi.fn(async () => null),
+    generateHistoryNotes: overrides.generateHistoryNotes ?? vi.fn(async () => createTranscriptNotes('tx-1')),
     getHistoryAudioPlayback: overrides.getHistoryAudioPlayback ?? vi.fn(async () => null),
     deleteHistory: overrides.deleteHistory ?? vi.fn(async () => false),
     copyHistory: overrides.copyHistory ?? vi.fn(async () => undefined),
@@ -598,6 +638,22 @@ function createSettings(): AppSettings {
       diagnosticsEnabled: true,
       experimentalFlags: []
     }
+  }
+}
+
+function createTranscriptNotes(transcriptId: string): TranscriptNotes {
+  return {
+    transcriptId,
+    transcriptHash: `hash-${transcriptId}`,
+    language: 'en',
+    overview: 'Weekly sync covered release readiness.',
+    decisions: [],
+    actionItems: [],
+    openQuestions: [],
+    generatedAt: 1000,
+    promptVersion: 'notes-v1',
+    provider: 'openai-compatible',
+    model: 'gpt-4o-mini'
   }
 }
 

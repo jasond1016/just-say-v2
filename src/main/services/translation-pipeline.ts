@@ -5,6 +5,7 @@ import type {
   TranslationProvider,
   TranslationRuntimeConfig
 } from '../../shared/api-types'
+import { OpenAiCompatibleChatClient, normalizeOptionalString } from './openai-compatible-chat'
 
 export interface TranslationProviderClient {
   translateText(input: {
@@ -57,16 +58,16 @@ export type OpenAiCompatibleTranslationProviderOptions = {
 }
 
 export class OpenAiCompatibleTranslationProvider implements TranslationProviderClient {
-  private readonly baseUrl: string
-  private readonly model: string
-  private readonly timeoutMs: number
-  private readonly fetchFn: typeof fetch
+  private readonly client: OpenAiCompatibleChatClient
 
-  constructor(private readonly options: OpenAiCompatibleTranslationProviderOptions) {
-    this.baseUrl = normalizeBaseUrl(options.baseUrl ?? 'https://api.openai.com/v1')
-    this.model = normalizeNonEmptyString(options.model, 'gpt-4o-mini')
-    this.timeoutMs = options.timeoutMs ?? 10_000
-    this.fetchFn = options.fetchFn ?? fetch
+  constructor(options: OpenAiCompatibleTranslationProviderOptions) {
+    this.client = new OpenAiCompatibleChatClient({
+      apiKey: options.apiKey,
+      ...(options.baseUrl ? { baseUrl: options.baseUrl } : {}),
+      ...(options.model ? { model: options.model } : {}),
+      ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
+      ...(options.fetchFn ? { fetchFn: options.fetchFn } : {})
+    })
   }
 
   async translateText(input: {
@@ -74,72 +75,20 @@ export class OpenAiCompatibleTranslationProvider implements TranslationProviderC
     sourceLanguage: string
     targetLanguage: string
   }): Promise<string> {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => {
-      controller.abort()
-    }, this.timeoutMs)
-
-    try {
-      const response = await this.fetchFn(`${this.baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.options.apiKey}`,
-          'Content-Type': 'application/json'
+    return this.client.complete({
+      temperature: 0,
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You are a translation engine. Translate the user text faithfully. Return only the translated text without explanations or quotes.'
         },
-        body: JSON.stringify({
-          model: this.model,
-          temperature: 0,
-          messages: [
-            {
-              role: 'system',
-              content:
-                'You are a translation engine. Translate the user text faithfully. Return only the translated text without explanations or quotes.'
-            },
-            {
-              role: 'user',
-              content: `Source language: ${input.sourceLanguage}\nTarget language: ${input.targetLanguage}\nText:\n${input.text}`
-            }
-          ]
-        }),
-        signal: controller.signal
-      })
-
-      const payload = (await response.json()) as {
-        choices?: Array<{
-          message?: {
-            content?:
-              | string
-              | Array<{
-                  type?: string
-                  text?: string
-                }>
-          }
-        }>
-        error?: {
-          message?: string
+        {
+          role: 'user',
+          content: `Source language: ${input.sourceLanguage}\nTarget language: ${input.targetLanguage}\nText:\n${input.text}`
         }
-      }
-
-      if (!response.ok) {
-        throw new Error(payload.error?.message ?? `Translation request failed with status ${response.status}`)
-      }
-
-      const translatedText = extractCompletionText(payload)
-
-      if (!translatedText) {
-        throw new Error('Translation provider returned an empty result')
-      }
-
-      return translatedText
-    } catch (errorLike) {
-      if (errorLike instanceof DOMException && errorLike.name === 'AbortError') {
-        throw new Error('Translation request timed out')
-      }
-
-      throw errorLike
-    } finally {
-      clearTimeout(timeout)
-    }
+      ]
+    })
   }
 }
 
@@ -167,48 +116,6 @@ export function createTranslationProviderFromEnvironment(
         return assertNever(config.provider)
     }
   }
-}
-
-function extractCompletionText(payload: {
-  choices?: Array<{
-    message?: {
-      content?:
-        | string
-        | Array<{
-            type?: string
-            text?: string
-          }>
-    }
-  }>
-}): string {
-  const content = payload.choices?.[0]?.message?.content
-
-  if (typeof content === 'string') {
-    return content.trim()
-  }
-
-  if (Array.isArray(content)) {
-    return content
-      .map((part) => (typeof part.text === 'string' ? part.text : ''))
-      .join('')
-      .trim()
-  }
-
-  return ''
-}
-
-function normalizeBaseUrl(value: string): string {
-  return value.replace(/\/+$/, '')
-}
-
-function normalizeOptionalString(value: string | undefined): string | undefined {
-  const normalized = value?.trim()
-  return normalized ? normalized : undefined
-}
-
-function normalizeNonEmptyString(value: string | undefined, fallback: string): string {
-  const normalized = value?.trim()
-  return normalized ? normalized : fallback
 }
 
 function assertNever(value: never): never {

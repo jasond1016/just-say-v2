@@ -4,7 +4,8 @@ import type {
   HistoryListQuery,
   HistorySearchQuery,
   PaginatedHistoryResult,
-  SavedTranscript
+  SavedTranscript,
+  TranscriptNotes
 } from '../../shared/api-types'
 
 export interface TranscriptRepository {
@@ -13,6 +14,11 @@ export interface TranscriptRepository {
   search(query: HistorySearchQuery): Promise<PaginatedHistoryResult>
   getById(id: string): Promise<SavedTranscript | null>
   delete(id: string): Promise<boolean>
+}
+
+export interface TranscriptNotesRepository {
+  getNotesByTranscriptId(id: string): Promise<TranscriptNotes | null>
+  saveNotes(notes: TranscriptNotes): Promise<void>
 }
 
 export interface TranscriptExporter {

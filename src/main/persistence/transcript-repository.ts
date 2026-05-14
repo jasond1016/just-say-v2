@@ -2,15 +2,17 @@ import type {
   HistoryListQuery,
   HistorySearchQuery,
   PaginatedHistoryResult,
-  SavedTranscript
+  SavedTranscript,
+  TranscriptNotes
 } from '../../shared/api-types'
-import type { TranscriptRepository } from '../../core/contracts/storage'
+import type { TranscriptNotesRepository, TranscriptRepository } from '../../core/contracts/storage'
 
 const DEFAULT_PAGE = 1
 const DEFAULT_PAGE_SIZE = 20
 
-export class InMemoryTranscriptRepository implements TranscriptRepository {
+export class InMemoryTranscriptRepository implements TranscriptRepository, TranscriptNotesRepository {
   private readonly store = new Map<string, SavedTranscript>()
+  private readonly notesStore = new Map<string, TranscriptNotes>()
 
   async save(transcript: SavedTranscript): Promise<void> {
     this.store.set(transcript.id, cloneSavedTranscript(transcript))
@@ -41,7 +43,17 @@ export class InMemoryTranscriptRepository implements TranscriptRepository {
     return transcript ? cloneSavedTranscript(transcript) : null
   }
 
+  async getNotesByTranscriptId(id: string): Promise<TranscriptNotes | null> {
+    const notes = this.notesStore.get(id)
+    return notes ? cloneTranscriptNotes(notes) : null
+  }
+
+  async saveNotes(notes: TranscriptNotes): Promise<void> {
+    this.notesStore.set(notes.transcriptId, cloneTranscriptNotes(notes))
+  }
+
   async delete(id: string): Promise<boolean> {
+    this.notesStore.delete(id)
     return this.store.delete(id)
   }
 }
@@ -162,5 +174,23 @@ function cloneSavedTranscript(transcript: SavedTranscript): SavedTranscript {
       ...transcript.metadata,
       ...(transcript.metadata.audio ? { audio: { ...transcript.metadata.audio } } : {})
     }
+  }
+}
+
+function cloneTranscriptNotes(notes: TranscriptNotes): TranscriptNotes {
+  return {
+    ...notes,
+    decisions: notes.decisions.map((decision) => ({
+      ...decision,
+      sourceRefs: decision.sourceRefs.map((sourceRef) => ({ ...sourceRef }))
+    })),
+    actionItems: notes.actionItems.map((actionItem) => ({
+      ...actionItem,
+      sourceRefs: actionItem.sourceRefs.map((sourceRef) => ({ ...sourceRef }))
+    })),
+    openQuestions: notes.openQuestions.map((question) => ({
+      ...question,
+      sourceRefs: question.sourceRefs.map((sourceRef) => ({ ...sourceRef }))
+    }))
   }
 }

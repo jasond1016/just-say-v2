@@ -4,9 +4,10 @@ import type {
   HistorySearchQuery,
   PaginatedHistoryResult,
   SavedTranscript,
-  TranscriptBlock
+  TranscriptBlock,
+  TranscriptNotes
 } from '../../shared/api-types'
-import type { TranscriptRepository } from '../../core/contracts/storage'
+import type { TranscriptNotesRepository, TranscriptRepository } from '../../core/contracts/storage'
 
 const DEFAULT_PAGE = 1
 const DEFAULT_PAGE_SIZE = 20
@@ -37,7 +38,18 @@ type TranscriptBlockRow = {
   words_json: string | null
 }
 
-export class SqliteTranscriptRepository implements TranscriptRepository {
+type TranscriptNotesRow = {
+  transcript_id: string
+  transcript_hash: string
+  language: string
+  provider: TranscriptNotes['provider']
+  model: string
+  prompt_version: string
+  notes_json: string
+  generated_at: number
+}
+
+export class SqliteTranscriptRepository implements TranscriptRepository, TranscriptNotesRepository {
   constructor(
     private readonly database: DatabaseSync,
     private readonly now: () => number = Date.now
@@ -225,6 +237,49 @@ export class SqliteTranscriptRepository implements TranscriptRepository {
     return this.mapTranscriptRow(row)
   }
 
+  async getNotesByTranscriptId(id: string): Promise<TranscriptNotes | null> {
+    const row = this.database
+      .prepare(`
+        SELECT transcript_id, transcript_hash, language, provider, model, prompt_version, notes_json, generated_at
+        FROM transcript_notes
+        WHERE transcript_id = ?
+      `)
+      .get(id) as TranscriptNotesRow | undefined
+
+    if (!row) {
+      return null
+    }
+
+    return this.mapTranscriptNotesRow(row)
+  }
+
+  async saveNotes(notes: TranscriptNotes): Promise<void> {
+    const now = this.now()
+    this.database
+      .prepare(`
+        INSERT OR REPLACE INTO transcript_notes (
+          transcript_id, transcript_hash, language, provider, model, prompt_version,
+          notes_json, generated_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+      .run(
+        notes.transcriptId,
+        notes.transcriptHash,
+        notes.language,
+        notes.provider,
+        notes.model,
+        notes.promptVersion,
+        JSON.stringify({
+          overview: notes.overview,
+          decisions: notes.decisions,
+          actionItems: notes.actionItems,
+          openQuestions: notes.openQuestions
+        }),
+        notes.generatedAt,
+        now
+      )
+  }
+
   async delete(id: string): Promise<boolean> {
     this.database.prepare('DELETE FROM transcript_search WHERE id = ?').run(id)
     const result = this.database.prepare('DELETE FROM transcripts WHERE id = ?').run(id) as { changes?: number }
@@ -278,6 +333,27 @@ export class SqliteTranscriptRepository implements TranscriptRepository {
         ...(block.words_json ? { words: JSON.parse(block.words_json) } : {})
       })),
       metadata: JSON.parse(row.metadata_json) as SavedTranscript['metadata']
+    }
+  }
+
+  private mapTranscriptNotesRow(row: TranscriptNotesRow): TranscriptNotes {
+    const notesJson = JSON.parse(row.notes_json) as Pick<
+      TranscriptNotes,
+      'overview' | 'decisions' | 'actionItems' | 'openQuestions'
+    >
+
+    return {
+      transcriptId: row.transcript_id,
+      transcriptHash: row.transcript_hash,
+      language: row.language,
+      overview: notesJson.overview,
+      decisions: notesJson.decisions,
+      actionItems: notesJson.actionItems,
+      openQuestions: notesJson.openQuestions,
+      generatedAt: row.generated_at,
+      promptVersion: row.prompt_version,
+      provider: row.provider,
+      model: row.model
     }
   }
 

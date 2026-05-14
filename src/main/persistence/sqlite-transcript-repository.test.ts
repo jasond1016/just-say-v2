@@ -133,6 +133,70 @@ describe('SqliteTranscriptRepository', () => {
       rmSync(tempDir, { recursive: true, force: true })
     }
   })
+
+  it('persists and loads generated transcript notes', async () => {
+    const tempDir = mkdtempSync(path.join(tmpdir(), 'justsay-sqlite-'))
+    const database = openSqliteDatabase(path.join(tempDir, 'history.db'))
+
+    try {
+      const repository = new SqliteTranscriptRepository(database, () => 5000)
+      await repository.save(createTranscript({ id: 'tx-notes' }))
+      await repository.saveNotes({
+        transcriptId: 'tx-notes',
+        transcriptHash: 'hash-tx-notes',
+        language: 'en',
+        overview: 'Discussed blockers and agreed next steps.',
+        decisions: [
+          {
+            summary: 'Ship after QA sign-off.',
+            sourceRefs: [{ blockId: 'tx-notes-block-1', startedAt: 1000, endedAt: 1500 }]
+          }
+        ],
+        actionItems: [
+          {
+            task: 'Send the QA checklist.',
+            owner: 'Mina',
+            due: 'Friday',
+            sourceRefs: [{ blockId: 'tx-notes-block-1', startedAt: 1000, endedAt: 1500 }]
+          }
+        ],
+        openQuestions: [],
+        generatedAt: 4000,
+        promptVersion: 'notes-v1',
+        provider: 'openai-compatible',
+        model: 'gpt-4o-mini'
+      })
+
+      await expect(repository.getNotesByTranscriptId('tx-notes')).resolves.toEqual({
+        transcriptId: 'tx-notes',
+        transcriptHash: 'hash-tx-notes',
+        language: 'en',
+        overview: 'Discussed blockers and agreed next steps.',
+        decisions: [
+          {
+            summary: 'Ship after QA sign-off.',
+            sourceRefs: [{ blockId: 'tx-notes-block-1', startedAt: 1000, endedAt: 1500 }]
+          }
+        ],
+        actionItems: [
+          {
+            task: 'Send the QA checklist.',
+            owner: 'Mina',
+            due: 'Friday',
+            sourceRefs: [{ blockId: 'tx-notes-block-1', startedAt: 1000, endedAt: 1500 }]
+          }
+        ],
+        openQuestions: [],
+        generatedAt: 4000,
+        promptVersion: 'notes-v1',
+        provider: 'openai-compatible',
+        model: 'gpt-4o-mini'
+      })
+    } finally {
+      database.close()
+      rmSync(tempDir, { recursive: true, force: true })
+    }
+  })
 })
 
 function createTranscript(overrides: Partial<SavedTranscript> & Pick<SavedTranscript, 'id'>): SavedTranscript {

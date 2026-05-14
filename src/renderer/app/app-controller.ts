@@ -12,6 +12,7 @@ import type {
   SavedTranscript,
   SpeechLanguage,
   ThemeSetting,
+  TranscriptNotes,
   TranslationProvider
 } from '../../shared/api-types'
 import type { CaptureSource } from '../../shared/primitive-types'
@@ -39,6 +40,9 @@ export type AppControllerState = {
   historyTotal: number
   selectedHistory: SavedTranscript | null
   selectedHistoryAudio: HistoryAudioPlayback | null
+  selectedHistoryNotes: TranscriptNotes | null
+  selectedHistoryNotesStatus: 'idle' | 'loading' | 'generating' | 'failed' | 'ready'
+  selectedHistoryNotesError: string | null
   exportMessage: string | null
   liveSessionMessage: string | null
   diagnosticsMessage: string | null
@@ -70,6 +74,9 @@ export function createInitialAppControllerState(): AppControllerState {
     historyTotal: 0,
     selectedHistory: null,
     selectedHistoryAudio: null,
+    selectedHistoryNotes: null,
+    selectedHistoryNotesStatus: 'idle',
+    selectedHistoryNotesError: null,
     exportMessage: null,
     liveSessionMessage: null,
     diagnosticsMessage: null,
@@ -167,7 +174,10 @@ export class AppController {
   clearSelectedHistory(): void {
     this.setState({
       selectedHistory: null,
-      selectedHistoryAudio: null
+      selectedHistoryAudio: null,
+      selectedHistoryNotes: null,
+      selectedHistoryNotesStatus: 'idle',
+      selectedHistoryNotesError: null
     })
   }
 
@@ -267,12 +277,62 @@ export class AppController {
   }
 
   async openHistoryItem(id: string): Promise<void> {
+    this.setState({
+      selectedHistoryNotes: null,
+      selectedHistoryNotesStatus: 'loading',
+      selectedHistoryNotesError: null
+    })
+
     await this.runAction(`open:${id}`, async () => {
-      const { transcript, audioPlayback } = await this.loadHistoryDetail(id)
+      const { transcript, audioPlayback, notes, notesError } = await this.loadHistoryDetail(id)
       this.setState({
         selectedHistory: transcript,
-        selectedHistoryAudio: audioPlayback
+        selectedHistoryAudio: audioPlayback,
+        selectedHistoryNotes: notes,
+        selectedHistoryNotesStatus: transcript
+          ? notes
+            ? 'ready'
+            : notesError
+              ? 'failed'
+              : 'idle'
+          : 'idle',
+        selectedHistoryNotesError: notesError
       })
+    })
+  }
+
+  async generateHistoryNotes(
+    id: string,
+    options: Parameters<AppApi['generateHistoryNotes']>[1] = {}
+  ): Promise<void> {
+    await this.runAction(`history-notes:${options.force ? 'regenerate' : 'generate'}:${id}`, async () => {
+      this.setState({
+        selectedHistoryNotesStatus: 'generating',
+        selectedHistoryNotesError: null
+      })
+
+      try {
+        const notes = await this.deps.api.generateHistoryNotes(id, options)
+
+        if (this.state.selectedHistory?.id !== id) {
+          return
+        }
+
+        this.setState({
+          selectedHistoryNotes: notes,
+          selectedHistoryNotesStatus: 'ready',
+          selectedHistoryNotesError: null
+        })
+      } catch (error) {
+        if (this.state.selectedHistory?.id === id) {
+          this.setState({
+            selectedHistoryNotesStatus: 'failed',
+            selectedHistoryNotesError: describeError(error, 'Notes could not be generated this time.')
+          })
+        }
+
+        throw error
+      }
     })
   }
 
@@ -283,7 +343,10 @@ export class AppController {
       if (this.state.selectedHistory?.id === id) {
         this.setState({
           selectedHistory: null,
-          selectedHistoryAudio: null
+          selectedHistoryAudio: null,
+          selectedHistoryNotes: null,
+          selectedHistoryNotesStatus: 'idle',
+          selectedHistoryNotesError: null
         })
       }
 
@@ -628,7 +691,14 @@ export class AppController {
         history: historyPage.items,
         historyTotal: historyPage.total,
         selectedHistory: nextSelectedHistory,
-        selectedHistoryAudio: nextSelectedHistoryAudio
+        selectedHistoryAudio: nextSelectedHistoryAudio,
+        ...(nextSelectedHistory
+          ? {}
+          : {
+              selectedHistoryNotes: null,
+              selectedHistoryNotesStatus: 'idle' as const,
+              selectedHistoryNotesError: null
+            })
       })
     } catch (error) {
       if (!this.isLifecycleCurrent(lifecycleToken) || requestId !== this.historyRequestId) {
@@ -665,12 +735,39 @@ export class AppController {
   private async loadHistoryDetail(id: string): Promise<{
     transcript: SavedTranscript | null
     audioPlayback: HistoryAudioPlayback | null
+    notes: TranscriptNotes | null
+    notesError: string | null
   }> {
     const transcript = await this.deps.api.getHistory(id)
 
+    if (!transcript) {
+      return {
+        transcript: null,
+        audioPlayback: null,
+        notes: null,
+        notesError: null
+      }
+    }
+
+    const [audioPlayback, notesResult] = await Promise.all([
+      this.loadHistoryAudioPlayback(transcript),
+      this.deps.api
+        .getHistoryNotes(id)
+        .then((notes) => ({
+          notes,
+          error: null
+        }))
+        .catch((error) => ({
+          notes: null,
+          error: describeError(error, 'History notes could not be loaded.')
+        }))
+    ])
+
     return {
       transcript,
-      audioPlayback: transcript ? await this.loadHistoryAudioPlayback(transcript) : null
+      audioPlayback,
+      notes: notesResult.notes,
+      notesError: notesResult.error
     }
   }
 

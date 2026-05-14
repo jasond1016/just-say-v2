@@ -44,6 +44,8 @@ describe('createAppApi', () => {
     await api.listHistory({ page: 2 })
     await api.searchHistory({ query: 'hello' })
     await api.getHistory('tx-1')
+    await api.getHistoryNotes('tx-1')
+    await api.generateHistoryNotes('tx-1', { force: true })
     await api.getHistoryAudioPlayback('tx-1')
     await api.deleteHistory('tx-1')
     await api.copyHistory('tx-1', 'plain_text')
@@ -90,6 +92,8 @@ describe('createAppApi', () => {
       [IPC_CHANNELS.historyList, { page: 2 }],
       [IPC_CHANNELS.historySearch, { query: 'hello' }],
       [IPC_CHANNELS.historyGet, 'tx-1'],
+      [IPC_CHANNELS.historyGetNotes, 'tx-1'],
+      [IPC_CHANNELS.historyGenerateNotes, 'tx-1', { force: true }],
       [IPC_CHANNELS.historyGetAudioPlayback, 'tx-1'],
       [IPC_CHANNELS.historyDelete, 'tx-1'],
       [IPC_CHANNELS.historyCopy, 'tx-1', 'plain_text'],

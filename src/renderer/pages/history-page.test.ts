@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { HistoryAudioPlayback, SavedTranscript } from '../../shared/api-types'
 import {
+  formatNotesOverview,
   getArchivePreview,
   getHistoryDetailActionGroups,
   HistoryPage
@@ -164,11 +165,32 @@ describe('getHistoryDetailActionGroups', () => {
   })
 })
 
+describe('formatNotesOverview', () => {
+  it('preserves explicit paragraph breaks from the model output', () => {
+    expect(formatNotesOverview('First summary line.\n\nSecond summary line.')).toEqual([
+      'First summary line.',
+      'Second summary line.'
+    ])
+  })
+
+  it('splits long single-paragraph overviews into readable chunks', () => {
+    const paragraphs = formatNotesOverview(
+      '会议讨论了曲子项目进展、各团队的推进情况，以及 AI 课题列表追加和定期会议的需求。会议确认前端团队定期会议从下周一开始每周一 17:30 举行。各团队优先处理现有事项，并在下次会议前同步阻塞点。'
+    )
+
+    expect(paragraphs).toHaveLength(2)
+    expect(paragraphs.join('')).toBe(
+      '会议讨论了曲子项目进展、各团队的推进情况，以及 AI 课题列表追加和定期会议的需求。会议确认前端团队定期会议从下周一开始每周一 17:30 举行。各团队优先处理现有事项，并在下次会议前同步阻塞点。'
+    )
+  })
+})
+
 function createProps(overrides: {
   items?: SavedTranscript[]
   searchQuery?: string
   selectedTranscript: SavedTranscript | null
   selectedAudio: HistoryAudioPlayback | null
+  notesState?: React.ComponentProps<typeof HistoryPage>['notesState']
 }) {
   return {
     items: overrides.items ?? [],
@@ -179,6 +201,7 @@ function createProps(overrides: {
     selectedTimeFilter: 'all' as const,
     selectedTranscript: overrides.selectedTranscript,
     selectedAudio: overrides.selectedAudio,
+    notesState: overrides.notesState ?? { status: 'idle' as const },
     exportMessage: null,
     busyAction: null,
     onOpenQuickDictation: vi.fn(),
@@ -191,7 +214,8 @@ function createProps(overrides: {
     onCloseDetail: vi.fn(),
     onDelete: vi.fn(),
     onCopy: vi.fn(),
-    onExport: vi.fn()
+    onExport: vi.fn(),
+    onGenerateNotes: vi.fn()
   }
 }
 

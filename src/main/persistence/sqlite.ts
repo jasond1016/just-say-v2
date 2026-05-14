@@ -46,6 +46,22 @@ function initializeSchema(database: DatabaseSync): void {
     CREATE INDEX IF NOT EXISTS idx_transcript_blocks_transcript_seq
       ON transcript_blocks(transcript_id, seq);
 
+    CREATE TABLE IF NOT EXISTS transcript_notes (
+      transcript_id TEXT PRIMARY KEY,
+      transcript_hash TEXT NOT NULL,
+      language TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      model TEXT NOT NULL,
+      prompt_version TEXT NOT NULL,
+      notes_json TEXT NOT NULL,
+      generated_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY(transcript_id) REFERENCES transcripts(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_transcript_notes_updated_at
+      ON transcript_notes(updated_at DESC);
+
     CREATE VIRTUAL TABLE IF NOT EXISTS transcript_search
       USING fts5(
         id UNINDEXED,

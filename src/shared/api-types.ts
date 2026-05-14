@@ -228,6 +228,16 @@ export type TranslationRuntimeConfig = {
   }
 }
 
+export type TranscriptNotesRuntimeConfig = {
+  provider: TranslationProvider
+  language: string
+  endpoint?: string
+  model?: string
+  credentials: {
+    translationApiKey: string
+  }
+}
+
 export type ResolvedRuntimeConfig = {
   engineProfile: EngineProfile
   engineConfig: Record<string, unknown>
@@ -275,6 +285,43 @@ export type HistoryAudioPlayback = {
   status: TranscriptAudioMetadata['status']
 }
 
+export type TranscriptNoteSourceRef = {
+  blockId: string
+  startedAt: number
+  endedAt: number
+}
+
+export type TranscriptDecision = {
+  summary: string
+  sourceRefs: TranscriptNoteSourceRef[]
+}
+
+export type TranscriptActionItem = {
+  task: string
+  owner?: string
+  due?: string
+  sourceRefs: TranscriptNoteSourceRef[]
+}
+
+export type TranscriptOpenQuestion = {
+  question: string
+  sourceRefs: TranscriptNoteSourceRef[]
+}
+
+export type TranscriptNotes = {
+  transcriptId: string
+  transcriptHash: string
+  language: string
+  overview: string
+  decisions: TranscriptDecision[]
+  actionItems: TranscriptActionItem[]
+  openQuestions: TranscriptOpenQuestion[]
+  generatedAt: number
+  promptVersion: string
+  provider: TranslationProvider
+  model: string
+}
+
 export type HistoryListQuery = {
   page?: number
   pageSize?: number
@@ -285,6 +332,10 @@ export type HistoryListQuery = {
 
 export type HistorySearchQuery = HistoryListQuery & {
   query: string
+}
+
+export type HistoryNotesGenerateOptions = {
+  force?: boolean
 }
 
 export type PaginatedHistoryResult = {

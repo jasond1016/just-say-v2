@@ -1322,9 +1322,31 @@
 }
 
 .notes-list li {
+  display: grid;
+  gap: 4px;
   max-width: 68ch;
   font-size: 15px;
   line-height: 1.7;
+}
+
+.notes-overview {
+  display: grid;
+  gap: 12px;
+  max-width: 68ch;
+}
+
+.notes-overview p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.78;
+  color: var(--text-primary);
+  text-wrap: pretty;
+}
+
+.notes-list__meta {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-tertiary);
 }
 
 .notes-dots {

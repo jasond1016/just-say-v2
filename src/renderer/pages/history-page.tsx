@@ -1,6 +1,13 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 
-import type { ExportFormat, HistoryAudioPlayback, SavedTranscript } from '../../shared/api-types'
+import type {
+  ExportFormat,
+  HistoryAudioPlayback,
+  HistoryNotesGenerateOptions,
+  SavedTranscript,
+  TranscriptNoteSourceRef,
+  TranscriptNotes
+} from '../../shared/api-types'
 import type { CaptureSource } from '../../shared/primitive-types'
 import { Button, TextInput } from '../ui/controls'
 import { describeCaptureSource, describeProfileId, describeSessionMode, describeTranscriptSummary } from '../ui/copy'
@@ -8,15 +15,10 @@ import { describeCaptureSource, describeProfileId, describeSessionMode, describe
 type HistoryTimeFilter = 'all' | 'today' | 'last_7_days' | 'last_30_days'
 type HistoryNotesState =
   | { status: 'idle' }
+  | { status: 'loading' }
   | { status: 'generating' }
   | { status: 'failed'; message: string }
-  | { status: 'ready'; generatedAt: number; notes: GeneratedNotes }
-
-type GeneratedNotes = {
-  overview: string
-  decisions: string[]
-  actionItems: string[]
-}
+  | { status: 'ready'; notes: TranscriptNotes }
 
 type ArchivePreview = {
   kind: 'opening' | 'match'
@@ -53,6 +55,7 @@ export function HistoryPage(props: {
   selectedTimeFilter: HistoryTimeFilter
   selectedTranscript: SavedTranscript | null
   selectedAudio: HistoryAudioPlayback | null
+  notesState: HistoryNotesState
   exportMessage: string | null
   busyAction: string | null
   onOpenQuickDictation: () => void
@@ -68,6 +71,7 @@ export function HistoryPage(props: {
   onExportBulk?: (ids: string[], format: ExportFormat) => void
   onCopy: (id: string, format: ExportFormat) => void
   onExport: (id: string, format: ExportFormat) => void
+  onGenerateNotes: (id: string, options?: HistoryNotesGenerateOptions) => void
 }) {
   const headingId = useId()
   const actionMenuId = useId()
@@ -75,21 +79,11 @@ export function HistoryPage(props: {
   const [detailView, setDetailView] = useState<'transcript' | 'notes'>('transcript')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [actionMenuOpen, setActionMenuOpen] = useState(false)
-  const [notesStateById, setNotesStateById] = useState<Record<string, HistoryNotesState>>({})
   const [bulkMode, setBulkMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const detailHeadingRef = useRef<HTMLDivElement | null>(null)
   const actionMenuRef = useRef<HTMLDivElement | null>(null)
-  const pendingNotesTimers = useRef<number[]>([])
-
-  useEffect(() => {
-    return () => {
-      for (const timerId of pendingNotesTimers.current) {
-        window.clearTimeout(timerId)
-      }
-    }
-  }, [])
 
   useEffect(() => {
     setDetailQuery('')
@@ -159,28 +153,12 @@ export function HistoryPage(props: {
     )
   }, [detailQuery, selectedTranscript])
 
-  const notesState = selectedTranscript ? notesStateById[selectedTranscript.id] ?? { status: 'idle' as const } : null
+  const notesState = selectedTranscript ? props.notesState : null
   const hasActiveFilters =
     props.searchQuery.trim().length > 0 ||
     props.selectedMode !== 'all' ||
     props.selectedSource !== 'all' ||
     props.selectedTimeFilter !== 'all'
-
-  const startGenerateNotes = (transcript: SavedTranscript) => {
-    setNotesStateById((current) => ({
-      ...current,
-      [transcript.id]: { status: 'generating' }
-    }))
-
-    const timerId = window.setTimeout(() => {
-      setNotesStateById((current) => ({
-        ...current,
-        [transcript.id]: buildNotesState(transcript)
-      }))
-    }, 900)
-
-    pendingNotesTimers.current.push(timerId)
-  }
 
   const closeActionMenu = () => setActionMenuOpen(false)
 
@@ -469,7 +447,7 @@ export function HistoryPage(props: {
               size="small"
               variant="secondary"
               disabled={Boolean(props.busyAction)}
-              onClick={() => startGenerateNotes(selectedTranscript)}
+              onClick={() => props.onGenerateNotes(selectedTranscript.id, { force: true })}
             />
           ) : null}
 
@@ -601,18 +579,24 @@ export function HistoryPage(props: {
                   variant="primary"
                   size="small"
                   disabled={Boolean(props.busyAction)}
-                  onClick={() => startGenerateNotes(selectedTranscript)}
+                  onClick={() => props.onGenerateNotes(selectedTranscript.id)}
                 />
               </div>
             </div>
           ) : null}
 
-          {notesState?.status === 'generating' ? (
+          {notesState?.status === 'loading' || notesState?.status === 'generating' ? (
             <div className="notes-state">
-              <div className="notes-state__eyebrow">Generating</div>
-              <div className="notes-state__title">Building notes from the transcript.</div>
+              <div className="notes-state__eyebrow">
+                {notesState.status === 'loading' ? 'Loading' : 'Generating'}
+              </div>
+              <div className="notes-state__title">
+                {notesState.status === 'loading' ? 'Loading saved notes for this transcript.' : 'Building notes from the transcript.'}
+              </div>
               <p className="notes-state__body">
-                The transcript stays available in the other tab while JustSay condenses the conversation into a lighter derived view.
+                {notesState.status === 'loading'
+                  ? 'If a notes snapshot already exists, it will appear here without changing the underlying transcript.'
+                  : 'The transcript stays available in the other tab while JustSay condenses the conversation into a lighter derived view.'}
               </p>
               <div className="notes-dots" aria-hidden="true">
                 <span />
@@ -635,7 +619,7 @@ export function HistoryPage(props: {
                   variant="primary"
                   size="small"
                   disabled={Boolean(props.busyAction)}
-                  onClick={() => startGenerateNotes(selectedTranscript)}
+                  onClick={() => props.onGenerateNotes(selectedTranscript.id, { force: true })}
                 />
                 <Button
                   label="Back to transcript"
@@ -649,27 +633,58 @@ export function HistoryPage(props: {
 
           {notesState?.status === 'ready' ? (
             <div className="notes-stack">
-              <div className="notes-state__eyebrow">Generated {formatRelativeTime(notesState.generatedAt)}</div>
+              <div className="notes-state__eyebrow">
+                Generated {formatRelativeTime(notesState.notes.generatedAt)} · {notesState.notes.model}
+              </div>
               <section className="notes-card">
                 <div className="notes-card__eyebrow">Overview</div>
-                <div className="notes-card__title">{notesState.notes.overview}</div>
+                <div className="notes-overview">
+                  {formatNotesOverview(notesState.notes.overview).map((paragraph, index) => (
+                    <p key={`${paragraph}-${index}`}>{paragraph}</p>
+                  ))}
+                </div>
               </section>
               <section className="notes-card">
                 <div className="notes-card__eyebrow">Decisions</div>
                 <ul className="notes-list">
-                  {notesState.notes.decisions.map((decision) => (
-                    <li key={decision}>{decision}</li>
+                  {notesState.notes.decisions.map((decision, index) => (
+                    <li key={`${decision.summary}-${index}`}>
+                      <div>{decision.summary}</div>
+                      {decision.sourceRefs.length > 0 ? (
+                        <div className="notes-list__meta">{formatNotesSourceRefs(decision.sourceRefs)}</div>
+                      ) : null}
+                    </li>
                   ))}
                 </ul>
               </section>
               <section className="notes-card">
                 <div className="notes-card__eyebrow">Action Items</div>
                 <ul className="notes-list">
-                  {notesState.notes.actionItems.map((action) => (
-                    <li key={action}>{action}</li>
+                  {notesState.notes.actionItems.map((action, index) => (
+                    <li key={`${action.task}-${index}`}>
+                      <div>{action.task}</div>
+                      <div className="notes-list__meta">
+                        {buildActionItemMeta(action.owner, action.due, action.sourceRefs)}
+                      </div>
+                    </li>
                   ))}
                 </ul>
               </section>
+              {notesState.notes.openQuestions.length > 0 ? (
+                <section className="notes-card">
+                  <div className="notes-card__eyebrow">Open Questions</div>
+                  <ul className="notes-list">
+                    {notesState.notes.openQuestions.map((question, index) => (
+                      <li key={`${question.question}-${index}`}>
+                        <div>{question.question}</div>
+                        {question.sourceRefs.length > 0 ? (
+                          <div className="notes-list__meta">{formatNotesSourceRefs(question.sourceRefs)}</div>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
             </div>
           ) : null}
         </section>
@@ -701,42 +716,6 @@ function FilterGroup(props: {
       </div>
     </div>
   )
-}
-
-function buildNotesState(transcript: SavedTranscript): HistoryNotesState {
-  if (transcript.blocks.length < 2 || transcript.plainText.trim().length < 80) {
-    return {
-      status: 'failed',
-      message: 'This transcript is too short to produce a useful notes view yet. Stay in Transcript or try again after capturing a longer session.'
-    }
-  }
-
-  return {
-    status: 'ready',
-    generatedAt: Date.now(),
-    notes: generateNotes(transcript)
-  }
-}
-
-function generateNotes(transcript: SavedTranscript): GeneratedNotes {
-  const lines = transcript.blocks
-    .map((block) => block.text.trim())
-    .filter(Boolean)
-  const overviewSource = lines.slice(0, 2).join(' ').trim()
-  const decisions = pickLines(lines, [/should/i, /need/i, /decid/i, /plan/i, /应该/, /需要/, /决定/, /改成/, /保留/, /去掉/], 3)
-  const actionItems = pickLines(lines, [/next/i, /follow/i, /action/i, /send/i, /review/i, /安排/, /确认/, /处理/, /导出/, /生成/], 3)
-
-  return {
-    overview: overviewSource.length > 180 ? `${overviewSource.slice(0, 180).trim()}...` : overviewSource,
-    decisions,
-    actionItems
-  }
-}
-
-function pickLines(lines: string[], patterns: RegExp[], limit: number): string[] {
-  const preferred = lines.filter((line) => patterns.some((pattern) => pattern.test(line)))
-  const fallback = lines.filter((line) => !preferred.includes(line))
-  return [...preferred, ...fallback].slice(0, limit)
 }
 
 export function getArchivePreview(transcript: SavedTranscript, query: string): ArchivePreview {
@@ -842,6 +821,103 @@ function formatRelativeTime(timestamp: number): string {
 
   const hours = Math.floor(minutes / 60)
   return `${hours}h ago`
+}
+
+export function formatNotesOverview(overview: string): string[] {
+  const explicitParagraphs = overview
+    .split(/\r?\n+/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean)
+
+  if (explicitParagraphs.length > 1) {
+    return explicitParagraphs
+  }
+
+  const normalized = overview.replace(/\s+/g, ' ').trim()
+
+  if (!normalized) {
+    return []
+  }
+
+  const sentences = splitOverviewSentences(normalized)
+
+  if (sentences.length <= 1) {
+    return [normalized]
+  }
+
+  const paragraphs: string[] = []
+  let current = ''
+  let sentenceCount = 0
+
+  for (const sentence of sentences) {
+    const next = current ? joinOverviewSentences(current, sentence) : sentence
+
+    if (current && (next.length > 72 || sentenceCount >= 2)) {
+      paragraphs.push(current)
+      current = sentence
+      sentenceCount = 1
+      continue
+    }
+
+    current = next
+    sentenceCount += 1
+  }
+
+  if (current) {
+    paragraphs.push(current)
+  }
+
+  return paragraphs
+}
+
+function splitOverviewSentences(text: string): string[] {
+  const sentences: string[] = []
+  let current = ''
+
+  for (const character of text) {
+    current += character
+
+    if (/[。！？!?；;]/.test(character)) {
+      const trimmed = current.trim()
+
+      if (trimmed) {
+        sentences.push(trimmed)
+      }
+
+      current = ''
+    }
+  }
+
+  const trailing = current.trim()
+
+  if (trailing) {
+    sentences.push(trailing)
+  }
+
+  return sentences
+}
+
+function joinOverviewSentences(current: string, next: string): string {
+  const needsSpace = /[A-Za-z0-9]$/.test(current) && /^[A-Za-z0-9]/.test(next)
+  return `${current}${needsSpace ? ' ' : ''}${next}`
+}
+
+function buildActionItemMeta(
+  owner: string | undefined,
+  due: string | undefined,
+  sourceRefs: TranscriptNoteSourceRef[]
+): string {
+  return [
+    owner ? `Owner: ${owner}` : null,
+    due ? `Due: ${due}` : null,
+    sourceRefs.length > 0 ? formatNotesSourceRefs(sourceRefs) : null
+  ]
+    .filter(Boolean)
+    .join(' · ')
+}
+
+function formatNotesSourceRefs(sourceRefs: TranscriptNoteSourceRef[]): string {
+  return `Source: ${sourceRefs.map((sourceRef) => formatClockTime(sourceRef.startedAt)).join(', ')}`
 }
 
 function getArchivePreviewCandidates(transcript: SavedTranscript): string[] {

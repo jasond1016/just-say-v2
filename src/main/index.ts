@@ -5,6 +5,7 @@ import type {
   AppSettings,
   ResolvedRuntimeConfig,
   SettingsPatch,
+  TranscriptNotesRuntimeConfig,
   TranslationCredentialsInput
 } from '../shared/api-types'
 import { resolveAppPaths } from './app-paths'
@@ -34,6 +35,7 @@ import { LocalServiceSupervisor } from './services/local-service-supervisor'
 import { LiveSessionActionsService } from './services/live-session-actions-service'
 import { MeetingAudioStorage } from './services/meeting-audio-storage'
 import { MeetingCoordinator } from './services/meeting-coordinator'
+import { NotesGenerationService } from './services/notes-generation-service'
 import { OutputDispatcher } from './services/output-dispatcher'
 import { PttCoordinator } from './services/ptt-coordinator'
 import { PttHotkeyController } from './services/ptt-hotkey-controller'
@@ -199,11 +201,17 @@ void wireAppLifecycle(app, {
     const hotkeyService = new HotkeyService({
       windowsHelperPath: path.join(resourcesPath, 'windows-hotkey-helper', 'JustSayHotkeyHelper.exe')
     })
+    const notesGenerationService = new NotesGenerationService()
     const historyService = new HistoryService(
       transcriptRepository,
       transcriptExporter,
       clipboardService,
-      meetingAudioStorage
+      meetingAudioStorage,
+      {
+        repository: transcriptRepository,
+        generationService: notesGenerationService,
+        configProvider: () => resolveTranscriptNotesRuntimeConfig(cachedSettings, getRuntimeCredentials())
+      }
     )
     const diagnosticsService = new DiagnosticsService({
       exportDir: path.join(userDataPath, 'diagnostics'),
@@ -341,3 +349,35 @@ void wireAppLifecycle(app, {
     })
   }
 })
+
+function resolveTranscriptNotesRuntimeConfig(
+  settings: AppSettings,
+  credentials: ResolverCredentials | undefined
+): TranscriptNotesRuntimeConfig {
+  const translationApiKey = credentials?.translationApiKey?.trim()
+
+  if (!translationApiKey) {
+    throw new Error('Translation API key is required before generating notes')
+  }
+
+  const envEndpoint = process.env.JUSTSAY_TRANSLATION_BASE_URL?.trim()
+  const envModel = process.env.JUSTSAY_TRANSLATION_MODEL?.trim()
+
+  return {
+    provider: settings.translation.provider,
+    language: settings.translation.targetLanguage,
+    ...(settings.translation.endpoint?.trim()
+      ? { endpoint: settings.translation.endpoint.trim() }
+      : envEndpoint
+        ? { endpoint: envEndpoint }
+        : {}),
+    ...(settings.translation.model?.trim()
+      ? { model: settings.translation.model.trim() }
+      : envModel
+        ? { model: envModel }
+        : {}),
+    credentials: {
+      translationApiKey
+    }
+  }
+}

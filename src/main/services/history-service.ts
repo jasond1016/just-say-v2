@@ -3,11 +3,15 @@ import type {
   ExportResult,
   HistoryAudioPlayback,
   HistoryListQuery,
+  HistoryNotesGenerateOptions,
   HistorySearchQuery,
   PaginatedHistoryResult,
-  SavedTranscript
+  SavedTranscript,
+  TranscriptNotes,
+  TranscriptNotesRuntimeConfig
 } from '../../shared/api-types'
-import type { TranscriptExporter, TranscriptRepository } from '../../core/contracts/storage'
+import type { TranscriptExporter, TranscriptNotesRepository, TranscriptRepository } from '../../core/contracts/storage'
+import type { NotesGenerationService } from './notes-generation-service'
 
 export class HistoryService {
   constructor(
@@ -19,6 +23,11 @@ export class HistoryService {
     private readonly audioStorage?: {
       getPlayback(transcript: SavedTranscript): Promise<HistoryAudioPlayback | null>
       deleteForTranscript(transcript: SavedTranscript): Promise<void>
+    },
+    private readonly notes?: {
+      repository: TranscriptNotesRepository
+      generationService: NotesGenerationService
+      configProvider: () => TranscriptNotesRuntimeConfig
     }
   ) {}
 
@@ -32,6 +41,49 @@ export class HistoryService {
 
   async get(id: string): Promise<SavedTranscript | null> {
     return this.repository.getById(id)
+  }
+
+  async getNotes(id: string): Promise<TranscriptNotes | null> {
+    if (!this.notes) {
+      return null
+    }
+
+    return this.notes.repository.getNotesByTranscriptId(id)
+  }
+
+  async generateNotes(id: string, options: HistoryNotesGenerateOptions = {}): Promise<TranscriptNotes> {
+    if (!this.notes) {
+      throw new Error('History notes are not configured')
+    }
+
+    const transcript = await this.repository.getById(id)
+
+    if (!transcript) {
+      throw new Error(`Transcript not found: ${id}`)
+    }
+
+    const runtimeConfig = this.notes.configProvider()
+    const cachedNotes = options.force ? null : await this.notes.repository.getNotesByTranscriptId(id)
+    const transcriptHash = this.notes.generationService.computeTranscriptHash(transcript)
+    const resolvedModel = runtimeConfig.model?.trim() || 'gpt-4o-mini'
+
+    if (
+      cachedNotes &&
+      cachedNotes.transcriptHash === transcriptHash &&
+      cachedNotes.promptVersion === this.notes.generationService.getPromptVersion() &&
+      cachedNotes.language === runtimeConfig.language &&
+      cachedNotes.provider === runtimeConfig.provider &&
+      cachedNotes.model === resolvedModel
+    ) {
+      return cachedNotes
+    }
+
+    const notes = await this.notes.generationService.generate({
+      transcript,
+      config: runtimeConfig
+    })
+    await this.notes.repository.saveNotes(notes)
+    return notes
   }
 
   async delete(id: string): Promise<boolean> {
