@@ -22,6 +22,13 @@ import {
 } from '../ui/copy'
 
 type SettingsSectionId = 'workspace' | 'dictation' | 'meetings' | 'translation' | 'recognition' | 'advanced'
+export type TranslationTargetOption = 'zh' | 'en' | 'ja'
+
+export const TRANSLATION_TARGET_OPTIONS: Array<{ value: TranslationTargetOption; label: string }> = [
+  { value: 'zh', label: 'Chinese' },
+  { value: 'en', label: 'English' },
+  { value: 'ja', label: 'Japanese' }
+]
 
 type SettingsHeaderState =
   | { tone: 'saved'; label: string }
@@ -85,6 +92,7 @@ export function SettingsPage(props: {
   const invalidRemotePort = remotePortValue.length > 0 && !/^\d+$/.test(remotePortValue)
   const invalidPort = localServiceMode === 'managed-local' ? invalidManagedPort : invalidRemotePort
   const selectedProfile = props.profiles.find((profile) => profile.id === props.settings.speech.selectedProfileId) ?? null
+  const selectedTranslationTarget = getTranslationTargetSelectValue(props.settings.translation.targetLanguage)
 
   useEffect(() => {
     setDraftManagedHost(props.settings.advanced.localServiceHost ?? '')
@@ -392,14 +400,17 @@ export function SettingsPage(props: {
                   />
                 </SettingRow>
 
-                <SettingRow title="Translate to" hint="Use a language name or short code.">
-                  <TextInput
-                    value={props.settings.translation.targetLanguage}
+                <SettingRow title="Translate to" hint="Choose the output language for translation.">
+                  <SelectField
+                    value={selectedTranslationTarget}
                     disabled={disabled || !translationEnabled}
-                    placeholder="en"
-                    onChange={(event) => props.onTranslationTargetLanguageChange(event.target.value)}
-                    className="field-input--wide"
-                  />
+                    onChange={(event) => props.onTranslationTargetLanguageChange(event.target.value as TranslationTargetOption)}
+                    className="field-select--wide"
+                  >
+                    {TRANSLATION_TARGET_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </SelectField>
                   {!translationEnabled ? (
                     <div className="field-note">Translation stays off until you enable it for dictation or meetings.</div>
                   ) : null}
@@ -713,6 +724,28 @@ function describeSettingsSection(section: SettingsSectionId) {
     case 'advanced':
     default:
       return { title: 'Advanced' }
+  }
+}
+
+export function getTranslationTargetSelectValue(targetLanguage: string): TranslationTargetOption {
+  const normalized = targetLanguage.trim().toLowerCase()
+
+  switch (normalized) {
+    case 'zh':
+    case 'zh-cn':
+    case 'cn':
+    case 'chinese':
+      return 'zh'
+    case 'ja':
+    case 'ja-jp':
+    case 'jp':
+    case 'japanese':
+      return 'ja'
+    case 'en':
+    case 'en-us':
+    case 'english':
+    default:
+      return 'en'
   }
 }
 
