@@ -3,7 +3,11 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { HistoryAudioPlayback, SavedTranscript } from '../../shared/api-types'
-import { getArchivePreview, HistoryPage } from './history-page'
+import {
+  getArchivePreview,
+  getHistoryDetailActionGroups,
+  HistoryPage
+} from './history-page'
 
 describe('HistoryPage audio detail', () => {
   it('renders a meeting audio player when playback is available', () => {
@@ -68,6 +72,20 @@ describe('HistoryPage audio detail', () => {
     expect(markup).toContain('Audio unavailable')
     expect(markup).toContain('saved meeting audio file is no longer available on disk')
   })
+
+  it('renders a compact Actions trigger instead of the inline More summary', () => {
+    const transcript = createTranscript()
+
+    const markup = renderToStaticMarkup(
+      React.createElement(HistoryPage, createProps({
+        selectedTranscript: transcript,
+        selectedAudio: null
+      }))
+    )
+
+    expect(markup).toContain('Actions')
+    expect(markup).not.toContain('Copy, export, delete')
+  })
 })
 
 describe('getArchivePreview', () => {
@@ -115,6 +133,34 @@ describe('getArchivePreview', () => {
       kind: 'opening',
       text: 'Kickoff and introductions. Next steps are still open.'
     })
+  })
+})
+
+describe('getHistoryDetailActionGroups', () => {
+  it('groups history detail actions into copy, export, and danger sections', () => {
+    expect(getHistoryDetailActionGroups()).toEqual([
+      {
+        label: 'Copy',
+        items: [
+          { id: 'copy-text', label: 'Copy text' },
+          { id: 'copy-bilingual', label: 'Copy bilingual' }
+        ]
+      },
+      {
+        label: 'Export',
+        items: [
+          { id: 'export-text', label: 'Export text' },
+          { id: 'export-bilingual', label: 'Export bilingual' },
+          { id: 'export-json', label: 'Export JSON' }
+        ]
+      },
+      {
+        label: 'Danger',
+        items: [
+          { id: 'delete-record', label: 'Delete record', danger: true }
+        ]
+      }
+    ])
   })
 })
 

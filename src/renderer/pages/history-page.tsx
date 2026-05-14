@@ -23,6 +23,23 @@ type ArchivePreview = {
   text: string
 }
 
+type HistoryDetailActionId =
+  | 'copy-text'
+  | 'copy-bilingual'
+  | 'export-text'
+  | 'export-bilingual'
+  | 'export-json'
+  | 'delete-record'
+
+type HistoryDetailActionGroup = {
+  label: string
+  items: Array<{
+    id: HistoryDetailActionId
+    label: string
+    danger?: boolean
+  }>
+}
+
 const ARCHIVE_PREVIEW_MAX_CHARS = 220
 const ARCHIVE_PREVIEW_CONTEXT_BEFORE = 48
 const ARCHIVE_PREVIEW_CONTEXT_AFTER = 128
@@ -53,14 +70,17 @@ export function HistoryPage(props: {
   onExport: (id: string, format: ExportFormat) => void
 }) {
   const headingId = useId()
+  const actionMenuId = useId()
   const [detailQuery, setDetailQuery] = useState('')
   const [detailView, setDetailView] = useState<'transcript' | 'notes'>('transcript')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [actionMenuOpen, setActionMenuOpen] = useState(false)
   const [notesStateById, setNotesStateById] = useState<Record<string, HistoryNotesState>>({})
   const [bulkMode, setBulkMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const detailHeadingRef = useRef<HTMLDivElement | null>(null)
+  const actionMenuRef = useRef<HTMLDivElement | null>(null)
   const pendingNotesTimers = useRef<number[]>([])
 
   useEffect(() => {
@@ -75,6 +95,7 @@ export function HistoryPage(props: {
     setDetailQuery('')
     setDetailView('transcript')
     setConfirmDelete(false)
+    setActionMenuOpen(false)
   }, [props.selectedTranscript?.id])
 
   useEffect(() => {
@@ -87,6 +108,10 @@ export function HistoryPage(props: {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setActionMenuOpen(false)
+      }
+
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') {
         event.preventDefault()
 
@@ -102,6 +127,25 @@ export function HistoryPage(props: {
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [props.selectedTranscript])
+
+  useEffect(() => {
+    if (!actionMenuOpen) {
+      return
+    }
+
+    const onPointerDown = (event: PointerEvent) => {
+      const menu = actionMenuRef.current
+
+      if (!menu || !(event.target instanceof Node) || menu.contains(event.target)) {
+        return
+      }
+
+      setActionMenuOpen(false)
+    }
+
+    window.addEventListener('pointerdown', onPointerDown)
+    return () => window.removeEventListener('pointerdown', onPointerDown)
+  }, [actionMenuOpen])
 
   const selectedTranscript = props.selectedTranscript
   const filteredBlocks = useMemo(() => {
@@ -137,6 +181,8 @@ export function HistoryPage(props: {
 
     pendingNotesTimers.current.push(timerId)
   }
+
+  const closeActionMenu = () => setActionMenuOpen(false)
 
   if (!selectedTranscript) {
     return (
@@ -427,51 +473,52 @@ export function HistoryPage(props: {
             />
           ) : null}
 
-          <details className="quiet-details">
-            <summary className="quiet-details__summary">
-              <span>More</span>
-              <span>Copy, export, delete</span>
-            </summary>
-            <div className="quiet-details__body">
-              <Button
-                label="Copy text"
-                disabled={Boolean(props.busyAction)}
-                size="small"
-                onClick={() => props.onCopy(selectedTranscript.id, 'plain_text')}
-              />
-              <Button
-                label="Copy bilingual"
-                disabled={Boolean(props.busyAction)}
-                size="small"
-                onClick={() => props.onCopy(selectedTranscript.id, 'bilingual_text')}
-              />
-              <Button
-                label="Export text"
-                disabled={Boolean(props.busyAction)}
-                size="small"
-                onClick={() => props.onExport(selectedTranscript.id, 'plain_text')}
-              />
-              <Button
-                label="Export bilingual"
-                disabled={Boolean(props.busyAction)}
-                size="small"
-                onClick={() => props.onExport(selectedTranscript.id, 'bilingual_text')}
-              />
-              <Button
-                label="Export JSON"
-                disabled={Boolean(props.busyAction)}
-                size="small"
-                onClick={() => props.onExport(selectedTranscript.id, 'json')}
-              />
-              <Button
-                label="Delete record"
-                danger
-                disabled={Boolean(props.busyAction)}
-                size="small"
-                onClick={() => setConfirmDelete(true)}
-              />
-            </div>
-          </details>
+          <div
+            ref={actionMenuRef}
+            className={`detail-actions-menu ${actionMenuOpen ? 'detail-actions-menu--open' : ''}`}
+          >
+            <button
+              type="button"
+              className="detail-actions-menu__trigger"
+              aria-haspopup="true"
+              aria-expanded={actionMenuOpen}
+              aria-controls={actionMenuOpen ? actionMenuId : undefined}
+              onClick={() => setActionMenuOpen((current) => !current)}
+            >
+              <span>Actions</span>
+              <span aria-hidden="true" className="detail-actions-menu__chevron">v</span>
+            </button>
+
+            {actionMenuOpen ? (
+              <div id={actionMenuId} className="detail-actions-menu__popover">
+                {getHistoryDetailActionGroups().map((group) => (
+                  <section key={group.label} className="detail-actions-menu__section" aria-label={group.label}>
+                    <div className="detail-actions-menu__section-label">{group.label}</div>
+                    <div className="detail-actions-menu__items">
+                      {group.items.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          className={`detail-actions-menu__item ${item.danger ? 'detail-actions-menu__item--danger' : ''}`}
+                          disabled={Boolean(props.busyAction)}
+                          onClick={() => {
+                            closeActionMenu()
+                            runHistoryDetailAction(item.id, {
+                              onCopy: (format) => props.onCopy(selectedTranscript.id, format),
+                              onExport: (format) => props.onExport(selectedTranscript.id, format),
+                              onDelete: () => setConfirmDelete(true)
+                            })
+                          }}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            ) : null}
+          </div>
         </div>
       </section>
 
@@ -715,6 +762,32 @@ export function getArchivePreview(transcript: SavedTranscript, query: string): A
   }
 }
 
+export function getHistoryDetailActionGroups(): HistoryDetailActionGroup[] {
+  return [
+    {
+      label: 'Copy',
+      items: [
+        { id: 'copy-text', label: 'Copy text' },
+        { id: 'copy-bilingual', label: 'Copy bilingual' }
+      ]
+    },
+    {
+      label: 'Export',
+      items: [
+        { id: 'export-text', label: 'Export text' },
+        { id: 'export-bilingual', label: 'Export bilingual' },
+        { id: 'export-json', label: 'Export JSON' }
+      ]
+    },
+    {
+      label: 'Danger',
+      items: [
+        { id: 'delete-record', label: 'Delete record', danger: true }
+      ]
+    }
+  ]
+}
+
 function describeTranscriptSources(transcript: SavedTranscript): string {
   const sources = [...new Set(transcript.blocks.map((block) => describeCaptureSource(block.source)))]
   return sources.length === 0 ? 'Unknown source' : sources.join(' + ')
@@ -812,4 +885,40 @@ function truncateArchivePreview(text: string): string {
 
 function normalizeWhitespace(value: string): string {
   return value.replace(/\s+/g, ' ').trim()
+}
+
+function runHistoryDetailAction(
+  actionId: HistoryDetailActionId,
+  handlers: {
+    onCopy: (format: ExportFormat) => void
+    onExport: (format: ExportFormat) => void
+    onDelete: () => void
+  }
+) {
+  switch (actionId) {
+    case 'copy-text':
+      handlers.onCopy('plain_text')
+      return
+    case 'copy-bilingual':
+      handlers.onCopy('bilingual_text')
+      return
+    case 'export-text':
+      handlers.onExport('plain_text')
+      return
+    case 'export-bilingual':
+      handlers.onExport('bilingual_text')
+      return
+    case 'export-json':
+      handlers.onExport('json')
+      return
+    case 'delete-record':
+      handlers.onDelete()
+      return
+    default:
+      return assertNever(actionId)
+  }
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unhandled history detail action: ${String(value)}`)
 }

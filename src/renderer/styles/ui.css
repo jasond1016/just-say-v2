@@ -1172,6 +1172,101 @@
   align-items: center;
 }
 
+.detail-actions-menu {
+  position: relative;
+}
+
+.detail-actions-menu__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--bg-surface) 96%, transparent);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.detail-actions-menu--open .detail-actions-menu__trigger {
+  color: var(--text-primary);
+  border-color: color-mix(in oklab, var(--accent) 24%, var(--border));
+  background: color-mix(in oklab, var(--accent-muted) 36%, var(--bg-surface));
+}
+
+.detail-actions-menu__chevron {
+  font-size: 10px;
+  line-height: 1;
+}
+
+.detail-actions-menu__popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 6;
+  min-width: 224px;
+  padding: 10px;
+  border: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
+  border-radius: 16px;
+  background: color-mix(in oklab, var(--bg-surface) 98%, transparent);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.12);
+}
+
+.detail-actions-menu__section {
+  display: grid;
+  gap: 6px;
+}
+
+.detail-actions-menu__section + .detail-actions-menu__section {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in oklab, var(--border) 58%, transparent);
+}
+
+.detail-actions-menu__section-label {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.detail-actions-menu__items {
+  display: grid;
+  gap: 4px;
+}
+
+.detail-actions-menu__item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 34px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.detail-actions-menu__item:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--accent-muted) 28%, var(--bg-surface));
+}
+
+.detail-actions-menu__item:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.detail-actions-menu__item--danger {
+  color: var(--danger-text);
+}
+
 .detail-search {
   display: flex;
   justify-content: space-between;
@@ -1606,6 +1701,12 @@
   .result-panel,
   .hud-preview {
     padding: 16px;
+  }
+
+  .detail-actions-menu__popover {
+    left: 0;
+    right: auto;
+    width: min(280px, calc(100vw - 64px));
   }
 
   .hud-strip {
