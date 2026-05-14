@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { HistoryAudioPlayback, SavedTranscript } from '../../shared/api-types'
-import { HistoryPage } from './history-page'
+import { getArchivePreview, HistoryPage } from './history-page'
 
 describe('HistoryPage audio detail', () => {
   it('renders a meeting audio player when playback is available', () => {
@@ -70,14 +70,64 @@ describe('HistoryPage audio detail', () => {
   })
 })
 
+describe('getArchivePreview', () => {
+  it('returns a compact opening excerpt for archive rows', () => {
+    const transcript = createTranscript({
+      plainText: 'first line second line third line fourth line',
+      blocks: [
+        createBlock('first line'),
+        createBlock('second line'),
+        createBlock('third line')
+      ]
+    })
+
+    expect(getArchivePreview(transcript, '')).toEqual({
+      kind: 'opening',
+      text: 'first line second line third line'
+    })
+  })
+
+  it('returns a contextual search hit instead of the transcript opening', () => {
+    const transcript = createTranscript({
+      blocks: [
+        createBlock('Kickoff and introductions.'),
+        createBlock('We need to finalize the migration checklist before Friday and send it to the team.'),
+        createBlock('Parking lot items come later.')
+      ]
+    })
+
+    expect(getArchivePreview(transcript, 'migration')).toEqual({
+      kind: 'match',
+      text: 'We need to finalize the migration checklist before Friday and send it to the team.'
+    })
+  })
+
+  it('falls back to the opening excerpt when the search term only matched outside transcript lines', () => {
+    const transcript = createTranscript({
+      title: 'Migration review',
+      blocks: [
+        createBlock('Kickoff and introductions.'),
+        createBlock('Next steps are still open.')
+      ]
+    })
+
+    expect(getArchivePreview(transcript, 'review')).toEqual({
+      kind: 'opening',
+      text: 'Kickoff and introductions. Next steps are still open.'
+    })
+  })
+})
+
 function createProps(overrides: {
+  items?: SavedTranscript[]
+  searchQuery?: string
   selectedTranscript: SavedTranscript | null
   selectedAudio: HistoryAudioPlayback | null
 }) {
   return {
-    items: [],
+    items: overrides.items ?? [],
     total: 0,
-    searchQuery: '',
+    searchQuery: overrides.searchQuery ?? '',
     selectedMode: 'all' as const,
     selectedSource: 'all' as const,
     selectedTimeFilter: 'all' as const,
@@ -121,5 +171,15 @@ function createTranscript(overrides: Partial<SavedTranscript> = {}): SavedTransc
       includeMicrophone: true,
       translationEnabled: false
     }
+  }
+}
+
+function createBlock(text: string) {
+  return {
+    id: `block-${text}`,
+    source: 'system' as const,
+    text,
+    startedAt: 1_000,
+    endedAt: 4_000
   }
 }

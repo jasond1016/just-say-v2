@@ -18,6 +18,15 @@ type GeneratedNotes = {
   actionItems: string[]
 }
 
+type ArchivePreview = {
+  kind: 'opening' | 'match'
+  text: string
+}
+
+const ARCHIVE_PREVIEW_MAX_CHARS = 220
+const ARCHIVE_PREVIEW_CONTEXT_BEFORE = 48
+const ARCHIVE_PREVIEW_CONTEXT_AFTER = 128
+
 export function HistoryPage(props: {
   items: SavedTranscript[]
   total: number
@@ -280,6 +289,7 @@ export function HistoryPage(props: {
           ) : (
             props.items.map((item) => {
               const isSelected = selectedIds.has(item.id)
+              const preview = getArchivePreview(item, props.searchQuery)
               return (
                 <button
                   key={item.id}
@@ -306,7 +316,7 @@ export function HistoryPage(props: {
                       <div className={`archive-row__checkbox ${isSelected ? 'archive-row__checkbox--checked' : ''}`} />
                     </div>
                   ) : null}
-                  <div>
+                  <div className="archive-row__content">
                     <div className="archive-row__head">
                       <div className="archive-row__title">{item.title}</div>
                       <div className="archive-row__time">{formatArchiveTime(item.startedAt)}</div>
@@ -315,7 +325,10 @@ export function HistoryPage(props: {
                       <span>{describeTranscriptSummary(item)}</span>
                       <span>{formatDurationMs(item.endedAt - item.startedAt)}</span>
                     </div>
-                    <div className="archive-row__preview">{item.plainText}</div>
+                    {preview.kind === 'match' ? (
+                      <div className="archive-row__preview-kicker">Search hit</div>
+                    ) : null}
+                    <div className="archive-row__preview">{preview.text}</div>
                   </div>
                 </button>
               )
@@ -679,6 +692,29 @@ function pickLines(lines: string[], patterns: RegExp[], limit: number): string[]
   return [...preferred, ...fallback].slice(0, limit)
 }
 
+export function getArchivePreview(transcript: SavedTranscript, query: string): ArchivePreview {
+  const normalizedQuery = normalizeWhitespace(query).toLowerCase()
+
+  if (normalizedQuery) {
+    for (const candidate of getArchivePreviewCandidates(transcript)) {
+      const normalizedCandidate = normalizeWhitespace(candidate)
+      const matchIndex = normalizedCandidate.toLowerCase().indexOf(normalizedQuery)
+
+      if (matchIndex >= 0) {
+        return {
+          kind: 'match',
+          text: buildContextSnippet(normalizedCandidate, matchIndex, normalizedQuery.length)
+        }
+      }
+    }
+  }
+
+  return {
+    kind: 'opening',
+    text: buildOpeningPreview(transcript)
+  }
+}
+
 function describeTranscriptSources(transcript: SavedTranscript): string {
   const sources = [...new Set(transcript.blocks.map((block) => describeCaptureSource(block.source)))]
   return sources.length === 0 ? 'Unknown source' : sources.join(' + ')
@@ -733,4 +769,47 @@ function formatRelativeTime(timestamp: number): string {
 
   const hours = Math.floor(minutes / 60)
   return `${hours}h ago`
+}
+
+function getArchivePreviewCandidates(transcript: SavedTranscript): string[] {
+  const blockCandidates = transcript.blocks.flatMap((block) => [
+    block.text,
+    block.translatedText ?? '',
+    block.speakerLabel ?? ''
+  ])
+
+  return [...blockCandidates, transcript.plainText]
+    .map((value) => normalizeWhitespace(value))
+    .filter(Boolean)
+}
+
+function buildOpeningPreview(transcript: SavedTranscript): string {
+  const openingSource = transcript.blocks
+    .map((block) => normalizeWhitespace(block.text))
+    .filter(Boolean)
+    .slice(0, 3)
+    .join(' ')
+
+  return truncateArchivePreview(openingSource || normalizeWhitespace(transcript.plainText) || 'Open this transcript to read it in full.')
+}
+
+function buildContextSnippet(source: string, matchIndex: number, queryLength: number): string {
+  const start = Math.max(0, matchIndex - ARCHIVE_PREVIEW_CONTEXT_BEFORE)
+  const end = Math.min(source.length, matchIndex + queryLength + ARCHIVE_PREVIEW_CONTEXT_AFTER)
+  const prefix = start > 0 ? '...' : ''
+  const suffix = end < source.length ? '...' : ''
+
+  return truncateArchivePreview(`${prefix}${source.slice(start, end).trim()}${suffix}`)
+}
+
+function truncateArchivePreview(text: string): string {
+  if (text.length <= ARCHIVE_PREVIEW_MAX_CHARS) {
+    return text
+  }
+
+  return `${text.slice(0, ARCHIVE_PREVIEW_MAX_CHARS).trim()}...`
+}
+
+function normalizeWhitespace(value: string): string {
+  return value.replace(/\s+/g, ' ').trim()
 }
