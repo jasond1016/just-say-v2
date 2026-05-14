@@ -6,6 +6,11 @@ import { Button } from '../ui/controls'
 import { describeCaptureSource } from '../ui/copy'
 
 type LiveSessionSnapshot = NonNullable<AppRuntimeSnapshot['liveSession']>
+type LatestContentViewportMetrics = {
+  latestContentBottom: number
+  viewportBottom: number
+}
+const AUTO_SCROLL_RESUME_THRESHOLD_PX = 48
 
 export function LiveSessionPage(props: {
   liveSession: LiveSessionSnapshot | null
@@ -28,6 +33,7 @@ export function LiveSessionPage(props: {
   const isStreaming = props.activeRuntimeSession?.status === 'streaming'
   const isSessionActive = Boolean(props.activeRuntimeSession)
   const hasTranscript = timeline.length > 0
+  const transcriptRevision = session?.transcript.revision ?? 0
   const isColdStart = !session && !hasTranscript
   const statusCopy = describeStatus(activeStatus, hasTranscript)
   const sessionTitle = session ? deriveSessionTitle(session) : 'Live Session'
@@ -119,6 +125,7 @@ export function LiveSessionPage(props: {
 
       <TranscriptWithJump
         timeline={timeline}
+        transcriptRevision={transcriptRevision}
         isStreaming={isStreaming}
         meetingStartDisabled={props.meetingStartDisabled}
         busyAction={props.busyAction}
@@ -187,6 +194,7 @@ export function LiveSessionPage(props: {
 
 function TranscriptWithJump(props: {
   timeline: ReturnType<typeof selectVisibleTimeline>
+  transcriptRevision: number
   isStreaming: boolean
   meetingStartDisabled: boolean
   busyAction: string | null
@@ -194,48 +202,92 @@ function TranscriptWithJump(props: {
 }) {
   const canvasRef = useRef<HTMLElement | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
+  const scrollContainerRef = useRef<HTMLElement | null>(null)
   const [userScrolledAway, setUserScrolledAway] = useState(false)
   const isAutoScrolling = useRef(false)
+  const autoScrollReleaseTimerRef = useRef<number | null>(null)
 
-  const checkIfAtBottom = useCallback(() => {
-    const el = canvasRef.current
-    if (!el) return true
-    return el.scrollHeight - el.scrollTop - el.clientHeight < 48
+  const clearAutoScrollReleaseTimer = useCallback(() => {
+    if (autoScrollReleaseTimerRef.current === null) {
+      return
+    }
+
+    window.clearTimeout(autoScrollReleaseTimerRef.current)
+    autoScrollReleaseTimerRef.current = null
   }, [])
 
   useEffect(() => {
-    const el = canvasRef.current
-    if (!el) return
+    return () => {
+      clearAutoScrollReleaseTimer()
+    }
+  }, [clearAutoScrollReleaseTimer])
+
+  const checkIfAtBottom = useCallback(() => {
+    const container = scrollContainerRef.current
+    const latestMarker = bottomRef.current
+    if (!container || !latestMarker) {
+      return true
+    }
+
+    return isLatestContentNearViewportBottom({
+      latestContentBottom: latestMarker.getBoundingClientRect().bottom,
+      viewportBottom: container.getBoundingClientRect().bottom
+    })
+  }, [])
+
+  const releaseAutoScrolling = useCallback((delayMs: number) => {
+    clearAutoScrollReleaseTimer()
+
+    autoScrollReleaseTimerRef.current = window.setTimeout(() => {
+      isAutoScrolling.current = false
+      autoScrollReleaseTimerRef.current = null
+      setUserScrolledAway(!checkIfAtBottom())
+    }, delayMs)
+  }, [checkIfAtBottom, clearAutoScrollReleaseTimer])
+
+  const scrollLatestIntoView = useCallback((behavior: ScrollBehavior) => {
+    const bottom = bottomRef.current
+    if (!bottom) {
+      return
+    }
+
+    isAutoScrolling.current = true
+    bottom.scrollIntoView({ block: 'end', behavior })
+    releaseAutoScrolling(behavior === 'smooth' ? 400 : 32)
+  }, [releaseAutoScrolling])
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const container = resolveLiveSessionScrollContainer(canvas)
+    scrollContainerRef.current = container
 
     const handleScroll = () => {
       if (isAutoScrolling.current) return
       setUserScrolledAway(!checkIfAtBottom())
     }
 
-    el.addEventListener('scroll', handleScroll, { passive: true })
-    return () => el.removeEventListener('scroll', handleScroll)
+    setUserScrolledAway(!checkIfAtBottom())
+    container.addEventListener('scroll', handleScroll, { passive: true })
+
+    return () => {
+      container.removeEventListener('scroll', handleScroll)
+      if (scrollContainerRef.current === container) {
+        scrollContainerRef.current = null
+      }
+    }
   }, [checkIfAtBottom])
 
   useEffect(() => {
-    if (userScrolledAway || !props.isStreaming) return
+    if (!shouldAutoFollowTranscript(props.isStreaming, userScrolledAway)) return
 
-    const el = canvasRef.current
-    if (!el) return
-
-    isAutoScrolling.current = true
-    el.scrollTop = el.scrollHeight
-    requestAnimationFrame(() => {
-      isAutoScrolling.current = false
-    })
-  }, [props.timeline.length, props.isStreaming, userScrolledAway])
+    scrollLatestIntoView('auto')
+  }, [props.transcriptRevision, props.isStreaming, scrollLatestIntoView, userScrolledAway])
 
   const jumpToLatest = () => {
-    const el = canvasRef.current
-    if (!el) return
-    isAutoScrolling.current = true
-    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
     setUserScrolledAway(false)
-    setTimeout(() => { isAutoScrolling.current = false }, 400)
+    scrollLatestIntoView('smooth')
   }
 
   return (
@@ -309,6 +361,31 @@ function deriveSessionTitle(session: LiveSessionSnapshot): string {
   }
 
   return sourceText.length > 64 ? `${sourceText.slice(0, 64).trim()}...` : sourceText
+}
+
+function resolveLiveSessionScrollContainer(canvas: HTMLElement): HTMLElement {
+  const appMain = canvas.closest('.app-main')
+
+  if (appMain instanceof HTMLElement) {
+    return appMain
+  }
+
+  return canvas
+}
+
+export function shouldAutoFollowTranscript(isStreaming: boolean, userScrolledAway: boolean): boolean {
+  return isStreaming && !userScrolledAway
+}
+
+export function isLatestContentNearViewportBottom(
+  metrics: LatestContentViewportMetrics,
+  thresholdPx: number = AUTO_SCROLL_RESUME_THRESHOLD_PX
+): boolean {
+  return getDistanceFromLatestContent(metrics) < thresholdPx
+}
+
+export function getDistanceFromLatestContent(metrics: LatestContentViewportMetrics): number {
+  return metrics.latestContentBottom - metrics.viewportBottom
 }
 
 function useDisplayedSessionDuration(

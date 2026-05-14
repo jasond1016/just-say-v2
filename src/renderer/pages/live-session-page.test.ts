@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import type { AppRuntimeSnapshot } from '../../shared/api-types'
-import { getDisplayedSessionDurationSec } from './live-session-page'
+import {
+  getDisplayedSessionDurationSec,
+  getDistanceFromLatestContent,
+  isLatestContentNearViewportBottom,
+  shouldAutoFollowTranscript
+} from './live-session-page'
 
 describe('getDisplayedSessionDurationSec', () => {
   it('keeps the live-session timer moving from startedAt while streaming', () => {
@@ -33,6 +38,42 @@ describe('getDisplayedSessionDurationSec', () => {
     })
 
     expect(getDisplayedSessionDurationSec(session, 'completed', 80_000)).toBe(42)
+  })
+})
+
+describe('live transcript auto-follow helpers', () => {
+  it('measures how far the viewport is from the latest content', () => {
+    expect(getDistanceFromLatestContent({
+      latestContentBottom: 720,
+      viewportBottom: 672
+    })).toBe(48)
+  })
+
+  it('treats positions within the 48px threshold as near latest', () => {
+    expect(isLatestContentNearViewportBottom({
+      latestContentBottom: 719,
+      viewportBottom: 672
+    })).toBe(true)
+  })
+
+  it('counts a visible latest marker as already near latest even if more layout exists below it', () => {
+    expect(isLatestContentNearViewportBottom({
+      latestContentBottom: 620,
+      viewportBottom: 672
+    })).toBe(true)
+  })
+
+  it('keeps auto-follow paused until the latest marker returns inside the 48px threshold', () => {
+    expect(isLatestContentNearViewportBottom({
+      latestContentBottom: 720,
+      viewportBottom: 672
+    })).toBe(false)
+  })
+
+  it('only auto-follows while streaming and the user has not scrolled away', () => {
+    expect(shouldAutoFollowTranscript(true, false)).toBe(true)
+    expect(shouldAutoFollowTranscript(true, true)).toBe(false)
+    expect(shouldAutoFollowTranscript(false, false)).toBe(false)
   })
 })
 
