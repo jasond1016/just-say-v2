@@ -234,6 +234,7 @@ function WorkspaceApp() {
             onOpen={(id) => { void controller.openHistoryItem(id) }}
             onCloseDetail={() => { controller.clearSelectedHistory() }}
             onDelete={(id) => { void controller.deleteHistoryItem(id) }}
+            onDeleteBulk={(ids) => controller.deleteHistoryItems(ids)}
             onCopy={(id, format) => { void controller.copyHistoryItem(id, format) }}
             onExport={(id, format) => { void controller.exportHistoryItem(id, format) }}
             onGenerateNotes={(id, options) => { void controller.generateHistoryNotes(id, options) }}

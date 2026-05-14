@@ -459,6 +459,46 @@ describe('AppController', () => {
     dispose()
   })
 
+  it('deletes multiple history items through the API and refreshes the archive', async () => {
+    const deleteHistory = vi.fn(async () => true)
+    const listHistory = vi
+      .fn()
+      .mockResolvedValueOnce({
+        items: [createHistoryItem('tx-1', 'meeting'), createHistoryItem('tx-2', 'meeting')],
+        total: 2,
+        page: 1,
+        pageSize: 20,
+        totalPages: 1
+      })
+      .mockResolvedValueOnce({
+        items: [],
+        total: 0,
+        page: 1,
+        pageSize: 20,
+        totalPages: 0
+      })
+    const controller = new AppController({
+      api: createApi({
+        deleteHistory,
+        listHistory
+      }),
+      runtimeStore: new RuntimeStore()
+    })
+
+    const dispose = controller.start()
+    await flushPromises()
+
+    await controller.deleteHistoryItems(['tx-1', 'tx-2', 'tx-1'])
+
+    expect(deleteHistory).toHaveBeenCalledTimes(2)
+    expect(deleteHistory).toHaveBeenCalledWith('tx-1')
+    expect(deleteHistory).toHaveBeenCalledWith('tx-2')
+    expect(controller.getSnapshot().history).toEqual([])
+    expect(controller.getSnapshot().exportMessage).toBe('Deleted 2 transcripts.')
+
+    dispose()
+  })
+
   it('cancels pending bootstrap work when stopped before startup completes', async () => {
     const firstRuntime = createDeferred<AppRuntimeSnapshot>()
     const firstSettings = createDeferred<AppSettings>()

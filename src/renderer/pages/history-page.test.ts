@@ -4,6 +4,11 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { HistoryAudioPlayback, SavedTranscript } from '../../shared/api-types'
 import {
+  formatDeleteConfirmationLabel,
+  formatDeleteDialogBody,
+  formatDeleteDialogTitle,
+  formatBulkDeleteLabel,
+  formatBulkSelectionSummary,
   formatNotesOverview,
   getArchivePreview,
   getHistoryDetailActionGroups,
@@ -182,6 +187,32 @@ describe('formatNotesOverview', () => {
     expect(paragraphs.join('')).toBe(
       '会议讨论了曲子项目进展、各团队的推进情况，以及 AI 课题列表追加和定期会议的需求。会议确认前端团队定期会议从下周一开始每周一 17:30 举行。各团队优先处理现有事项，并在下次会议前同步阻塞点。'
     )
+  })
+})
+
+describe('bulk selection labels', () => {
+  it('formats the bulk selection summary clearly', () => {
+    expect(formatBulkSelectionSummary(0)).toBe('Select records')
+    expect(formatBulkSelectionSummary(2)).toBe('2 selected')
+  })
+
+  it('formats the bulk delete action label without a second inline confirm state', () => {
+    expect(formatBulkDeleteLabel(0)).toBe('Delete selected')
+    expect(formatBulkDeleteLabel(1)).toBe('Delete record')
+    expect(formatBulkDeleteLabel(2)).toBe('Delete 2 records')
+  })
+
+  it('formats delete dialog copy for single and bulk delete confirmations', () => {
+    expect(formatDeleteDialogTitle(1)).toBe('Delete record?')
+    expect(formatDeleteDialogBody(1, 'Weekly sync')).toBe(
+      '"Weekly sync" will be removed from history permanently. This cannot be undone.'
+    )
+    expect(formatDeleteConfirmationLabel(1)).toBe('Delete record')
+    expect(formatDeleteDialogTitle(2)).toBe('Delete 2 records?')
+    expect(formatDeleteDialogBody(2)).toBe(
+      'These records will be removed from history permanently. This cannot be undone.'
+    )
+    expect(formatDeleteConfirmationLabel(2)).toBe('Delete 2 records')
   })
 })
 

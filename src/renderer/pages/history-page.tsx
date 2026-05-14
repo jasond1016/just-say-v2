@@ -67,7 +67,7 @@ export function HistoryPage(props: {
   onOpen: (id: string) => void
   onCloseDetail: () => void
   onDelete: (id: string) => void
-  onDeleteBulk?: (ids: string[]) => void
+  onDeleteBulk?: (ids: string[]) => Promise<void> | void
   onExportBulk?: (ids: string[], format: ExportFormat) => void
   onCopy: (id: string, format: ExportFormat) => void
   onExport: (id: string, format: ExportFormat) => void
@@ -80,6 +80,7 @@ export function HistoryPage(props: {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [actionMenuOpen, setActionMenuOpen] = useState(false)
   const [bulkMode, setBulkMode] = useState(false)
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const detailHeadingRef = useRef<HTMLDivElement | null>(null)
@@ -93,6 +94,12 @@ export function HistoryPage(props: {
   }, [props.selectedTranscript?.id])
 
   useEffect(() => {
+    if (!bulkMode || selectedIds.size === 0) {
+      setConfirmBulkDelete(false)
+    }
+  }, [bulkMode, selectedIds])
+
+  useEffect(() => {
     if (!props.selectedTranscript) {
       return
     }
@@ -104,6 +111,8 @@ export function HistoryPage(props: {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setActionMenuOpen(false)
+        setConfirmDelete(false)
+        setConfirmBulkDelete(false)
       }
 
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') {
@@ -154,6 +163,7 @@ export function HistoryPage(props: {
   }, [detailQuery, selectedTranscript])
 
   const notesState = selectedTranscript ? props.notesState : null
+  const selectedCount = selectedIds.size
   const hasActiveFilters =
     props.searchQuery.trim().length > 0 ||
     props.selectedMode !== 'all' ||
@@ -161,211 +171,264 @@ export function HistoryPage(props: {
     props.selectedTimeFilter !== 'all'
 
   const closeActionMenu = () => setActionMenuOpen(false)
+  const activeDeleteDialog =
+    confirmDelete && selectedTranscript
+      ? {
+          title: formatDeleteDialogTitle(1),
+          body: formatDeleteDialogBody(1, selectedTranscript.title),
+          confirmLabel: formatDeleteConfirmationLabel(1),
+          onConfirm: async () => {
+            setConfirmDelete(false)
+            props.onDelete(selectedTranscript.id)
+          },
+          onCancel: () => setConfirmDelete(false)
+        }
+      : confirmBulkDelete && selectedCount > 0
+        ? {
+            title: formatDeleteDialogTitle(selectedCount),
+            body: formatDeleteDialogBody(selectedCount),
+            confirmLabel: formatDeleteConfirmationLabel(selectedCount),
+            onConfirm: async () => {
+              setConfirmBulkDelete(false)
+
+              if (!props.onDeleteBulk) {
+                return
+              }
+
+              await props.onDeleteBulk([...selectedIds])
+              setSelectedIds(new Set())
+              setBulkMode(false)
+            },
+            onCancel: () => setConfirmBulkDelete(false)
+          }
+        : null
+  const deleteDialog = activeDeleteDialog ? (
+    <DeleteConfirmDialog
+      title={activeDeleteDialog.title}
+      body={activeDeleteDialog.body}
+      confirmLabel={activeDeleteDialog.confirmLabel}
+      busy={Boolean(props.busyAction)}
+      onConfirm={() => { void activeDeleteDialog.onConfirm() }}
+      onCancel={activeDeleteDialog.onCancel}
+    />
+  ) : null
 
   if (!selectedTranscript) {
     return (
-      <div className="page page--wide">
-        <header className="surface-header">
-          <div className="surface-header__eyebrow">History</div>
-          <div className="surface-header__row">
-            <div className="surface-header__headline-group">
-              <h1 className="surface-header__title">Archive</h1>
-            </div>
-            <div className="surface-header__meta">
-              <span>{props.total} records</span>
-              {props.items.length > 0 ? (
-                <Button
-                  label={bulkMode ? 'Done' : 'Select'}
-                  variant="ghost"
-                  size="small"
-                  onClick={() => {
-                    setBulkMode(!bulkMode)
-                    setSelectedIds(new Set())
-                  }}
-                />
-              ) : null}
-            </div>
-          </div>
-
-        </header>
-
-        <section className="archive-controls" aria-labelledby={headingId}>
-          <div className="archive-controls__search">
-            <TextInput
-              ref={searchInputRef}
-              value={props.searchQuery}
-              onChange={(event) => props.onSearchQueryChange(event.target.value)}
-              placeholder="Search transcripts"
-              ariaLabel="Search transcripts"
-              className="field-input--full archive-search"
-            />
-          </div>
-
-          <div className="archive-filter-row">
-            <FilterGroup
-              label="Mode"
-              options={[
-                { value: 'all', label: 'All' },
-                { value: 'ptt', label: 'Quick Dictation' },
-                { value: 'meeting', label: 'Live Session' }
-              ]}
-              selected={props.selectedMode}
-              onSelect={(value) => props.onModeChange(value as 'all' | SavedTranscript['mode'])}
-            />
-            <FilterGroup
-              label="Source"
-              options={[
-                { value: 'all', label: 'All sources' },
-                { value: 'microphone', label: 'Microphone' },
-                { value: 'system', label: 'System audio' }
-              ]}
-              selected={props.selectedSource}
-              onSelect={(value) => props.onSourceChange(value as 'all' | CaptureSource)}
-            />
-            <FilterGroup
-              label="Time"
-              options={[
-                { value: 'all', label: 'All time' },
-                { value: 'today', label: 'Today' },
-                { value: 'last_7_days', label: '7 days' },
-                { value: 'last_30_days', label: '30 days' }
-              ]}
-              selected={props.selectedTimeFilter}
-              onSelect={(value) => props.onTimeFilterChange(value as HistoryTimeFilter)}
-            />
-            {hasActiveFilters ? (
-              <Button
-                label="Clear filters"
-                variant="ghost"
-                size="small"
-                onClick={() => {
-                  props.onSearchQueryChange('')
-                  props.onModeChange('all')
-                  props.onSourceChange('all')
-                  props.onTimeFilterChange('all')
-                }}
-              />
-            ) : null}
-          </div>
-        </section>
-
-        <section className="archive-list" aria-labelledby={headingId}>
-          <div id={headingId} className="sr-only">Archive results</div>
-
-          {bulkMode && selectedIds.size > 0 ? (
-            <div className="archive-bulk-bar" role="toolbar" aria-label="Bulk actions">
-              <div className="archive-bulk-bar__info">{selectedIds.size} selected</div>
-              <div className="archive-bulk-bar__actions">
-                <Button
-                  label="Export selected"
-                  size="small"
-                  variant="secondary"
-                  disabled={Boolean(props.busyAction)}
-                  onClick={() => {
-                    if (props.onExportBulk) {
-                      props.onExportBulk([...selectedIds], 'plain_text')
-                    }
-                  }}
-                />
-                <Button
-                  label="Delete selected"
-                  size="small"
-                  variant="secondary"
-                  danger
-                  disabled={Boolean(props.busyAction)}
-                  onClick={() => {
-                    if (props.onDeleteBulk) {
-                      props.onDeleteBulk([...selectedIds])
+      <>
+        <div className="page page--wide">
+          <header className="surface-header">
+            <div className="surface-header__eyebrow">History</div>
+            <div className="surface-header__row">
+              <div className="surface-header__headline-group">
+                <h1 className="surface-header__title">Archive</h1>
+              </div>
+              <div className="surface-header__meta">
+                <span>{props.total} records</span>
+                {props.items.length > 0 ? (
+                  <Button
+                    label={bulkMode ? 'Done' : 'Select'}
+                    variant="ghost"
+                    size="small"
+                    onClick={() => {
+                      setBulkMode(!bulkMode)
                       setSelectedIds(new Set())
-                    }
-                  }}
-                />
-                <Button
-                  label="Cancel"
-                  size="small"
-                  variant="ghost"
-                  onClick={() => {
-                    setBulkMode(false)
-                    setSelectedIds(new Set())
-                  }}
-                />
+                      setConfirmBulkDelete(false)
+                    }}
+                  />
+                ) : null}
               </div>
             </div>
-          ) : null}
 
-          {props.items.length === 0 ? (
-            <div className="empty-state empty-state--archive" role="status" aria-live="polite">
-              <div className="empty-state__title">
-                {hasActiveFilters ? 'No transcripts match these filters.' : 'No transcripts yet.'}
-              </div>
-              <p className="empty-state__body">
-                {hasActiveFilters
-                  ? 'Clear filters or search for a broader phrase to see more of the archive again.'
-                  : 'Finished dictation and live sessions will land here automatically after capture is done.'}
-              </p>
-              {!hasActiveFilters ? (
-                <div className="empty-state__actions">
-                  <Button label="Open quick dictation" size="small" onClick={props.onOpenQuickDictation} />
-                  <Button label="Open live session" size="small" variant="secondary" onClick={props.onOpenLiveSession} />
-                </div>
+          </header>
+
+          <section className="archive-controls" aria-labelledby={headingId}>
+            <div className="archive-controls__search">
+              <TextInput
+                ref={searchInputRef}
+                value={props.searchQuery}
+                onChange={(event) => props.onSearchQueryChange(event.target.value)}
+                placeholder="Search transcripts"
+                ariaLabel="Search transcripts"
+                className="field-input--full archive-search"
+              />
+            </div>
+
+            <div className="archive-filter-row">
+              <FilterGroup
+                label="Mode"
+                options={[
+                  { value: 'all', label: 'All' },
+                  { value: 'ptt', label: 'Quick Dictation' },
+                  { value: 'meeting', label: 'Live Session' }
+                ]}
+                selected={props.selectedMode}
+                onSelect={(value) => props.onModeChange(value as 'all' | SavedTranscript['mode'])}
+              />
+              <FilterGroup
+                label="Source"
+                options={[
+                  { value: 'all', label: 'All sources' },
+                  { value: 'microphone', label: 'Microphone' },
+                  { value: 'system', label: 'System audio' }
+                ]}
+                selected={props.selectedSource}
+                onSelect={(value) => props.onSourceChange(value as 'all' | CaptureSource)}
+              />
+              <FilterGroup
+                label="Time"
+                options={[
+                  { value: 'all', label: 'All time' },
+                  { value: 'today', label: 'Today' },
+                  { value: 'last_7_days', label: '7 days' },
+                  { value: 'last_30_days', label: '30 days' }
+                ]}
+                selected={props.selectedTimeFilter}
+                onSelect={(value) => props.onTimeFilterChange(value as HistoryTimeFilter)}
+              />
+              {hasActiveFilters ? (
+                <Button
+                  label="Clear filters"
+                  variant="ghost"
+                  size="small"
+                  onClick={() => {
+                    props.onSearchQueryChange('')
+                    props.onModeChange('all')
+                    props.onSourceChange('all')
+                    props.onTimeFilterChange('all')
+                  }}
+                />
               ) : null}
             </div>
-          ) : (
-            props.items.map((item) => {
-              const isSelected = selectedIds.has(item.id)
-              const preview = getArchivePreview(item, props.searchQuery)
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => {
-                    if (bulkMode) {
-                      setSelectedIds((prev) => {
-                        const next = new Set(prev)
-                        if (next.has(item.id)) {
-                          next.delete(item.id)
-                        } else {
-                          next.add(item.id)
-                        }
-                        return next
-                      })
-                    } else {
-                      props.onOpen(item.id)
-                    }
-                  }}
-                  className={`archive-row ${bulkMode ? 'archive-row--selectable' : ''} ${isSelected ? 'archive-row--selected' : ''}`}
-                >
-                  {bulkMode ? (
-                    <div className="archive-row__check">
-                      <div className={`archive-row__checkbox ${isSelected ? 'archive-row__checkbox--checked' : ''}`} />
-                    </div>
-                  ) : null}
-                  <div className="archive-row__content">
-                    <div className="archive-row__head">
-                      <div className="archive-row__title">{item.title}</div>
-                      <div className="archive-row__time">{formatArchiveTime(item.startedAt)}</div>
-                    </div>
-                    <div className="archive-row__meta">
-                      <span>{describeTranscriptSummary(item)}</span>
-                      <span>{formatDurationMs(item.endedAt - item.startedAt)}</span>
-                    </div>
-                    {preview.kind === 'match' ? (
-                      <div className="archive-row__preview-kicker">Search hit</div>
-                    ) : null}
-                    <div className="archive-row__preview">{preview.text}</div>
+          </section>
+
+          <section className="archive-list" aria-labelledby={headingId}>
+            <div id={headingId} className="sr-only">Archive results</div>
+
+            {bulkMode ? (
+              <div className="archive-bulk-bar" role="toolbar" aria-label="Bulk actions">
+                <div className="archive-bulk-bar__info">
+                  <div>{formatBulkSelectionSummary(selectedCount)}</div>
+                  <div className="archive-bulk-bar__hint">
+                    {selectedCount > 0
+                      ? 'Pick an action for the selected records.'
+                      : 'Select records from the list below to delete them together.'}
                   </div>
-                </button>
-              )
-            })
-          )}
-        </section>
-      </div>
+                </div>
+                <div className="archive-bulk-bar__actions">
+                  {props.onExportBulk ? (
+                    <Button
+                      label={selectedCount > 0 ? `Export ${selectedCount}` : 'Export selected'}
+                      size="small"
+                      variant="secondary"
+                      disabled={Boolean(props.busyAction) || selectedCount === 0}
+                      onClick={() => {
+                        if (props.onExportBulk) {
+                          props.onExportBulk([...selectedIds], 'plain_text')
+                        }
+                      }}
+                    />
+                  ) : null}
+                  {props.onDeleteBulk ? (
+                    <Button
+                      label={formatBulkDeleteLabel(selectedCount)}
+                      size="small"
+                      variant="secondary"
+                      danger
+                      disabled={Boolean(props.busyAction) || selectedCount === 0}
+                      onClick={() => setConfirmBulkDelete(true)}
+                    />
+                  ) : null}
+                  <Button
+                    label="Cancel"
+                    size="small"
+                    variant="ghost"
+                    onClick={() => {
+                      setBulkMode(false)
+                      setSelectedIds(new Set())
+                      setConfirmBulkDelete(false)
+                    }}
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            {props.items.length === 0 ? (
+              <div className="empty-state empty-state--archive" role="status" aria-live="polite">
+                <div className="empty-state__title">
+                  {hasActiveFilters ? 'No transcripts match these filters.' : 'No transcripts yet.'}
+                </div>
+                <p className="empty-state__body">
+                  {hasActiveFilters
+                    ? 'Clear filters or search for a broader phrase to see more of the archive again.'
+                    : 'Finished dictation and live sessions will land here automatically after capture is done.'}
+                </p>
+                {!hasActiveFilters ? (
+                  <div className="empty-state__actions">
+                    <Button label="Open quick dictation" size="small" onClick={props.onOpenQuickDictation} />
+                    <Button label="Open live session" size="small" variant="secondary" onClick={props.onOpenLiveSession} />
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              props.items.map((item) => {
+                const isSelected = selectedIds.has(item.id)
+                const preview = getArchivePreview(item, props.searchQuery)
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      if (bulkMode) {
+                        setSelectedIds((prev) => {
+                          const next = new Set(prev)
+                          if (next.has(item.id)) {
+                            next.delete(item.id)
+                          } else {
+                            next.add(item.id)
+                          }
+                          return next
+                        })
+                      } else {
+                        props.onOpen(item.id)
+                      }
+                    }}
+                    className={`archive-row ${bulkMode ? 'archive-row--selectable' : ''} ${isSelected ? 'archive-row--selected' : ''}`}
+                  >
+                    {bulkMode ? (
+                      <div className="archive-row__check">
+                        <div className={`archive-row__checkbox ${isSelected ? 'archive-row__checkbox--checked' : ''}`} />
+                      </div>
+                    ) : null}
+                    <div className="archive-row__content">
+                      <div className="archive-row__head">
+                        <div className="archive-row__title">{item.title}</div>
+                        <div className="archive-row__time">{formatArchiveTime(item.startedAt)}</div>
+                      </div>
+                      <div className="archive-row__meta">
+                        <span>{describeTranscriptSummary(item)}</span>
+                        <span>{formatDurationMs(item.endedAt - item.startedAt)}</span>
+                      </div>
+                      {preview.kind === 'match' ? (
+                        <div className="archive-row__preview-kicker">Search hit</div>
+                      ) : null}
+                      <div className="archive-row__preview">{preview.text}</div>
+                    </div>
+                  </button>
+                )
+              })
+            )}
+          </section>
+        </div>
+        {deleteDialog}
+      </>
     )
   }
 
   return (
-    <div className="page page--wide">
-      <header className="detail-header">
+    <>
+      <div className="page page--wide">
+        <header className="detail-header">
         <button type="button" className="detail-header__back" onClick={props.onCloseDetail}>
           Back to archive
         </button>
@@ -499,24 +562,6 @@ export function HistoryPage(props: {
           </div>
         </div>
       </section>
-
-      {confirmDelete ? (
-        <div className="inline-note inline-note--danger" role="alert">
-          <div>Delete this record permanently? This cannot be undone.</div>
-          <div className="inline-note__actions">
-            <Button label="Keep record" size="small" variant="ghost" onClick={() => setConfirmDelete(false)} />
-            <Button
-              label="Delete now"
-              size="small"
-              danger
-              onClick={() => {
-                setConfirmDelete(false)
-                props.onDelete(selectedTranscript.id)
-              }}
-            />
-          </div>
-        </div>
-      ) : null}
 
       {props.exportMessage ? (
         <div className="inline-note inline-note--neutral" role="status" aria-live="polite">
@@ -689,7 +734,9 @@ export function HistoryPage(props: {
           ) : null}
         </section>
       )}
-    </div>
+      </div>
+      {deleteDialog}
+    </>
   )
 }
 
@@ -868,6 +915,67 @@ export function formatNotesOverview(overview: string): string[] {
   }
 
   return paragraphs
+}
+
+export function formatBulkSelectionSummary(selectedCount: number): string {
+  return selectedCount === 0 ? 'Select records' : `${selectedCount} selected`
+}
+
+export function formatBulkDeleteLabel(selectedCount: number): string {
+  if (selectedCount === 0) {
+    return 'Delete selected'
+  }
+
+  return selectedCount === 1 ? 'Delete record' : `Delete ${selectedCount} records`
+}
+
+export function formatDeleteDialogTitle(selectedCount: number): string {
+  return selectedCount === 1 ? 'Delete record?' : `Delete ${selectedCount} records?`
+}
+
+export function formatDeleteDialogBody(selectedCount: number, recordTitle?: string): string {
+  if (selectedCount === 1) {
+    return recordTitle
+      ? `"${recordTitle}" will be removed from history permanently. This cannot be undone.`
+      : 'This record will be removed from history permanently. This cannot be undone.'
+  }
+
+  return 'These records will be removed from history permanently. This cannot be undone.'
+}
+
+export function formatDeleteConfirmationLabel(selectedCount: number): string {
+  return selectedCount === 1 ? 'Delete record' : `Delete ${selectedCount} records`
+}
+
+function DeleteConfirmDialog(props: {
+  title: string
+  body: string
+  confirmLabel: string
+  busy: boolean
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  const titleId = useId()
+
+  return (
+    <div className="confirm-modal" role="presentation">
+      <button
+        type="button"
+        className="confirm-modal__backdrop"
+        aria-label="Close delete confirmation"
+        onClick={props.onCancel}
+      />
+      <div className="confirm-modal__dialog" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+        <div className="confirm-modal__eyebrow">Delete</div>
+        <div id={titleId} className="confirm-modal__title">{props.title}</div>
+        <div className="confirm-modal__body">{props.body}</div>
+        <div className="confirm-modal__actions">
+          <Button label="Cancel" size="small" variant="ghost" disabled={props.busy} onClick={props.onCancel} />
+          <Button label={props.confirmLabel} size="small" danger disabled={props.busy} onClick={props.onConfirm} />
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function splitOverviewSentences(text: string): string[] {

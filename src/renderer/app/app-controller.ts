@@ -361,6 +361,34 @@ export class AppController {
     })
   }
 
+  async deleteHistoryItems(ids: string[]): Promise<void> {
+    const uniqueIds = [...new Set(ids)]
+
+    if (uniqueIds.length === 0) {
+      return
+    }
+
+    await this.runAction(`delete-bulk:${uniqueIds.length}`, async () => {
+      await Promise.all(uniqueIds.map((id) => this.deps.api.deleteHistory(id)))
+
+      if (this.state.selectedHistory && uniqueIds.includes(this.state.selectedHistory.id)) {
+        this.setState({
+          selectedHistory: null,
+          selectedHistoryAudio: null,
+          selectedHistoryNotes: null,
+          selectedHistoryNotesStatus: 'idle',
+          selectedHistoryNotesError: null
+        })
+      }
+
+      this.setState({
+        exportMessage: uniqueIds.length === 1 ? 'Deleted 1 transcript.' : `Deleted ${uniqueIds.length} transcripts.`
+      })
+
+      await this.refreshAll()
+    })
+  }
+
   async copyHistoryItem(id: string, format: ExportFormat): Promise<void> {
     await this.runAction(`copy:${id}:${format}`, async () => {
       await this.deps.api.copyHistory(id, format)
