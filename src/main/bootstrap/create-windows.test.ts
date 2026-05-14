@@ -9,6 +9,7 @@ describe('createWindows', () => {
       show: boolean
       preload?: string
       urls: string[]
+      removeMenuCalls: number
     }> = []
 
     const windows = await createWindows({
@@ -17,6 +18,7 @@ describe('createWindows', () => {
           title,
           show,
           urls: [] as string[],
+          removeMenuCalls: 0,
           ...(webPreferences?.preload ? { preload: webPreferences.preload } : {})
         }
         calls.push(record)
@@ -24,6 +26,9 @@ describe('createWindows', () => {
         return {
           loadURL(url: string) {
             record.urls.push(url)
+          },
+          removeMenu() {
+            record.removeMenuCalls += 1
           }
         }
       },
@@ -37,13 +42,15 @@ describe('createWindows', () => {
         title: 'JustSay V2',
         show: true,
         preload: '/abs/preload.js',
-        urls: ['app://renderer']
+        urls: ['app://renderer'],
+        removeMenuCalls: process.platform === 'darwin' ? 0 : 1
       },
       {
         title: 'JustSay Capture',
         show: false,
         preload: '/abs/preload.js',
-        urls: ['app://capture']
+        urls: ['app://capture'],
+        removeMenuCalls: process.platform === 'darwin' ? 0 : 1
       }
     ])
     expect(windows.mainWindow).toBeDefined()

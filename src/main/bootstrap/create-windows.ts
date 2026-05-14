@@ -1,5 +1,6 @@
 export type BrowserWindowLike = {
   loadURL(url: string): Promise<void> | void
+  removeMenu?: () => void
   webContents?: {
     openDevTools?: () => void
     send?: (channel: string, payload?: unknown) => void
@@ -41,6 +42,11 @@ export async function createWindows(options: CreateWindowsOptions): Promise<AppW
       preload: options.preloadPath
     }
   })
+
+  if (process.platform !== 'darwin') {
+    mainWindow.removeMenu?.()
+    captureWindow.removeMenu?.()
+  }
 
   await Promise.all([
     Promise.resolve(mainWindow.loadURL(options.rendererUrl)),
