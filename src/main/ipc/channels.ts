@@ -13,6 +13,8 @@ export const IPC_CHANNELS = {
   sessionStartPtt: 'session.startPtt',
   sessionStopPtt: 'session.stopPtt',
   sessionCopyLatestPttText: 'session.copyLatestPttText',
+  pttHudGetState: 'pttHud.getState',
+  pttHudDismiss: 'pttHud.dismiss',
   sessionStartMeeting: 'session.startMeeting',
   sessionStopMeeting: 'session.stopMeeting',
   sessionCopyLiveSession: 'session.copyLiveSession',
@@ -28,6 +30,7 @@ export const IPC_CHANNELS = {
   historyExport: 'history.export',
   diagnosticsExport: 'diagnostics.export',
   runtimeSnapshot: 'runtime.snapshot',
+  pttHudSnapshot: 'pttHud.snapshot',
   runtimeNotification: 'runtime.notification',
   settingsChanged: 'settings.changed'
 } as const

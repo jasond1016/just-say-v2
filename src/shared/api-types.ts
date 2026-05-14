@@ -123,6 +123,7 @@ export type AppErrorCode =
   | 'E_ENGINE_UNAVAILABLE'
   | 'E_ENGINE_TIMEOUT'
   | 'E_ENGINE_PROTOCOL'
+  | 'E_NO_SPEECH_DETECTED'
   | 'E_TRANSLATION_FAILED'
   | 'E_OUTPUT_DELIVERY'
   | 'E_STORAGE_WRITE'
@@ -396,6 +397,28 @@ export type AppRuntimeSnapshot = {
     localService: LocalServiceStatus
   }
 }
+
+export type PttHudSnapshot =
+  | {
+      mode: 'hidden'
+    }
+  | {
+      mode: 'recording'
+      elapsedMs: number
+    }
+  | {
+      mode: 'processing'
+    }
+  | {
+      mode: 'sent'
+    }
+  | {
+      mode: 'recovery'
+      tone: 'warning' | 'danger'
+      title: string
+      body: string
+      canCopy: boolean
+    }
 
 export type DiagnosticEvent =
   | {

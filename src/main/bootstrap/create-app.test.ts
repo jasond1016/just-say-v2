@@ -6,6 +6,7 @@ describe('createApp', () => {
   it('registers IPC handlers and forwards runtime events to the main window', async () => {
     const registrations: string[] = []
     const mainWindowEvents: Array<{ channel: string; payload: unknown }> = []
+    const hudWindowEvents: Array<{ channel: string; payload: unknown }> = []
     const runtimeNotification = {
       level: 'warning' as const,
       message: 'Recovered after a brief engine stall'
@@ -45,6 +46,9 @@ describe('createApp', () => {
       liveSession: null,
       services: { localService: 'stopped' as const }
     }
+    const pttHudSnapshot = {
+      mode: 'hidden' as const
+    }
     const sessionCoordinator = {
       getRuntimeSnapshot: vi.fn().mockReturnValue(runtimeSnapshot),
       onSnapshot: vi.fn().mockImplementation((listener) => {
@@ -63,6 +67,14 @@ describe('createApp', () => {
       stopMeeting: vi.fn().mockResolvedValue(undefined),
       copyLiveSession: vi.fn().mockResolvedValue(undefined),
       exportLiveSession: vi.fn().mockResolvedValue({ ok: true, path: 'C:\\exports\\live-session.txt' })
+    }
+    const pttHudService = {
+      getSnapshot: vi.fn().mockReturnValue(pttHudSnapshot),
+      onSnapshot: vi.fn().mockImplementation((listener) => {
+        listener(pttHudSnapshot)
+        return () => {}
+      }),
+      dismiss: vi.fn().mockResolvedValue(undefined)
     }
     const historyService = {
       list: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 0 }),
@@ -113,6 +125,7 @@ describe('createApp', () => {
       },
       services: {
         sessionCoordinator,
+        pttHudService,
         speechService,
         historyService,
         settingsService,
@@ -130,10 +143,19 @@ describe('createApp', () => {
                   }
                 }
               }
+            : title === 'JustSay HUD'
+              ? {
+                  webContents: {
+                    send(channel: string, payload?: unknown) {
+                      hudWindowEvents.push({ channel, payload })
+                    }
+                  }
+                }
             : {})
         }),
         rendererUrl: 'app://renderer',
         captureUrl: 'app://capture',
+        hudUrl: 'app://hud',
         preloadPath: '/abs/preload.js'
       }
     })
@@ -148,6 +170,8 @@ describe('createApp', () => {
       'session.stopMeeting',
       'session.copyLiveSession',
       'session.exportLiveSession',
+      'pttHud.getState',
+      'pttHud.dismiss',
       'speech.listProfiles',
       'speech.testProfile',
       'speech.restartLocalService',
@@ -167,6 +191,7 @@ describe('createApp', () => {
     ])
     expect(app.windows.mainWindow).toBeDefined()
     expect(app.windows.captureWindow).toBeDefined()
+    expect(app.windows.hudWindow).toBeDefined()
     expect(mainWindowEvents).toEqual([
       {
         channel: 'runtime.snapshot',
@@ -179,6 +204,20 @@ describe('createApp', () => {
       {
         channel: 'runtime.notification',
         payload: runtimeNotification
+      },
+      {
+        channel: 'settings.changed',
+        payload: changedSettings
+      }
+    ])
+    expect(hudWindowEvents).toEqual([
+      {
+        channel: 'pttHud.snapshot',
+        payload: pttHudSnapshot
+      },
+      {
+        channel: 'pttHud.snapshot',
+        payload: pttHudSnapshot
       },
       {
         channel: 'settings.changed',

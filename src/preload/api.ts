@@ -10,6 +10,7 @@ import type {
   HistoryNotesGenerateOptions,
   HistorySearchQuery,
   PaginatedHistoryResult,
+  PttHudSnapshot,
   ProfileTestResult,
   SavedTranscript,
   StartMeetingCommand,
@@ -25,6 +26,8 @@ export type AppApi = {
   getRuntime: () => Promise<AppRuntimeSnapshot>
   onRuntimeSnapshot: (listener: (snapshot: AppRuntimeSnapshot) => void) => () => void
   onRuntimeNotification: (listener: (notification: RuntimeNotification) => void) => () => void
+  getPttHudState: () => Promise<PttHudSnapshot>
+  onPttHudState: (listener: (snapshot: PttHudSnapshot) => void) => () => void
   getSettings: () => Promise<AppSettings>
   onSettingsChanged: (listener: (settings: AppSettings) => void) => () => void
   updateSettings: (patch: SettingsPatch) => Promise<AppSettings>
@@ -36,6 +39,7 @@ export type AppApi = {
   startPtt: () => Promise<void>
   stopPtt: () => Promise<void>
   copyLatestPttText: () => Promise<void>
+  dismissPttHud: () => Promise<void>
   startMeeting: (input?: StartMeetingCommand) => Promise<void>
   stopMeeting: () => Promise<void>
   copyLiveSession: () => Promise<void>
@@ -71,6 +75,12 @@ export function createAppApi(invoke: IpcInvoke, events?: IpcEventSource): AppApi
         listener(payload as RuntimeNotification)
       })
     },
+    getPttHudState: async () => invoke<PttHudSnapshot>(IPC_CHANNELS.pttHudGetState),
+    onPttHudState(listener) {
+      return subscribeToEvent(events, IPC_CHANNELS.pttHudSnapshot, (payload) => {
+        listener(payload as PttHudSnapshot)
+      })
+    },
     getSettings: async () => invoke<AppSettings>(IPC_CHANNELS.settingsGet),
     onSettingsChanged(listener) {
       return subscribeToEvent(events, IPC_CHANNELS.settingsChanged, (payload) => {
@@ -88,6 +98,7 @@ export function createAppApi(invoke: IpcInvoke, events?: IpcEventSource): AppApi
     startPtt: async () => invoke<void>(IPC_CHANNELS.sessionStartPtt),
     stopPtt: async () => invoke<void>(IPC_CHANNELS.sessionStopPtt),
     copyLatestPttText: async () => invoke<void>(IPC_CHANNELS.sessionCopyLatestPttText),
+    dismissPttHud: async () => invoke<void>(IPC_CHANNELS.pttHudDismiss),
     startMeeting: async (input = {}) => invoke<void>(IPC_CHANNELS.sessionStartMeeting, input),
     stopMeeting: async () => invoke<void>(IPC_CHANNELS.sessionStopMeeting),
     copyLiveSession: async () => invoke<void>(IPC_CHANNELS.sessionCopyLiveSession),

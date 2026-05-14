@@ -32,13 +32,19 @@ describe('installPreloadBridge', () => {
     const exposedApi = exposeInMainWorld.mock.calls[0]?.[1] as AppApi
     await exposedApi.getRuntime()
     const unsubscribe = exposedApi.onRuntimeSnapshot(() => {})
+    await exposedApi.getPttHudState()
+    const unsubscribeHud = exposedApi.onPttHudState(() => {})
     const captureApi = exposeInMainWorld.mock.calls[1]?.[1] as CaptureApi
     captureApi.notifyReady()
     unsubscribe()
+    unsubscribeHud()
 
     expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.sessionGetRuntime)
+    expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.pttHudGetState)
     expect(on).toHaveBeenCalledWith(IPC_CHANNELS.runtimeSnapshot, expect.any(Function))
     expect(off).toHaveBeenCalledWith(IPC_CHANNELS.runtimeSnapshot, expect.any(Function))
+    expect(on).toHaveBeenCalledWith(IPC_CHANNELS.pttHudSnapshot, expect.any(Function))
+    expect(off).toHaveBeenCalledWith(IPC_CHANNELS.pttHudSnapshot, expect.any(Function))
     expect(send).toHaveBeenCalledWith(IPC_CHANNELS.captureReady)
   })
 })

@@ -8,13 +8,17 @@ import { LiveSessionPage } from '../pages/live-session-page'
 import { QuickDictationPage } from '../pages/quick-dictation-page'
 import { SettingsPage } from '../pages/settings-page'
 import { describeLocalServiceStatus } from '../ui/copy'
-import type { AppRuntimeSnapshot, LocalServiceStatus } from '../../shared/api-types'
+import type { AppRuntimeSnapshot, LocalServiceStatus, PttHudSnapshot, ThemeSetting } from '../../shared/api-types'
 import { APP_SECTIONS } from './app-model'
 import { AppController } from './app-controller'
 
 type RetainedLiveSession = NonNullable<AppRuntimeSnapshot['liveSession']>
 
 export function App() {
+  if (window.location.hash === '#hud') {
+    return <PttHudWindowApp />
+  }
+
   if (window.location.hash === '#capture') {
     return <CaptureWindowApp />
   }
@@ -57,13 +61,7 @@ function WorkspaceApp() {
   const [retainedLiveSession, setRetainedLiveSession] = useState<RetainedLiveSession | null>(null)
 
   useEffect(() => {
-    const theme = settings.general.theme
-    if (theme === 'system') {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-      document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light')
-    } else {
-      document.documentElement.setAttribute('data-theme', theme)
-    }
+    applyThemeSetting(settings.general.theme)
   }, [settings.general.theme])
 
   useEffect(() => {
@@ -300,6 +298,128 @@ function CaptureWindowApp() {
   )
 }
 
+function PttHudWindowApp() {
+  const [snapshot, setSnapshot] = useState<PttHudSnapshot>({ mode: 'hidden' })
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-surface', 'hud')
+
+    const api = window.justSay
+    if (!api) {
+      return () => {
+        document.documentElement.removeAttribute('data-surface')
+      }
+    }
+
+    void api.getPttHudState().then((nextSnapshot) => {
+      setSnapshot(nextSnapshot)
+    })
+    void api.getSettings().then((settings) => {
+      applyThemeSetting(settings.general.theme)
+    })
+
+    const unsubscribeHud = api.onPttHudState((nextSnapshot) => {
+      setSnapshot(nextSnapshot)
+    })
+    const unsubscribeSettings = api.onSettingsChanged((settings) => {
+      applyThemeSetting(settings.general.theme)
+    })
+
+    return () => {
+      unsubscribeHud()
+      unsubscribeSettings()
+      document.documentElement.removeAttribute('data-surface')
+    }
+  }, [])
+
+  const handleCopy = () => {
+    if (!window.justSay) {
+      return
+    }
+
+    void window.justSay.copyLatestPttText()
+  }
+
+  const handleDismiss = () => {
+    if (!window.justSay) {
+      return
+    }
+
+    void window.justSay.dismissPttHud()
+  }
+
+  return (
+    <main
+      className={`hud-overlay ${snapshot.mode === 'recovery' ? 'hud-overlay--interactive' : ''}`}
+      aria-hidden={snapshot.mode === 'hidden'}
+    >
+      {snapshot.mode === 'hidden' ? null : (
+        <div className="hud-overlay__stage">
+          <span className="sr-only" aria-live="polite">
+            {describeHudLiveMessage(snapshot)}
+          </span>
+          {snapshot.mode === 'recording' ? (
+            <div className="hud-card hud-card--recording" role="status" aria-label="Dictation recording">
+              <div className="hud-card__motion hud-card__motion--recording" aria-hidden="true">
+                <span />
+              </div>
+              <div className="hud-card__timer">{formatHudTimer(snapshot.elapsedMs)}</div>
+            </div>
+          ) : null}
+
+          {snapshot.mode === 'processing' ? (
+            <div className="hud-card hud-card--processing" role="status" aria-label="Dictation processing">
+              <div className="hud-card__motion hud-card__motion--processing" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </div>
+            </div>
+          ) : null}
+
+          {snapshot.mode === 'sent' ? (
+            <div className="hud-card hud-card--sent" role="status" aria-label="Dictation sent">
+              <div className="hud-card__motion hud-card__motion--sent" aria-hidden="true">
+                <span />
+              </div>
+            </div>
+          ) : null}
+
+          {snapshot.mode === 'recovery' ? (
+            <div
+              className={`hud-strip ${snapshot.tone === 'danger' ? 'hud-strip--danger' : 'hud-strip--warning'}`}
+              role="alert"
+            >
+              <div className="hud-strip__copy">
+                <div className="hud-strip__title">{snapshot.title}</div>
+                <div className="hud-strip__body">{snapshot.body}</div>
+              </div>
+              <div className="hud-strip__actions">
+                {snapshot.canCopy ? (
+                  <button
+                    type="button"
+                    className="hud-strip__button hud-strip__button--primary"
+                    onClick={handleCopy}
+                  >
+                    Copy
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="hud-strip__button hud-strip__button--ghost"
+                  onClick={handleDismiss}
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
+    </main>
+  )
+}
+
 function requireApi() {
   if (!window.justSay) {
     throw new Error('window.justSay is not available')
@@ -344,6 +464,39 @@ function formatNotificationLevel(level: 'info' | 'warning' | 'error') {
       return 'Action needed'
     default:
       return level
+  }
+}
+
+function applyThemeSetting(theme: ThemeSetting): void {
+  if (theme === 'system') {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light')
+    return
+  }
+
+  document.documentElement.setAttribute('data-theme', theme)
+}
+
+function formatHudTimer(elapsedMs: number): string {
+  const totalSeconds = Math.max(0, Math.floor(elapsedMs / 1000))
+  const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0')
+  const seconds = String(totalSeconds % 60).padStart(2, '0')
+  return `${minutes}:${seconds}`
+}
+
+function describeHudLiveMessage(snapshot: PttHudSnapshot): string {
+  switch (snapshot.mode) {
+    case 'recording':
+      return `Recording, ${formatHudTimer(snapshot.elapsedMs)}`
+    case 'processing':
+      return 'Processing dictation'
+    case 'sent':
+      return 'Dictation sent'
+    case 'recovery':
+      return `${snapshot.title}. ${snapshot.body}`
+    case 'hidden':
+    default:
+      return ''
   }
 }
 

@@ -8,6 +8,7 @@ export type BrowserWindowLike = {
 }
 
 export type BrowserWindowFactory = (options: {
+  kind: 'main' | 'capture' | 'hud'
   title: string
   show: boolean
   webPreferences?: {
@@ -18,17 +19,20 @@ export type BrowserWindowFactory = (options: {
 export type AppWindows = {
   mainWindow: BrowserWindowLike
   captureWindow: BrowserWindowLike
+  hudWindow: BrowserWindowLike
 }
 
 export type CreateWindowsOptions = {
   browserWindowFactory: BrowserWindowFactory
   rendererUrl: string
   captureUrl: string
+  hudUrl: string
   preloadPath: string
 }
 
 export async function createWindows(options: CreateWindowsOptions): Promise<AppWindows> {
   const mainWindow = options.browserWindowFactory({
+    kind: 'main',
     title: 'JustSay V2',
     show: true,
     webPreferences: {
@@ -36,7 +40,16 @@ export async function createWindows(options: CreateWindowsOptions): Promise<AppW
     }
   })
   const captureWindow = options.browserWindowFactory({
+    kind: 'capture',
     title: 'JustSay Capture',
+    show: false,
+    webPreferences: {
+      preload: options.preloadPath
+    }
+  })
+  const hudWindow = options.browserWindowFactory({
+    kind: 'hud',
+    title: 'JustSay HUD',
     show: false,
     webPreferences: {
       preload: options.preloadPath
@@ -46,15 +59,18 @@ export async function createWindows(options: CreateWindowsOptions): Promise<AppW
   if (process.platform !== 'darwin') {
     mainWindow.removeMenu?.()
     captureWindow.removeMenu?.()
+    hudWindow.removeMenu?.()
   }
 
   await Promise.all([
     Promise.resolve(mainWindow.loadURL(options.rendererUrl)),
-    Promise.resolve(captureWindow.loadURL(options.captureUrl))
+    Promise.resolve(captureWindow.loadURL(options.captureUrl)),
+    Promise.resolve(hudWindow.loadURL(options.hudUrl))
   ])
 
   return {
     mainWindow,
-    captureWindow
+    captureWindow,
+    hudWindow
   }
 }

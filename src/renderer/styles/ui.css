@@ -685,6 +685,16 @@
   padding: 10px 12px 10px 14px;
 }
 
+.hud-strip--warning {
+  border-color: color-mix(in oklab, var(--warning) 22%, var(--border));
+  background: color-mix(in oklab, var(--warning-muted) 54%, var(--bg-surface));
+}
+
+.hud-strip--danger {
+  border-color: color-mix(in oklab, var(--danger) 24%, var(--border));
+  background: color-mix(in oklab, var(--danger-muted) 52%, var(--bg-surface));
+}
+
 .hud-strip__copy {
   display: grid;
   gap: 4px;
@@ -706,6 +716,31 @@
   display: flex;
   gap: 8px;
   flex-shrink: 0;
+}
+
+.hud-strip__button {
+  min-height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: color-mix(in oklab, var(--bg-surface) 96%, transparent);
+  padding: 0 12px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.hud-strip__button--primary {
+  border-color: color-mix(in oklab, var(--accent) 38%, var(--border));
+  background: var(--accent);
+  color: var(--accent-on);
+  font-weight: 600;
+}
+
+.hud-strip__button--ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-secondary);
 }
 
 .hud-standby {

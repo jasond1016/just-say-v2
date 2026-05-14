@@ -1,4 +1,4 @@
-import { app, BrowserWindow, desktopCapturer, ipcMain, Menu, safeStorage, session, Tray } from 'electron'
+import { app, BrowserWindow, desktopCapturer, ipcMain, Menu, safeStorage, screen, session, Tray } from 'electron'
 import path from 'node:path'
 import { getProfileById, profileCatalog } from '../core/settings/profile-catalog'
 import type {
@@ -24,6 +24,7 @@ import { registerElectronDisplayMediaHandler } from './platform/electron-display
 import { ElectronCaptureWindowTransport } from './platform/electron-capture-window-transport'
 import { HotkeyService } from './platform/hotkey-service'
 import { OutputWindowService } from './platform/output-window-service'
+import { PttHudWindowController } from './platform/ptt-hud-window-controller'
 import { TrayController } from './platform/tray-controller'
 import { WindowsInputService } from './platform/windows-input-service'
 import { DiagnosticsService } from './services/diagnostics-service'
@@ -39,6 +40,7 @@ import { NotesGenerationService } from './services/notes-generation-service'
 import { OutputDispatcher } from './services/output-dispatcher'
 import { PttCoordinator } from './services/ptt-coordinator'
 import { PttHotkeyController } from './services/ptt-hotkey-controller'
+import { PttHudService } from './services/ptt-hud-service'
 import { SessionCoordinator } from './services/session-coordinator'
 import { SettingsService } from './services/settings-service'
 import { SpeechService } from './services/speech-service'
@@ -254,6 +256,7 @@ void wireAppLifecycle(app, {
       diagnostics: diagnosticsService
     })
     const sessionCoordinator = new SessionCoordinator(pttCoordinator, meetingCoordinator)
+    const pttHudService = new PttHudService(sessionCoordinator)
     const liveSessionActionsService = new LiveSessionActionsService({
       getRuntimeSnapshot: () => sessionCoordinator.getRuntimeSnapshot(),
       clipboard: clipboardService,
@@ -300,28 +303,31 @@ void wireAppLifecycle(app, {
       registrar: createElectronIpcRegistrar(ipcMain),
       services: {
         sessionCoordinator: sessionService,
+        pttHudService,
         diagnosticsService,
         speechService,
         historyService,
         settingsService
       },
       windows: {
-        browserWindowFactory: ({ title, show, webPreferences }) =>
-          new BrowserWindow({
+        browserWindowFactory: ({ kind, title, show, webPreferences }) =>
+          createWindowByKind(kind, {
             title,
             show,
-            width: title === 'JustSay Capture' ? 800 : 1280,
-            height: title === 'JustSay Capture' ? 600 : 860,
-            backgroundColor: '#10161f',
-            icon: iconPath,
+            iconPath,
             ...(webPreferences ? { webPreferences } : {})
           }),
         rendererUrl: `file://${rendererIndexPath}`,
         captureUrl: `file://${rendererIndexPath}#capture`,
+        hudUrl: `file://${rendererIndexPath}#hud`,
         preloadPath
       }
     })
     captureTransport.attachWindow(appBootstrap.windows.captureWindow)
+    const pttHudWindowController = new PttHudWindowController(
+      appBootstrap.windows.hudWindow as BrowserWindow,
+      pttHudService
+    )
     const trayController = new TrayController({
       mainWindow: appBootstrap.windows.mainWindow as BrowserWindow,
       getSettings: () => cachedSettings,
@@ -335,6 +341,8 @@ void wireAppLifecycle(app, {
     const shutdown = async (): Promise<void> => {
       trayController.prepareForQuit()
       trayController.dispose()
+      pttHudWindowController.dispose()
+      pttHudService.dispose()
       pttHotkeyController.dispose()
       await localServiceSupervisor.stop()
       transcriptDatabase.close()
@@ -391,4 +399,57 @@ function resolveTranscriptNotesRuntimeConfig(
       translationApiKey
     }
   }
+}
+
+function createWindowByKind(
+  kind: 'main' | 'capture' | 'hud',
+  input: {
+    title: string
+    show: boolean
+    iconPath: string
+    webPreferences?: {
+      preload?: string
+    }
+  }
+): BrowserWindow {
+  if (kind === 'hud') {
+    const display = screen.getPrimaryDisplay()
+    const hudWidth = 440
+    const hudHeight = 136
+    const x = Math.round(display.workArea.x + (display.workArea.width - hudWidth) / 2)
+    const y = Math.round(display.workArea.y + display.workArea.height - hudHeight - 48)
+
+    return new BrowserWindow({
+      title: input.title,
+      show: input.show,
+      width: hudWidth,
+      height: hudHeight,
+      x,
+      y,
+      transparent: true,
+      frame: false,
+      resizable: false,
+      movable: false,
+      minimizable: false,
+      maximizable: false,
+      fullscreenable: false,
+      skipTaskbar: true,
+      autoHideMenuBar: true,
+      alwaysOnTop: true,
+      focusable: true,
+      hasShadow: false,
+      backgroundColor: '#00000000',
+      ...(input.webPreferences ? { webPreferences: input.webPreferences } : {})
+    })
+  }
+
+  return new BrowserWindow({
+    title: input.title,
+    show: input.show,
+    width: kind === 'capture' ? 800 : 1280,
+    height: kind === 'capture' ? 600 : 860,
+    backgroundColor: '#10161f',
+    icon: input.iconPath,
+    ...(input.webPreferences ? { webPreferences: input.webPreferences } : {})
+  })
 }

@@ -209,7 +209,7 @@ export class PttCoordinator {
 
     this.transition({ type: 'PTT_HOTKEY_UP' })
     session.stopCapturePromise = this.dependencies.captureWindowService.stopCapture(session.sessionId)
-    await session.engine.stopSession()
+    await session.stopCapturePromise
     await session.completion.promise
   }
 
@@ -253,6 +253,19 @@ export class PttCoordinator {
         case 'warning':
           return
         case 'session-ended':
+          if (this.status === 'recognizing' && !session.finalText) {
+            this.notify({
+              level: 'warning',
+              message: 'No speech was captured. Check the microphone level and try again.'
+            })
+            await this.fail({
+              code: 'E_NO_SPEECH_DETECTED',
+              message: 'PTT session ended without a transcript.',
+              retryable: true
+            })
+            return
+          }
+
           if (
             this.status === 'post_processing' &&
             session.finalText &&
@@ -325,25 +338,32 @@ export class PttCoordinator {
       return
     }
 
-    switch (event.type) {
-      case 'audio-chunk':
-        session.engine.pushAudio(event.chunk)
-        return
-      case 'capture-error':
-        await this.fail(event.error)
-        return
-      case 'capture-started':
-        this.dependencies.diagnostics?.record({
-          type: 'capture-started',
-          timestamp: this.now(),
-          sessionId: session.sessionId,
-          sources: [...event.sources]
-        })
-        return
-      case 'capture-stopped':
-        return
-      default:
-        return assertNever(event)
+    try {
+      switch (event.type) {
+        case 'audio-chunk':
+          session.engine.pushAudio(event.chunk)
+          return
+        case 'capture-error':
+          await this.fail(event.error)
+          return
+        case 'capture-started':
+          this.dependencies.diagnostics?.record({
+            type: 'capture-started',
+            timestamp: this.now(),
+            sessionId: session.sessionId,
+            sources: [...event.sources]
+          })
+          return
+        case 'capture-stopped':
+          if (this.status === 'recognizing') {
+            await session.engine.stopSession()
+          }
+          return
+        default:
+          return assertNever(event)
+      }
+    } catch (error) {
+      await this.fail(error)
     }
   }
 

@@ -31,6 +31,8 @@ describe('RuntimeStore', () => {
       getRuntime: async () => nextSnapshot,
       onRuntimeSnapshot: () => () => {},
       onRuntimeNotification: () => () => {},
+      getPttHudState: async () => ({ mode: 'hidden' }),
+      onPttHudState: () => () => {},
       getSettings: async () => ({
         general: {
           language: 'zh-CN',
@@ -105,6 +107,7 @@ describe('RuntimeStore', () => {
       startPtt: async () => undefined,
       stopPtt: async () => undefined,
       copyLatestPttText: async () => undefined,
+      dismissPttHud: async () => undefined,
       startMeeting: async () => undefined,
       stopMeeting: async () => undefined,
       copyLiveSession: async () => undefined,
@@ -159,6 +162,8 @@ describe('RuntimeStore', () => {
         }
       },
       onRuntimeNotification: () => () => {},
+      getPttHudState: async () => ({ mode: 'hidden' }),
+      onPttHudState: () => () => {},
       getSettings: async () => createSettings(),
       onSettingsChanged: () => () => {},
       updateSettings: async () => createSettings(),
@@ -170,6 +175,7 @@ describe('RuntimeStore', () => {
       startPtt: async () => undefined,
       stopPtt: async () => undefined,
       copyLatestPttText: async () => undefined,
+      dismissPttHud: async () => undefined,
       startMeeting: async () => undefined,
       stopMeeting: async () => undefined,
       copyLiveSession: async () => undefined,

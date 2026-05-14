@@ -876,6 +876,45 @@ describe('SessionCoordinator + PTTCoordinator', () => {
       }
     })
   })
+
+  it('returns to idle and notifies when ptt ends without a committed transcript', async () => {
+    const harness = createHarness()
+    const notifications: Array<{ level: string; message: string }> = []
+    const unsubscribe = harness.sessionCoordinator.onNotification((notification) => {
+      notifications.push(notification)
+    })
+
+    await harness.sessionCoordinator.startPtt()
+    harness.captureTransport.emit({
+      type: 'capture-started',
+      requestId: 'ptt-1',
+      sources: ['microphone']
+    })
+
+    const stopPromise = harness.sessionCoordinator.stopPtt()
+    harness.captureTransport.emit({
+      type: 'capture-stopped',
+      requestId: 'ptt-1'
+    })
+    harness.engine.emit({
+      type: 'session-ended'
+    })
+    await stopPromise
+
+    expect(harness.sessionCoordinator.getRuntimeSnapshot().ptt).toMatchObject({
+      status: 'idle',
+      error: {
+        code: 'E_NO_SPEECH_DETECTED',
+        message: 'PTT session ended without a transcript.',
+        retryable: true
+      }
+    })
+    expect(notifications).toContainEqual({
+      level: 'warning',
+      message: 'No speech was captured. Check the microphone level and try again.'
+    })
+    unsubscribe()
+  })
 })
 
 type HarnessOptions = {

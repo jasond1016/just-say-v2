@@ -17,6 +17,8 @@ describe('createAppApi', () => {
     await api.getRuntime()
     const unsubscribe = api.onRuntimeSnapshot(() => {})
     const unsubscribeNotification = api.onRuntimeNotification(() => {})
+    await api.getPttHudState()
+    const unsubscribeHud = api.onPttHudState(() => {})
     await api.getSettings()
     const unsubscribeSettings = api.onSettingsChanged(() => {})
     await api.updateSettings({
@@ -34,6 +36,7 @@ describe('createAppApi', () => {
     await api.startPtt()
     await api.stopPtt()
     await api.copyLatestPttText()
+    await api.dismissPttHud()
     await api.startMeeting({
       includeMicrophone: false,
       translationEnabled: true,
@@ -54,10 +57,12 @@ describe('createAppApi', () => {
     await api.exportDiagnostics()
     unsubscribe()
     unsubscribeNotification()
+    unsubscribeHud()
     unsubscribeSettings()
 
     expect(invokeMock.mock.calls).toEqual([
       [IPC_CHANNELS.sessionGetRuntime],
+      [IPC_CHANNELS.pttHudGetState],
       [IPC_CHANNELS.settingsGet],
       [
         IPC_CHANNELS.settingsUpdate,
@@ -80,6 +85,7 @@ describe('createAppApi', () => {
       [IPC_CHANNELS.sessionStartPtt],
       [IPC_CHANNELS.sessionStopPtt],
       [IPC_CHANNELS.sessionCopyLatestPttText],
+      [IPC_CHANNELS.pttHudDismiss],
       [
         IPC_CHANNELS.sessionStartMeeting,
         {
@@ -106,6 +112,8 @@ describe('createAppApi', () => {
     expect(events.off).toHaveBeenCalledWith(IPC_CHANNELS.runtimeSnapshot, expect.any(Function))
     expect(events.on).toHaveBeenCalledWith(IPC_CHANNELS.runtimeNotification, expect.any(Function))
     expect(events.off).toHaveBeenCalledWith(IPC_CHANNELS.runtimeNotification, expect.any(Function))
+    expect(events.on).toHaveBeenCalledWith(IPC_CHANNELS.pttHudSnapshot, expect.any(Function))
+    expect(events.off).toHaveBeenCalledWith(IPC_CHANNELS.pttHudSnapshot, expect.any(Function))
     expect(events.on).toHaveBeenCalledWith(IPC_CHANNELS.settingsChanged, expect.any(Function))
     expect(events.off).toHaveBeenCalledWith(IPC_CHANNELS.settingsChanged, expect.any(Function))
   })
