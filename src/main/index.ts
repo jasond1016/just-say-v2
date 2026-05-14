@@ -1,6 +1,6 @@
 import { app, BrowserWindow, desktopCapturer, ipcMain, Menu, safeStorage, session, Tray } from 'electron'
 import path from 'node:path'
-import { profileCatalog } from '../core/settings/profile-catalog'
+import { getProfileById, profileCatalog } from '../core/settings/profile-catalog'
 import type {
   AppSettings,
   ResolvedRuntimeConfig,
@@ -159,6 +159,7 @@ void wireAppLifecycle(app, {
         await refreshSettingsCache()
         if (getLocalServiceSettingsSignature(cachedSettings) !== previousLocalServiceSettingsSignature) {
           await localServiceSupervisor.stop()
+          void scheduleSelectedLocalServiceProbe()
         }
         return updated
       },
@@ -222,6 +223,15 @@ void wireAppLifecycle(app, {
       resolveProfileRuntimeConfig: (profileId, mode) =>
         baseSettingsService.resolveProfileRuntimeConfig(profileId, mode)
     })
+    const scheduleSelectedLocalServiceProbe = async (): Promise<void> => {
+      const selectedProfile = getProfileById(cachedSettings.speech.selectedProfileId)
+
+      if (!selectedProfile?.capabilities.requiresLocalService) {
+        return
+      }
+
+      await speechService.probeLocalService()
+    }
     const translationPipeline = new TranslationPipeline()
     const pttCoordinator = new PttCoordinator({
       settingsProvider,
@@ -273,6 +283,7 @@ void wireAppLifecycle(app, {
       sessionCoordinator.setLocalServiceStatus(status)
       diagnosticsService.setLocalServiceStatus(status)
     })
+    void scheduleSelectedLocalServiceProbe()
     sessionCoordinator.onSnapshot((snapshot) => {
       if (snapshot.liveSession?.status === 'stopped_unexpectedly' || snapshot.ptt.error) {
         diagnosticsService.setLatestFailedSession(snapshot)

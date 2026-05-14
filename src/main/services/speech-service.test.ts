@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { exposedProfileCatalog, profileCatalog } from '../../core/settings/profile-catalog'
 import type { RecognitionEngine } from '../../core/contracts/engine'
@@ -44,9 +44,34 @@ describe('SpeechService', () => {
       }
     })
   })
+
+  it('restarts the local service through the supervisor', async () => {
+    const restart = vi.fn(async () => 'healthy' as const)
+    const service = createSpeechService({
+      restart
+    })
+
+    await service.restartLocalService()
+
+    expect(restart).toHaveBeenCalled()
+  })
+
+  it('probes the local service through the supervisor without starting it', async () => {
+    const probe = vi.fn(async () => 'healthy' as const)
+    const service = createSpeechService({
+      probe
+    })
+
+    await expect(service.probeLocalService()).resolves.toBe('healthy')
+
+    expect(probe).toHaveBeenCalled()
+  })
 })
 
-function createSpeechService(): SpeechService {
+function createSpeechService(overrides: {
+  restart?: () => Promise<'healthy' | 'degraded' | 'starting' | 'stopped' | 'failed'>
+  probe?: () => Promise<'healthy' | 'degraded' | 'starting' | 'stopped' | 'failed'>
+} = {}): SpeechService {
   const registry = new EngineRegistry(profileCatalog, (config) => new FakeRecognitionEngine(config))
   const localServiceSupervisor = new LocalServiceSupervisor({
     async start() {},
@@ -55,6 +80,12 @@ function createSpeechService(): SpeechService {
       return { ok: true }
     }
   })
+  if (overrides.restart) {
+    localServiceSupervisor.restart = overrides.restart as LocalServiceSupervisor['restart']
+  }
+  if (overrides.probe) {
+    localServiceSupervisor.probe = overrides.probe as LocalServiceSupervisor['probe']
+  }
 
   return new SpeechService(registry, localServiceSupervisor, {
     async resolveProfileRuntimeConfig(profileId) {

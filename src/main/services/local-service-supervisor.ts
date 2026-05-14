@@ -53,10 +53,40 @@ export class LocalServiceSupervisor {
     return this.inFlightEnsureReady
   }
 
+  async probe(): Promise<LocalServiceStatus> {
+    if (this.inFlightEnsureReady) {
+      return this.inFlightEnsureReady
+    }
+
+    try {
+      const health = await this.controller.healthCheck()
+
+      if (!health.ok) {
+        this.lastError = createLocalServiceError('Local service health check failed', health.detail)
+        this.transitionTo('failed')
+        return 'failed'
+      }
+
+      this.lastError = null
+      const nextStatus: LocalServiceStatus = health.degraded ? 'degraded' : 'healthy'
+      this.transitionTo(nextStatus)
+      return nextStatus
+    } catch (errorLike) {
+      this.lastError = normalizeLocalServiceError(errorLike)
+      this.transitionTo('stopped')
+      return 'stopped'
+    }
+  }
+
   async stop(): Promise<void> {
     await this.controller.stop()
     this.lastError = null
     this.transitionTo('stopped')
+  }
+
+  async restart(): Promise<LocalServiceStatus> {
+    await this.stop()
+    return this.ensureReady()
   }
 
   private async bootstrap(): Promise<LocalServiceStatus> {

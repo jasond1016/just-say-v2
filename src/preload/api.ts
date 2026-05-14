@@ -31,6 +31,7 @@ export type AppApi = {
   saveTranslationCredentials: (input: TranslationCredentialsInput) => Promise<AppSettings>
   listSpeechProfiles: () => Promise<EngineProfile[]>
   testSpeechProfile: (profileId: string) => Promise<ProfileTestResult>
+  restartLocalService: () => Promise<void>
   prewarmSession: (mode: SessionMode) => Promise<void>
   startPtt: () => Promise<void>
   stopPtt: () => Promise<void>
@@ -82,6 +83,7 @@ export function createAppApi(invoke: IpcInvoke, events?: IpcEventSource): AppApi
     listSpeechProfiles: async () => invoke<EngineProfile[]>(IPC_CHANNELS.speechListProfiles),
     testSpeechProfile: async (profileId) =>
       invoke<ProfileTestResult>(IPC_CHANNELS.speechTestProfile, profileId),
+    restartLocalService: async () => invoke<void>(IPC_CHANNELS.speechRestartLocalService),
     prewarmSession: async (mode) => invoke<void>(IPC_CHANNELS.sessionPrewarm, mode),
     startPtt: async () => invoke<void>(IPC_CHANNELS.sessionStartPtt),
     stopPtt: async () => invoke<void>(IPC_CHANNELS.sessionStopPtt),

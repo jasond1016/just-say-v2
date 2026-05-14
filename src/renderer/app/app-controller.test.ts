@@ -217,6 +217,34 @@ describe('AppController', () => {
     dispose()
   })
 
+  it('restarts the local service through the API and refreshes runtime state', async () => {
+    const restartLocalService = vi.fn(async () => undefined)
+    let runtime = createIdleRuntimeSnapshot()
+    const controller = new AppController({
+      api: createApi({
+        restartLocalService,
+        getRuntime: vi.fn(async () => runtime)
+      }),
+      runtimeStore: new RuntimeStore()
+    })
+
+    const dispose = controller.start()
+    await flushPromises()
+    runtime = {
+      ...runtime,
+      services: {
+        localService: 'healthy'
+      }
+    }
+
+    await controller.restartLocalService()
+
+    expect(restartLocalService).toHaveBeenCalled()
+    expect(controller.getSnapshot().busyAction).toBeNull()
+
+    dispose()
+  })
+
   it('updates editable settings fields through the API and refreshes local state', async () => {
     let settings = createSettings()
     const updateSettings = vi.fn(async (patch: SettingsPatch) => {
@@ -512,6 +540,7 @@ function createApi(overrides: Partial<AppApi> & {
       overrides.saveTranslationCredentials ?? vi.fn(async () => settings),
     listSpeechProfiles: overrides.listSpeechProfiles ?? vi.fn(async () => []),
     testSpeechProfile: overrides.testSpeechProfile ?? vi.fn(async (profileId) => ({ ok: true, profileId })),
+    restartLocalService: overrides.restartLocalService ?? vi.fn(async () => undefined),
     prewarmSession: overrides.prewarmSession ?? vi.fn(async () => undefined),
     startPtt: overrides.startPtt ?? vi.fn(async () => undefined),
     stopPtt: overrides.stopPtt ?? vi.fn(async () => undefined),

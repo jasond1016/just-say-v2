@@ -43,6 +43,45 @@ describe('LocalServiceSupervisor', () => {
     })
     expect(supervisor.getStatus()).toBe('failed')
   })
+
+  it('restarts the local service by stopping and starting it again', async () => {
+    const controller = new FakeLocalServiceController({
+      health: { ok: true }
+    })
+    const supervisor = new LocalServiceSupervisor(controller)
+
+    await supervisor.ensureReady()
+    await expect(supervisor.restart()).resolves.toBe('healthy')
+
+    expect(controller.startCalls).toBe(2)
+    expect(controller.stopCalls).toBe(1)
+  })
+
+  it('probes an already running local service without starting it', async () => {
+    const controller = new FakeLocalServiceController({
+      health: { ok: true }
+    })
+    const supervisor = new LocalServiceSupervisor(controller)
+
+    await expect(supervisor.probe()).resolves.toBe('healthy')
+
+    expect(supervisor.getStatus()).toBe('healthy')
+    expect(controller.startCalls).toBe(0)
+    expect(controller.healthCheckCalls).toBe(1)
+  })
+
+  it('marks the local service stopped when probing cannot reach it', async () => {
+    const controller = new FakeLocalServiceController({
+      healthFailure: new Error('connect ECONNREFUSED 127.0.0.1:8765')
+    })
+    const supervisor = new LocalServiceSupervisor(controller)
+
+    await expect(supervisor.probe()).resolves.toBe('stopped')
+
+    expect(supervisor.getStatus()).toBe('stopped')
+    expect(controller.startCalls).toBe(0)
+    expect(controller.healthCheckCalls).toBe(1)
+  })
 })
 
 class FakeLocalServiceController {
@@ -54,9 +93,15 @@ class FakeLocalServiceController {
     private readonly options: {
       health: { ok: boolean; degraded?: boolean }
       startFailure?: Error
+      healthFailure?: Error
     } | {
       startFailure: Error
       health?: { ok: boolean; degraded?: boolean }
+      healthFailure?: Error
+    } | {
+      healthFailure: Error
+      health?: { ok: boolean; degraded?: boolean }
+      startFailure?: Error
     }
   ) {}
 
@@ -74,6 +119,11 @@ class FakeLocalServiceController {
 
   async healthCheck(): Promise<{ ok: boolean; degraded?: boolean }> {
     this.healthCheckCalls += 1
+
+    if (this.options.healthFailure) {
+      throw this.options.healthFailure
+    }
+
     return this.options.health ?? { ok: true }
   }
 }

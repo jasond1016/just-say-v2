@@ -100,6 +100,7 @@ describe('RuntimeStore', () => {
         ok: true,
         profileId: 'local-fast'
       }),
+      restartLocalService: async () => undefined,
       prewarmSession: async () => undefined,
       startPtt: async () => undefined,
       stopPtt: async () => undefined,
@@ -164,6 +165,7 @@ describe('RuntimeStore', () => {
       saveTranslationCredentials: async () => createSettings(),
       listSpeechProfiles: async () => [],
       testSpeechProfile: async () => ({ ok: true, profileId: 'local-fast' }),
+      restartLocalService: async () => undefined,
       prewarmSession: async () => undefined,
       startPtt: async () => undefined,
       stopPtt: async () => undefined,

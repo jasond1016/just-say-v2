@@ -7,7 +7,6 @@ import { HistoryPage } from '../pages/history-page'
 import { LiveSessionPage } from '../pages/live-session-page'
 import { QuickDictationPage } from '../pages/quick-dictation-page'
 import { SettingsPage } from '../pages/settings-page'
-import { Button } from '../ui/controls'
 import { describeLocalServiceStatus } from '../ui/copy'
 import type { AppRuntimeSnapshot, LocalServiceStatus } from '../../shared/api-types'
 import { APP_SECTIONS } from './app-model'
@@ -132,9 +131,9 @@ function WorkspaceApp() {
                 type="button"
                 className="app-sidebar__status-expand__action"
                 disabled={Boolean(busyAction)}
-                onClick={() => { void controller.refresh() }}
+                onClick={() => { void controller.restartLocalService() }}
               >
-                {busyAction === 'refresh' ? 'Restarting...' : 'Restart service'}
+                {busyAction === 'local-service-restart' ? 'Restarting...' : 'Restart service'}
               </button>
             </div>
           ) : (
@@ -148,14 +147,6 @@ function WorkspaceApp() {
             </div>
           )}
 
-          <Button
-            label={busyAction === 'refresh' ? 'Refreshing...' : 'Refresh'}
-            variant="ghost"
-            size="small"
-            disabled={Boolean(busyAction)}
-            className="app-sidebar__refresh"
-            onClick={() => { void controller.refresh() }}
-          />
         </div>
       </nav>
 

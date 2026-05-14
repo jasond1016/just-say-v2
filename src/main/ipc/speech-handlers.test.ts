@@ -10,15 +10,18 @@ describe('createSpeechHandlers', () => {
       testProfile: vi.fn().mockResolvedValue({
         ok: true,
         profileId: 'local-fast'
-      })
+      }),
+      restartLocalService: vi.fn().mockResolvedValue(undefined)
     }
 
     const handlers = createSpeechHandlers(speechService)
 
     await handlers[IPC_CHANNELS.speechListProfiles]()
     await handlers[IPC_CHANNELS.speechTestProfile]('local-fast')
+    await handlers[IPC_CHANNELS.speechRestartLocalService]()
 
     expect(speechService.listProfiles).toHaveBeenCalled()
     expect(speechService.testProfile).toHaveBeenCalledWith('local-fast')
+    expect(speechService.restartLocalService).toHaveBeenCalled()
   })
 })

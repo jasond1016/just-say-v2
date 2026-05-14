@@ -18,6 +18,14 @@ export class SpeechService {
     return this.registry.getProfileCatalog().filter((profile) => profile.kind === 'local')
   }
 
+  async probeLocalService(): Promise<'healthy' | 'degraded' | 'starting' | 'stopped' | 'failed'> {
+    return this.localServiceSupervisor.probe()
+  }
+
+  async restartLocalService(): Promise<void> {
+    await this.localServiceSupervisor.restart()
+  }
+
   async testProfile(profileId: string): Promise<ProfileTestResult> {
     const profile = this.registry.getProfileById(profileId)
 

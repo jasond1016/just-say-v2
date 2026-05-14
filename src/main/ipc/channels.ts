@@ -7,6 +7,7 @@ export const IPC_CHANNELS = {
   captureReady: 'capture.ready',
   speechListProfiles: 'speech.listProfiles',
   speechTestProfile: 'speech.testProfile',
+  speechRestartLocalService: 'speech.restartLocalService',
   sessionGetRuntime: 'session.getRuntime',
   sessionPrewarm: 'session.prewarm',
   sessionStartPtt: 'session.startPtt',

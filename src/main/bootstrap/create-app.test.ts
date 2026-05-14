@@ -89,7 +89,8 @@ describe('createApp', () => {
     }
     const speechService = {
       listProfiles: vi.fn().mockResolvedValue([]),
-      testProfile: vi.fn().mockResolvedValue({ ok: true, profileId: 'local-fast' })
+      testProfile: vi.fn().mockResolvedValue({ ok: true, profileId: 'local-fast' }),
+      restartLocalService: vi.fn().mockResolvedValue(undefined)
     }
     const settingsService = {
       getSettings: vi.fn().mockResolvedValue(changedSettings),
@@ -149,6 +150,7 @@ describe('createApp', () => {
       'session.exportLiveSession',
       'speech.listProfiles',
       'speech.testProfile',
+      'speech.restartLocalService',
       'history.list',
       'history.search',
       'history.get',

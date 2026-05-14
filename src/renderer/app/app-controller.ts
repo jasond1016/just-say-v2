@@ -215,6 +215,13 @@ export class AppController {
     })
   }
 
+  async restartLocalService(): Promise<void> {
+    await this.runAction('local-service-restart', async () => {
+      await this.deps.api.restartLocalService()
+      await this.refreshRuntimeOnly()
+    })
+  }
+
   async startPtt(): Promise<void> {
     await this.runAction('ptt-start', async () => {
       await this.deps.api.startPtt()
