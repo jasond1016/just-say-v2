@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import type {
   AppSettings,
@@ -29,6 +29,11 @@ export const TRANSLATION_TARGET_OPTIONS: Array<{ value: TranslationTargetOption;
   { value: 'en', label: 'English' },
   { value: 'ja', label: 'Japanese' }
 ]
+
+type TextSettingsDraft = {
+  host: string
+  port: string
+}
 
 type SettingsHeaderState =
   | { tone: 'saved'; label: string }
@@ -93,6 +98,34 @@ export function SettingsPage(props: {
   const invalidPort = localServiceMode === 'managed-local' ? invalidManagedPort : invalidRemotePort
   const selectedProfile = props.profiles.find((profile) => profile.id === props.settings.speech.selectedProfileId) ?? null
   const selectedTranslationTarget = getTranslationTargetSelectValue(props.settings.translation.targetLanguage)
+  const translationDraftDirty = hasTranslationDraftChanges(props.settings.translation, {
+    endpoint: draftTranslationEndpoint,
+    model: draftTranslationModel,
+    apiKey: draftTranslationApiKey
+  })
+  const managedConnectionDraftDirty = hasConnectionDraftChanges(
+    {
+      host: props.settings.advanced.localServiceHost,
+      port: props.settings.advanced.localServicePort
+    },
+    {
+      host: draftManagedHost,
+      port: draftManagedPort
+    }
+  )
+  const remoteConnectionDraftDirty = hasConnectionDraftChanges(
+    {
+      host: props.settings.advanced.remoteServiceHost,
+      port: props.settings.advanced.remoteServicePort
+    },
+    {
+      host: draftRemoteHost,
+      port: draftRemotePort
+    }
+  )
+  const activeConnectionDraftDirty = localServiceMode === 'managed-local'
+    ? managedConnectionDraftDirty
+    : remoteConnectionDraftDirty
 
   useEffect(() => {
     setDraftManagedHost(props.settings.advanced.localServiceHost ?? '')
@@ -145,84 +178,95 @@ export function SettingsPage(props: {
       return { tone: 'warning', label: 'Service degraded' }
     }
 
+    if (
+      (selectedSection === 'translation' && translationDraftDirty) ||
+      (selectedSection === 'advanced' && activeConnectionDraftDirty)
+    ) {
+      return { tone: 'warning', label: 'Unsaved changes' }
+    }
+
     if (showSavedState) {
       return { tone: 'saved', label: 'Saved just now' }
     }
 
     return null
-  }, [invalidPort, isCheckingProfile, props.localServiceStatus, selectedSection, showSavedState])
+  }, [
+    activeConnectionDraftDirty,
+    invalidPort,
+    isCheckingProfile,
+    props.localServiceStatus,
+    selectedSection,
+    showSavedState,
+    translationDraftDirty
+  ])
 
-  const commitAdvancedHost = () => {
-    if (draftManagedHost === (props.settings.advanced.localServiceHost ?? '')) {
-      return
-    }
-
-    props.onLocalServiceHostChange(draftManagedHost.trim())
+  const discardTranslationDrafts = () => {
+    setDraftTranslationEndpoint(props.settings.translation.endpoint ?? '')
+    setDraftTranslationModel(props.settings.translation.model ?? '')
+    setDraftTranslationApiKey('')
   }
 
-  const commitAdvancedPort = () => {
+  const saveTranslationDrafts = async () => {
+    const normalizedEndpoint = draftTranslationEndpoint.trim()
+    const normalizedModel = draftTranslationModel.trim()
+    const normalizedApiKey = draftTranslationApiKey.trim()
+
+    if (normalizedEndpoint !== (props.settings.translation.endpoint ?? '')) {
+      props.onTranslationEndpointChange(normalizedEndpoint)
+    }
+
+    if (normalizedModel !== (props.settings.translation.model ?? '')) {
+      props.onTranslationModelChange(normalizedModel)
+    }
+
+    if (normalizedApiKey) {
+      await props.onSaveTranslationApiKey(normalizedApiKey)
+      setDraftTranslationApiKey('')
+    }
+  }
+
+  const discardManagedConnectionDrafts = () => {
+    setDraftManagedHost(props.settings.advanced.localServiceHost ?? '')
+    setDraftManagedPort(props.settings.advanced.localServicePort?.toString() ?? '')
+  }
+
+  const discardRemoteConnectionDrafts = () => {
+    setDraftRemoteHost(props.settings.advanced.remoteServiceHost ?? '')
+    setDraftRemotePort(props.settings.advanced.remoteServicePort?.toString() ?? '')
+  }
+
+  const saveManagedConnectionDrafts = () => {
     if (invalidManagedPort) {
       return
     }
 
-    const normalizedCurrent = props.settings.advanced.localServicePort?.toString() ?? ''
-    if (managedPortValue === normalizedCurrent) {
-      return
+    const normalizedHost = draftManagedHost.trim()
+    if (normalizedHost !== (props.settings.advanced.localServiceHost ?? '')) {
+      props.onLocalServiceHostChange(normalizedHost)
     }
 
-    props.onLocalServicePortChange(
-      managedPortValue ? Number.parseInt(managedPortValue, 10) : undefined
-    )
-  }
-
-  const commitRemoteHost = () => {
-    if (draftRemoteHost === (props.settings.advanced.remoteServiceHost ?? '')) {
-      return
+    if (managedPortValue !== (props.settings.advanced.localServicePort?.toString() ?? '')) {
+      props.onLocalServicePortChange(
+        managedPortValue ? Number.parseInt(managedPortValue, 10) : undefined
+      )
     }
-
-    props.onRemoteServiceHostChange(draftRemoteHost.trim())
   }
 
-  const commitRemotePort = () => {
+  const saveRemoteConnectionDrafts = () => {
     if (invalidRemotePort) {
       return
     }
 
-    const normalizedCurrent = props.settings.advanced.remoteServicePort?.toString() ?? ''
-    if (remotePortValue === normalizedCurrent) {
-      return
+    const normalizedHost = draftRemoteHost.trim()
+    if (normalizedHost !== (props.settings.advanced.remoteServiceHost ?? '')) {
+      props.onRemoteServiceHostChange(normalizedHost)
     }
 
-    props.onRemoteServicePortChange(
-      remotePortValue ? Number.parseInt(remotePortValue, 10) : undefined
-    )
-  }
-
-  const commitTranslationEndpoint = () => {
-    if (draftTranslationEndpoint === (props.settings.translation.endpoint ?? '')) {
-      return
+    if (remotePortValue !== (props.settings.advanced.remoteServicePort?.toString() ?? '')) {
+      props.onRemoteServicePortChange(
+        remotePortValue ? Number.parseInt(remotePortValue, 10) : undefined
+      )
     }
-
-    props.onTranslationEndpointChange(draftTranslationEndpoint.trim())
-  }
-
-  const commitTranslationModel = () => {
-    if (draftTranslationModel === (props.settings.translation.model ?? '')) {
-      return
-    }
-
-    props.onTranslationModelChange(draftTranslationModel.trim())
-  }
-
-  const commitTranslationApiKey = async () => {
-    const apiKey = draftTranslationApiKey.trim()
-
-    if (!apiKey) {
-      return
-    }
-
-    await props.onSaveTranslationApiKey(apiKey)
-    setDraftTranslationApiKey('')
   }
 
   const selectedSectionMeta = describeSettingsSection(selectedSection)
@@ -435,9 +479,6 @@ export function SettingsPage(props: {
                     onChange={(event) => setDraftTranslationEndpoint(event.target.value)}
                     className="field-input--wide"
                   />
-                  <div className="field-action-row">
-                    <Button label="Save endpoint" size="small" disabled={disabled} onClick={commitTranslationEndpoint} />
-                  </div>
                 </SettingRow>
 
                 <SettingRow title="Model" hint="Leave blank to use the default translation model.">
@@ -448,9 +489,6 @@ export function SettingsPage(props: {
                     onChange={(event) => setDraftTranslationModel(event.target.value)}
                     className="field-input--wide"
                   />
-                  <div className="field-action-row">
-                    <Button label="Save model" size="small" disabled={disabled} onClick={commitTranslationModel} />
-                  </div>
                 </SettingRow>
 
                 <SettingRow title="API key" hint="Saved locally with device encryption and never written into settings.json.">
@@ -462,20 +500,23 @@ export function SettingsPage(props: {
                     onChange={(event) => setDraftTranslationApiKey(event.target.value)}
                     className="field-input--wide"
                   />
-                  <div className="field-action-row">
-                    <Button
-                      label={translationApiKeyConfigured ? 'Replace key' : 'Save key'}
-                      size="small"
-                      disabled={disabled || draftTranslationApiKey.trim().length === 0}
-                      onClick={() => { void commitTranslationApiKey() }}
-                    />
-                  </div>
                   <div className="field-note">
                     {translationApiKeyConfigured
                       ? 'Translation credentials are configured.'
                       : 'No translation API key is saved yet. Meeting translation will fail until you save one.'}
                   </div>
                 </SettingRow>
+
+                {translationDraftDirty ? (
+                  <DraftActionRow
+                    label="Unsaved translation settings"
+                    description="Endpoint, model, and credentials save together."
+                    disabled={disabled}
+                    onDiscard={discardTranslationDrafts}
+                    onSave={() => { void saveTranslationDrafts() }}
+                    saveLabel="Save translation settings"
+                  />
+                ) : null}
               </SettingsSection>
             ) : null}
 
@@ -573,9 +614,6 @@ export function SettingsPage(props: {
                         onChange={(event) => setDraftManagedHost(event.target.value)}
                         className="field-input--wide"
                       />
-                      <div className="field-action-row">
-                        <Button label="Save host" size="small" disabled={disabled} onClick={commitAdvancedHost} />
-                      </div>
                     </SettingRow>
 
                     <SettingRow
@@ -591,18 +629,22 @@ export function SettingsPage(props: {
                         onChange={(event) => setDraftManagedPort(event.target.value)}
                         className={`field-input--wide ${invalidManagedPort ? 'field-input--invalid' : ''}`}
                       />
-                      <div className="field-action-row">
-                        <Button
-                          label="Save port"
-                          size="small"
-                          disabled={disabled || invalidManagedPort}
-                          onClick={commitAdvancedPort}
-                        />
-                      </div>
                       {invalidManagedPort ? (
                         <div className="field-note field-note--danger">Port must be numeric. The current value cannot be used.</div>
                       ) : null}
                     </SettingRow>
+
+                    {managedConnectionDraftDirty ? (
+                      <DraftActionRow
+                        label="Unsaved connection settings"
+                        description="Host and port save together for the managed service."
+                        disabled={disabled}
+                        saveDisabled={invalidManagedPort}
+                        onDiscard={discardManagedConnectionDrafts}
+                        onSave={saveManagedConnectionDrafts}
+                        saveLabel="Save connection settings"
+                      />
+                    ) : null}
                   </>
                 ) : (
                   <>
@@ -618,9 +660,6 @@ export function SettingsPage(props: {
                         onChange={(event) => setDraftRemoteHost(event.target.value)}
                         className="field-input--wide"
                       />
-                      <div className="field-action-row">
-                        <Button label="Save host" size="small" disabled={disabled} onClick={commitRemoteHost} />
-                      </div>
                     </SettingRow>
 
                     <SettingRow
@@ -636,18 +675,22 @@ export function SettingsPage(props: {
                         onChange={(event) => setDraftRemotePort(event.target.value)}
                         className={`field-input--wide ${invalidRemotePort ? 'field-input--invalid' : ''}`}
                       />
-                      <div className="field-action-row">
-                        <Button
-                          label="Save port"
-                          size="small"
-                          disabled={disabled || invalidRemotePort}
-                          onClick={commitRemotePort}
-                        />
-                      </div>
                       {invalidRemotePort ? (
                         <div className="field-note field-note--danger">Port must be numeric. The current value cannot be used.</div>
                       ) : null}
                     </SettingRow>
+
+                    {remoteConnectionDraftDirty ? (
+                      <DraftActionRow
+                        label="Unsaved connection settings"
+                        description="Host and port save together for the remote service."
+                        disabled={disabled}
+                        saveDisabled={invalidRemotePort}
+                        onDiscard={discardRemoteConnectionDrafts}
+                        onSave={saveRemoteConnectionDrafts}
+                        saveLabel="Save connection settings"
+                      />
+                    ) : null}
                   </>
                 )}
 
@@ -727,6 +770,27 @@ function describeSettingsSection(section: SettingsSectionId) {
   }
 }
 
+export function hasTranslationDraftChanges(
+  translation: AppSettings['translation'],
+  draft: { endpoint: string; model: string; apiKey: string }
+): boolean {
+  return (
+    draft.endpoint.trim() !== (translation.endpoint ?? '') ||
+    draft.model.trim() !== (translation.model ?? '') ||
+    draft.apiKey.trim().length > 0
+  )
+}
+
+export function hasConnectionDraftChanges(
+  saved: { host: string | undefined; port: number | undefined },
+  draft: TextSettingsDraft
+): boolean {
+  return (
+    draft.host.trim() !== (saved.host ?? '') ||
+    draft.port.trim() !== (saved.port?.toString() ?? '')
+  )
+}
+
 export function getTranslationTargetSelectValue(targetLanguage: string): TranslationTargetOption {
   const normalized = targetLanguage.trim().toLowerCase()
 
@@ -747,6 +811,40 @@ export function getTranslationTargetSelectValue(targetLanguage: string): Transla
     default:
       return 'en'
   }
+}
+
+function DraftActionRow(props: {
+  label: string
+  description: string
+  disabled?: boolean
+  saveDisabled?: boolean
+  saveLabel: string
+  onDiscard: () => void
+  onSave: () => void
+}) {
+  return (
+    <div className="settings-draft-bar" role="status" aria-live="polite">
+      <div className="settings-draft-bar__copy">
+        <div className="settings-draft-bar__label">{props.label}</div>
+        <div className="settings-draft-bar__description">{props.description}</div>
+      </div>
+      <div className="settings-draft-bar__actions">
+        <Button
+          label="Discard changes"
+          size="small"
+          variant="ghost"
+          disabled={props.disabled}
+          onClick={props.onDiscard}
+        />
+        <Button
+          label={props.saveLabel}
+          size="small"
+          disabled={props.disabled || props.saveDisabled}
+          onClick={props.onSave}
+        />
+      </div>
+    </div>
+  )
 }
 
 function SettingsSection(props: { children: ReactNode }) {

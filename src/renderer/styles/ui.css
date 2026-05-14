@@ -271,7 +271,6 @@
   color: var(--danger-text);
 }
 
-.field-action-row,
 .advanced-actions {
   display: grid;
   gap: 10px;
@@ -1361,6 +1360,40 @@
   padding: 8px 0 4px;
 }
 
+.settings-draft-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0 2px;
+  border-top: 1px solid color-mix(in oklab, var(--border) 58%, transparent);
+}
+
+.settings-draft-bar__copy {
+  display: grid;
+  gap: 4px;
+}
+
+.settings-draft-bar__label {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+
+.settings-draft-bar__description {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.settings-draft-bar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .settings-reset {
   display: inline-flex;
   align-items: center;
@@ -1526,6 +1559,15 @@
   .settings-row,
   .settings-layout {
     grid-template-columns: 1fr;
+  }
+
+  .settings-draft-bar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .settings-draft-bar__actions {
+    justify-content: flex-start;
   }
 
   .settings-directory {
