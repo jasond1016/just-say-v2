@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import type { AppRuntimeSnapshot, AppSettings, ExportFormat, LocalServiceStatus, MeetingStatus } from '../../shared/api-types'
+import type { AppRuntimeSnapshot, AppSettings, ExportFormat, MeetingStatus } from '../../shared/api-types'
 import { selectVisibleTimeline } from '../../core/transcript/transcript-selectors'
 import { Button } from '../ui/controls'
 import { describeCaptureSource } from '../ui/copy'
@@ -18,7 +18,6 @@ export function LiveSessionPage(props: {
   settings: AppSettings
   busyAction: string | null
   liveSessionMessage: string | null
-  localServiceStatus: LocalServiceStatus
   meetingStartDisabled: boolean
   meetingStopDisabled: boolean
   onStartMeeting: () => void
@@ -43,32 +42,20 @@ export function LiveSessionPage(props: {
   const canUsePostActions = Boolean(session) && !isSessionActive && hasTranscript && !props.busyAction
 
   if (isColdStart) {
-    const serviceReady = props.localServiceStatus === 'healthy' || props.localServiceStatus === 'starting'
-    const serviceDotClass = serviceReady ? 'cold-start__status-dot--ready'
-      : props.localServiceStatus === 'degraded' ? 'cold-start__status-dot--degraded'
-      : 'cold-start__status-dot--failed'
-    const serviceText = serviceReady ? 'Recognition service connected'
-      : props.localServiceStatus === 'degraded' ? 'Recognition service degraded'
-      : 'Recognition service unavailable'
-
     return (
       <div className="page page--wide">
         <section className="transcript-canvas">
           <div className="cold-start">
-            <div className="cold-start__status">
-              <span className={`cold-start__status-dot ${serviceDotClass}`} />
-              {serviceText}
+            <div className="cold-start__eyebrow">Live Session</div>
+            <div className="cold-start__hero">
+              <h1 className="cold-start__headline">Ready to record</h1>
+              <p className="cold-start__body">
+                Start a session to capture a meeting or conversation. The transcript will stream here in real time and stay here for review after you stop.
+              </p>
             </div>
-            <h1 className="cold-start__headline">Ready to record</h1>
-            <p className="cold-start__body">
-              Capture system audio and transcribe in real time.
-            </p>
-            <div className="cold-start__sources">
-              <span className="cold-start__source">System audio</span>
-              {props.settings.input.includeMicrophoneInMeeting ? (
-                <span className="cold-start__source">Microphone</span>
-              ) : null}
-            </div>
+            {props.settings.input.includeMicrophoneInMeeting ? (
+              <p className="cold-start__detail">Microphone is also included in this session.</p>
+            ) : null}
             <div className="cold-start__actions">
               <Button
                 label={props.busyAction === 'meeting-start' ? 'Starting...' : 'Start session'}

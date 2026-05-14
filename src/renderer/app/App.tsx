@@ -189,7 +189,6 @@ function WorkspaceApp() {
             settings={settings}
             busyAction={busyAction}
             liveSessionMessage={liveSessionMessage}
-            localServiceStatus={serviceStatus}
             meetingStartDisabled={meetingStartDisabled}
             meetingStopDisabled={meetingStopDisabled}
             onStartMeeting={() => { void controller.startMeeting() }}

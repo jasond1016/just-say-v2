@@ -415,7 +415,7 @@ function createWindowByKind(
   if (kind === 'hud') {
     const display = screen.getPrimaryDisplay()
     const hudWidth = 440
-    const hudHeight = 136
+    const hudHeight = 112
     const x = Math.round(display.workArea.x + (display.workArea.width - hudWidth) / 2)
     const y = Math.round(display.workArea.y + display.workArea.height - hudHeight - 48)
 
