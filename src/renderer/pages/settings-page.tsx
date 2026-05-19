@@ -523,9 +523,9 @@ export function SettingsPage(props: {
             {selectedSection === 'recognition' ? (
               <SettingsSection>
                 <div className="settings-subhead">
-                  <div className="settings-subhead__title">Available presets</div>
+                  <div className="settings-subhead__title">Available profiles</div>
                   <div className="settings-subhead__body">
-                    The current preset should read as the default answer. Alternatives stay visible, but quiet until you actively switch.
+                    Pick the profile you want to compare. Deployment mode stays separate, and the Qwen profile may load its runtime when you check it.
                   </div>
                 </div>
 
@@ -554,7 +554,7 @@ export function SettingsPage(props: {
                               onClick={() => props.onSelectProfile(profile.id)}
                             />
                             <Button
-                              label={checking ? 'Checking...' : 'Check'}
+                              label={checking ? 'Checking...' : profile.runtimeFamilyId === 'qwen3-asr' ? 'Check / Load' : 'Check'}
                               disabled={disabled}
                               size="small"
                               variant="secondary"
@@ -909,9 +909,15 @@ function describeProfileTestResult(result: ProfileTestResult): string {
     return result.error?.message ?? 'Check failed.'
   }
 
+  if (result.runtimeIdentity?.runtimeFamilyId === 'qwen3-asr' && result.prewarmTriggered) {
+    return result.runtimeReadiness === 'ready'
+      ? 'Speech service ready. Qwen runtime loaded for this profile.'
+      : 'Speech service responded, but Qwen still needs prewarm.'
+  }
+
   if (result.localService) {
     return `${describeLocalServiceStatus(result.localService)}.`
   }
 
-  return 'Preset ready.'
+  return 'Profile ready.'
 }

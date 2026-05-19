@@ -1,0 +1,3 @@
+# Runtime-specific ASR sidecars with explicit prewarm
+
+JustSay will keep one user-facing profile model while treating deployment mode as a separate concern: each managed or remote sidecar serves exactly one ASR runtime family, sidecar health reports authoritative runtime identity, and heavyweight Qwen model loading happens through an explicit prewarm path rather than hidden `health-check` or session-start side effects. We chose this shape because it preserves the existing product model (`local-fast` / `local-accurate`), keeps remote mismatch detection understandable, and avoids turning a generic “local service” endpoint into an implicit multi-runtime broker.

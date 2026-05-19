@@ -11,9 +11,14 @@ import type {
 } from '../../shared/local-service-types'
 import { encodeAudioChunkToBase64 } from '../../shared/local-service-types'
 import type { WebSocketLike } from '../services/python-local-service-controller'
+import type { LocalServiceHealthResult } from '../services/local-service-supervisor'
 
 export type LocalEngineAdapterOptions = {
-  ensureLocalServiceReady: () => Promise<unknown>
+  ensureLocalServiceReady: (target: NonNullable<ResolvedRuntimeConfig['engineConfig']['localService']>) => Promise<unknown>
+  prewarmLocalService: (
+    target: NonNullable<ResolvedRuntimeConfig['engineConfig']['localService']>,
+    input: WarmupInput
+  ) => Promise<LocalServiceHealthResult>
   webSocketFactory?: (url: string) => WebSocketLike
   connectTimeoutMs?: number
 }
@@ -40,11 +45,21 @@ export class LocalEngineAdapter implements RecognitionEngine {
   }
 
   async warmup(_input: WarmupInput): Promise<void> {
-    await this.options.ensureLocalServiceReady()
+    const localService = this.requireLocalServiceConfig()
+    await this.options.ensureLocalServiceReady(localService)
+    const health = await this.options.prewarmLocalService(localService, _input)
+    this.assertRuntimeIdentity(health)
+
+    if (!health.ok) {
+      throw new Error('Local service reported unhealthy during prewarm')
+    }
   }
 
   async startSession(input: StartSessionInput): Promise<void> {
-    await this.options.ensureLocalServiceReady()
+    await this.warmup({
+      mode: input.mode,
+      language: input.language
+    })
     const socket = await this.connect(this.getSocketUrl())
     this.socket = socket
     this.activeSession = input
@@ -212,6 +227,8 @@ export class LocalEngineAdapter implements RecognitionEngine {
         this.socket?.close()
         this.socket = null
         return
+      case 'prewarm-complete':
+        return
       default:
         return assertNever(message)
     }
@@ -222,16 +239,32 @@ export class LocalEngineAdapter implements RecognitionEngine {
   }
 
   private getSocketUrl(): string {
-    const localService = this.config.engineConfig.localService as
-      | {
-          host?: string
-          port?: number
-        }
-      | undefined
-
+    const localService = this.config.engineConfig.localService
     const host = localService?.host ?? '127.0.0.1'
     const port = localService?.port ?? 8765
     return `ws://${host}:${port}`
+  }
+
+  private requireLocalServiceConfig(): NonNullable<ResolvedRuntimeConfig['engineConfig']['localService']> {
+    const localService = this.config.engineConfig.localService
+
+    if (!localService) {
+      throw new Error(`Profile "${this.config.engineProfile.id}" is missing local service configuration`)
+    }
+
+    return localService
+  }
+
+  private assertRuntimeIdentity(health: LocalServiceHealthResult): void {
+    if (
+      health.runtimeFamilyId !== this.config.engineProfile.runtimeFamilyId ||
+      health.modelIdentifier !== this.config.engineProfile.modelIdentifier
+    ) {
+      throw new Error(
+        `Configured runtime "${this.config.engineProfile.runtimeFamilyId}" does not match service runtime ` +
+          `"${health.runtimeFamilyId}" (${health.modelIdentifier})`
+      )
+    }
   }
 
   private emit(event: RecognitionEvent): void {

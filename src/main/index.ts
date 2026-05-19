@@ -56,7 +56,8 @@ void wireAppLifecycle(app, {
   onReady: async () => {
     registerElectronDisplayMediaHandler(session.defaultSession, desktopCapturer)
 
-    const { preloadPath, resourcesPath, localServicePath, rendererIndexPath, iconPath } = resolveAppPaths(__dirname)
+    const { preloadPath, resourcesPath, localServicePath, qwenLocalServicePath, rendererIndexPath, iconPath } =
+      resolveAppPaths(__dirname)
     const userDataPath = app.getPath('userData')
     const transcriptDatabase = openSqliteDatabase(path.join(userDataPath, 'history.db'))
     const transcriptRepository = new SqliteTranscriptRepository(transcriptDatabase)
@@ -86,7 +87,10 @@ void wireAppLifecycle(app, {
       return merged.cloudApiKey || merged.translationApiKey ? merged : undefined
     }
     const baseSettingsService = new SettingsService(settingsRepository, {
-      credentialsProvider: getRuntimeCredentials
+      credentialsProvider: getRuntimeCredentials,
+      platformProvider: () => ({
+        supportedManagedLocalRuntimes: process.platform === 'win32' ? ['sensevoice'] : ['sensevoice', 'qwen3-asr']
+      })
     })
     const settingsListeners = new Set<(settings: AppSettings) => void>()
     baseSettingsService.onChanged((settings) => {
@@ -140,6 +144,7 @@ void wireAppLifecycle(app, {
     }
     const getLocalServiceSettingsSignature = (settings: AppSettings) =>
       JSON.stringify({
+        profileId: settings.speech.selectedProfileId,
         mode: settings.advanced.localServiceMode,
         localHost: settings.advanced.localServiceHost ?? null,
         localPort: settings.advanced.localServicePort ?? null,
@@ -148,8 +153,10 @@ void wireAppLifecycle(app, {
       })
     const localServiceSupervisor = new LocalServiceSupervisor(
       new ConfigurableLocalServiceController({
-        getSettings: () => cachedSettings,
-        localServicePath,
+        managedRuntimePaths: {
+          sensevoice: localServicePath,
+          'qwen3-asr': qwenLocalServicePath
+        },
         healthTimeoutMs: 60_000
       })
     )
@@ -222,6 +229,7 @@ void wireAppLifecycle(app, {
       selectedProfileProvider: () => cachedSettings.speech.selectedProfileId
     })
     const speechService = new SpeechService(engineRegistry, localServiceSupervisor, {
+      resolveRuntimeConfig: (mode) => baseSettingsService.resolveRuntimeConfig(mode),
       resolveProfileRuntimeConfig: (profileId, mode) =>
         baseSettingsService.resolveProfileRuntimeConfig(profileId, mode)
     })

@@ -3,6 +3,7 @@ import type {
   AppErrorPayload,
   AppSettings,
   EngineProfile,
+  LocalRuntimeFamilyId,
   ResolvedRuntimeConfig,
   TranslationRuntimeConfig
 } from '../../shared/api-types'
@@ -18,6 +19,7 @@ export type ResolverCredentials = {
 export type PlatformCapabilities = {
   hasNetwork: boolean
   localServiceAvailable: boolean
+  supportedManagedLocalRuntimes: LocalRuntimeFamilyId[]
 }
 
 export type ResolveRuntimeConfigInput = {
@@ -37,7 +39,8 @@ export class SettingsResolverError extends Error {
 
 const DEFAULT_PLATFORM_CAPABILITIES: PlatformCapabilities = {
   hasNetwork: true,
-  localServiceAvailable: true
+  localServiceAvailable: true,
+  supportedManagedLocalRuntimes: ['sensevoice', 'qwen3-asr']
 }
 
 const DEFAULT_CAPTURE_CONFIG: ResolvedRuntimeConfig['captureConfig'] = {
@@ -72,7 +75,7 @@ export function resolveRuntimeConfig(input: ResolveRuntimeConfigInput): Resolved
       diagnosticsEnabled: settings.advanced.diagnosticsEnabled,
       experimentalFlags: [...settings.advanced.experimentalFlags],
       ...(engineProfile.capabilities.requiresLocalService
-        ? { localService: resolveLocalServiceConfig(settings) }
+        ? { localService: resolveLocalServiceConfig(settings, engineProfile, platform) }
         : {}),
       ...(engineProfile.capabilities.requiresNetwork && input.credentials?.cloudApiKey
         ? {
@@ -103,7 +106,13 @@ export function resolveRuntimeConfig(input: ResolveRuntimeConfigInput): Resolved
   }
 }
 
-function resolveLocalServiceConfig(settings: AppSettings) {
+function resolveLocalServiceConfig(
+  settings: AppSettings,
+  profile: EngineProfile,
+  platform: PlatformCapabilities
+) {
+  const runtimeFamilyId = toLocalRuntimeFamilyId(profile.runtimeFamilyId, profile.id)
+
   if (settings.advanced.localServiceMode === 'remote-service') {
     const host = settings.advanced.remoteServiceHost?.trim()
 
@@ -122,15 +131,49 @@ function resolveLocalServiceConfig(settings: AppSettings) {
     return {
       mode: settings.advanced.localServiceMode,
       host,
-      port: settings.advanced.remoteServicePort ?? DEFAULT_LOCAL_SERVICE_PORT
+      port: settings.advanced.remoteServicePort ?? DEFAULT_LOCAL_SERVICE_PORT,
+      runtimeFamilyId,
+      modelIdentifier: profile.modelIdentifier
     }
+  }
+
+  if (!platform.supportedManagedLocalRuntimes.includes(runtimeFamilyId)) {
+    throw createSettingsResolverError(
+      'E_ENGINE_UNAVAILABLE',
+      `Profile "${profile.id}" requires Remote service because runtime "${runtimeFamilyId}" is not supported for managed-local deployment on this machine`,
+      false,
+      {
+        profileId: profile.id,
+        runtimeFamilyId,
+        localServiceMode: settings.advanced.localServiceMode,
+        recommendedMode: 'remote-service'
+      }
+    )
   }
 
   return {
     mode: settings.advanced.localServiceMode,
     host: settings.advanced.localServiceHost ?? DEFAULT_LOCAL_SERVICE_HOST,
-    port: settings.advanced.localServicePort ?? DEFAULT_LOCAL_SERVICE_PORT
+    port: settings.advanced.localServicePort ?? DEFAULT_LOCAL_SERVICE_PORT,
+    runtimeFamilyId,
+    modelIdentifier: profile.modelIdentifier
   }
+}
+
+function toLocalRuntimeFamilyId(runtimeFamilyId: EngineProfile['runtimeFamilyId'], profileId: string): LocalRuntimeFamilyId {
+  if (runtimeFamilyId === 'sensevoice' || runtimeFamilyId === 'qwen3-asr') {
+    return runtimeFamilyId
+  }
+
+  throw createSettingsResolverError(
+    'E_ENGINE_UNAVAILABLE',
+    `Profile "${profileId}" is not compatible with the local service runtime selector`,
+    false,
+    {
+      profileId,
+      runtimeFamilyId
+    }
+  )
 }
 
 export function resolveEngineProfile(

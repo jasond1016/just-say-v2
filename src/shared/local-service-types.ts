@@ -1,4 +1,10 @@
-import type { AppErrorPayload, EngineCapabilities, TranscriptBlock } from './api-types'
+import type {
+  AppErrorPayload,
+  EngineCapabilities,
+  RuntimeFamilyId,
+  RuntimeReadiness,
+  TranscriptBlock
+} from './api-types'
 import type { CaptureSource, SessionMode, WordTiming } from './primitive-types'
 
 export type LocalServiceClientMessage =
@@ -24,6 +30,11 @@ export type LocalServiceClientMessage =
       }
     }
   | {
+      type: 'prewarm'
+      mode: SessionMode
+      language: string
+    }
+  | {
       type: 'stop-session'
       sessionId: string
     }
@@ -36,9 +47,16 @@ export type LocalServiceServerMessage =
   | {
       type: 'health-status'
       ok: boolean
-      model: string
+      runtimeFamilyId: RuntimeFamilyId
+      modelIdentifier: string
+      readiness: RuntimeReadiness
       capabilities: EngineCapabilities
       detail?: Record<string, unknown>
+    }
+  | {
+      type: 'prewarm-complete'
+      runtimeFamilyId: RuntimeFamilyId
+      modelIdentifier: string
     }
   | {
       type: 'session-ready'

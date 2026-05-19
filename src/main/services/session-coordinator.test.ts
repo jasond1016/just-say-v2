@@ -147,6 +147,9 @@ describe('SessionCoordinator + PTTCoordinator', () => {
         plainText: 'hello world',
         metadata: {
           engineProfileId: 'local-fast',
+          runtimeFamilyId: 'sensevoice',
+          modelIdentifier: 'iic/SenseVoiceSmall',
+          deploymentMode: 'managed-local',
           includeMicrophone: true,
           translationEnabled: false
         }
@@ -468,6 +471,9 @@ describe('SessionCoordinator + PTTCoordinator', () => {
         translatedPlainText: '你好，世界',
         metadata: {
           engineProfileId: 'local-fast',
+          runtimeFamilyId: 'sensevoice',
+          modelIdentifier: 'iic/SenseVoiceSmall',
+          deploymentMode: 'managed-local',
           includeMicrophone: true,
           translationEnabled: true
         }

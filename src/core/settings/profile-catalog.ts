@@ -6,10 +6,12 @@ export const profileCatalog = [
     label: 'Local Fast',
     kind: 'local',
     preset: 'local-fast',
+    runtimeFamilyId: 'sensevoice',
+    modelIdentifier: 'iic/SenseVoiceSmall',
     capabilities: {
       streaming: true,
       translation: false,
-      wordTiming: true,
+      wordTiming: false,
       speakerSeparation: false,
       requiresNetwork: false,
       requiresLocalService: true
@@ -20,11 +22,13 @@ export const profileCatalog = [
     label: 'Local Accurate',
     kind: 'local',
     preset: 'local-accurate',
+    runtimeFamilyId: 'qwen3-asr',
+    modelIdentifier: 'Qwen/Qwen3-ASR-1.7B',
     capabilities: {
       streaming: true,
       translation: false,
-      wordTiming: true,
-      speakerSeparation: true,
+      wordTiming: false,
+      speakerSeparation: false,
       requiresNetwork: false,
       requiresLocalService: true
     }
@@ -34,6 +38,8 @@ export const profileCatalog = [
     label: 'Cloud Low Latency',
     kind: 'cloud',
     preset: 'cloud-low-latency',
+    runtimeFamilyId: 'sensevoice',
+    modelIdentifier: 'cloud-low-latency',
     capabilities: {
       streaming: true,
       translation: false,
@@ -48,6 +54,8 @@ export const profileCatalog = [
     label: 'Cloud Low Cost',
     kind: 'cloud',
     preset: 'cloud-low-cost',
+    runtimeFamilyId: 'sensevoice',
+    modelIdentifier: 'cloud-low-cost',
     capabilities: {
       streaming: true,
       translation: false,

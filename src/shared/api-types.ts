@@ -20,6 +20,21 @@ export type TranslationProvider = 'openai-compatible'
 
 export type LocalServiceMode = 'managed-local' | 'remote-service'
 
+export type RuntimeFamilyId =
+  | 'sensevoice'
+  | 'qwen3-asr'
+  | 'cloud-low-latency'
+  | 'cloud-low-cost'
+
+export type LocalRuntimeFamilyId = Extract<RuntimeFamilyId, 'sensevoice' | 'qwen3-asr'>
+
+export type RuntimeReadiness = 'ready' | 'prewarm-required'
+
+export type RuntimeIdentity = {
+  runtimeFamilyId: RuntimeFamilyId
+  modelIdentifier: string
+}
+
 export type TranslationCredentialsInput = {
   apiKey: string
 }
@@ -55,6 +70,8 @@ export type EngineProfile = {
   kind: 'local' | 'cloud'
   capabilities: EngineCapabilities
   preset: EngineProfilePreset
+  runtimeFamilyId: RuntimeFamilyId
+  modelIdentifier: string
 }
 
 export type LocalServiceStatus = 'stopped' | 'starting' | 'healthy' | 'degraded' | 'failed'
@@ -229,6 +246,27 @@ export type TranslationRuntimeConfig = {
   }
 }
 
+export type ResolvedLocalServiceConfig = {
+  mode: LocalServiceMode
+  host: string
+  port: number
+  runtimeFamilyId: LocalRuntimeFamilyId
+  modelIdentifier: string
+}
+
+export type ResolvedEngineConfig = {
+  mode: SessionMode
+  profileId: string
+  preset: EngineProfilePreset
+  language: SpeechLanguage
+  diagnosticsEnabled: boolean
+  experimentalFlags: string[]
+  localService?: ResolvedLocalServiceConfig
+  credentials?: {
+    cloudApiKey: string
+  }
+}
+
 export type TranscriptNotesRuntimeConfig = {
   provider: TranslationProvider
   language: string
@@ -241,7 +279,7 @@ export type TranscriptNotesRuntimeConfig = {
 
 export type ResolvedRuntimeConfig = {
   engineProfile: EngineProfile
-  engineConfig: Record<string, unknown>
+  engineConfig: ResolvedEngineConfig
   translationConfig?: TranslationRuntimeConfig
   captureConfig: {
     sampleRate: 16000
@@ -265,6 +303,9 @@ export type SavedTranscript = {
   blocks: TranscriptBlock[]
   metadata: {
     engineProfileId: string
+    runtimeFamilyId: RuntimeFamilyId
+    modelIdentifier: string
+    deploymentMode: LocalServiceMode
     includeMicrophone: boolean
     translationEnabled: boolean
     audio?: TranscriptAudioMetadata
@@ -358,6 +399,9 @@ export type ExportResult = {
 export type ProfileTestResult = {
   ok: boolean
   profileId: string
+  runtimeIdentity?: RuntimeIdentity
+  runtimeReadiness?: RuntimeReadiness
+  prewarmTriggered?: boolean
   capabilities?: EngineCapabilities
   localService?: LocalServiceStatus
   error?: AppErrorPayload

@@ -42,6 +42,9 @@ describe('app-model', () => {
         blocks: [],
         metadata: {
           engineProfileId: 'local-fast',
+          runtimeFamilyId: 'sensevoice',
+          modelIdentifier: 'iic/SenseVoiceSmall',
+          deploymentMode: 'managed-local',
           includeMicrophone: true,
           translationEnabled: false
         }
@@ -57,6 +60,9 @@ describe('app-model', () => {
         blocks: [],
         metadata: {
           engineProfileId: 'local-fast',
+          runtimeFamilyId: 'sensevoice',
+          modelIdentifier: 'iic/SenseVoiceSmall',
+          deploymentMode: 'managed-local',
           includeMicrophone: false,
           translationEnabled: true
         }

@@ -76,8 +76,21 @@ function createSpeechService(overrides: {
   const localServiceSupervisor = new LocalServiceSupervisor({
     async start() {},
     async stop() {},
-    async healthCheck() {
-      return { ok: true }
+    async healthCheck(target) {
+      return {
+        ok: true,
+        runtimeFamilyId: target.runtimeFamilyId,
+        modelIdentifier: target.modelIdentifier,
+        readiness: 'ready'
+      }
+    },
+    async prewarm(target) {
+      return {
+        ok: true,
+        runtimeFamilyId: target.runtimeFamilyId,
+        modelIdentifier: target.modelIdentifier,
+        readiness: 'ready'
+      }
     }
   })
   if (overrides.restart) {
@@ -87,8 +100,7 @@ function createSpeechService(overrides: {
     localServiceSupervisor.probe = overrides.probe as LocalServiceSupervisor['probe']
   }
 
-  return new SpeechService(registry, localServiceSupervisor, {
-    async resolveProfileRuntimeConfig(profileId) {
+  const resolveProfileRuntimeConfig = async (profileId: string) => {
       const profile = profileCatalog.find((item) => item.id === profileId)
 
       if (!profile) {
@@ -97,7 +109,25 @@ function createSpeechService(overrides: {
 
       return {
         engineProfile: profile,
-        engineConfig: {},
+        engineConfig: {
+          mode: 'meeting',
+          profileId: profile.id,
+          preset: profile.preset,
+          language: 'auto',
+          diagnosticsEnabled: true,
+          experimentalFlags: [],
+          ...(profile.capabilities.requiresLocalService
+            ? {
+                localService: {
+                  mode: 'managed-local',
+                  host: '127.0.0.1',
+                  port: 8765,
+                  runtimeFamilyId: profile.runtimeFamilyId,
+                  modelIdentifier: profile.modelIdentifier
+                }
+              }
+            : {})
+        },
         captureConfig: {
           sampleRate: 16000,
           chunkMs: 100
@@ -106,6 +136,14 @@ function createSpeechService(overrides: {
           method: 'simulate_input'
         }
       } satisfies ResolvedRuntimeConfig
+  }
+
+  return new SpeechService(registry, localServiceSupervisor, {
+    async resolveRuntimeConfig() {
+      return resolveProfileRuntimeConfig('local-fast')
+    },
+    async resolveProfileRuntimeConfig(profileId) {
+      return resolveProfileRuntimeConfig(profileId)
     }
   })
 }

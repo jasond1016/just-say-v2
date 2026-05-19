@@ -20,6 +20,7 @@ describe('LocalEngineAdapter', () => {
     })
 
     expect(harness.ensureLocalServiceReady).toHaveBeenCalledTimes(1)
+    expect(harness.prewarmLocalService).toHaveBeenCalledTimes(1)
     expect(harness.socket.sentMessages).toContainEqual({
       type: 'start-session',
       sessionId: 'session-1',
@@ -48,7 +49,10 @@ describe('LocalEngineAdapter', () => {
         resolved = true
       })
 
-    await Promise.resolve()
+    await vi.waitFor(() => {
+      expect(harness.ensureLocalServiceReady).toHaveBeenCalledTimes(1)
+      expect(harness.prewarmLocalService).toHaveBeenCalledTimes(1)
+    })
     expect(resolved).toBe(false)
     expect(harness.socket.sentMessages).toEqual([])
 
@@ -195,12 +199,27 @@ describe('LocalEngineAdapter', () => {
 function createHarness(overrides: { socket?: ReturnType<typeof createFakeSocket> } = {}) {
   const socket = overrides.socket ?? createFakeSocket()
   const ensureLocalServiceReady = vi.fn(async () => {})
+  const prewarmLocalService = vi.fn(async () => ({
+    ok: true,
+    runtimeFamilyId: 'sensevoice' as const,
+    modelIdentifier: 'iic/SenseVoiceSmall',
+    readiness: 'ready' as const
+  }))
   const config: ResolvedRuntimeConfig = {
     engineProfile: profileCatalog[0]!,
     engineConfig: {
+      mode: 'meeting',
+      profileId: 'local-fast',
+      preset: 'local-fast',
+      language: 'auto',
+      diagnosticsEnabled: true,
+      experimentalFlags: [],
       localService: {
+        mode: 'managed-local',
         host: '127.0.0.1',
-        port: 8765
+        port: 8765,
+        runtimeFamilyId: 'sensevoice',
+        modelIdentifier: 'iic/SenseVoiceSmall'
       }
     },
     captureConfig: {
@@ -213,13 +232,15 @@ function createHarness(overrides: { socket?: ReturnType<typeof createFakeSocket>
   }
   const engine = new LocalEngineAdapter(config, {
     ensureLocalServiceReady,
+    prewarmLocalService,
     webSocketFactory: () => socket
   })
 
   return {
     engine,
     socket,
-    ensureLocalServiceReady
+    ensureLocalServiceReady,
+    prewarmLocalService
   }
 }
 

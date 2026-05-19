@@ -1,5 +1,5 @@
 import path from 'node:path'
-import type { AppErrorPayload, AppSettings } from '../../shared/api-types'
+import type { AppErrorPayload, ResolvedLocalServiceConfig } from '../../shared/api-types'
 import type { WebSocketLike } from './python-local-service-controller'
 import {
   createLocalServiceUrl,
@@ -8,20 +8,20 @@ import {
   sendLocalServiceRequest
 } from './python-local-service-controller'
 import type { LocalServiceController, LocalServiceHealthResult } from './local-service-supervisor'
+import type { SessionMode } from '../../shared/primitive-types'
 
-const DEFAULT_LOCAL_SERVICE_HOST = '127.0.0.1'
-const DEFAULT_LOCAL_SERVICE_PORT = 8765
-
-type ManagedLocalServiceConfig = {
-  mode: 'managed-local'
-  host: string
-  port: number
+type ManagedRuntimePaths = {
+  sensevoice: string
+  'qwen3-asr': string
 }
 
-type RemoteLocalServiceConfig = {
+type ManagedLocalServiceConfig = ResolvedLocalServiceConfig & {
+  mode: 'managed-local'
+  servicePath: string
+}
+
+type RemoteLocalServiceConfig = ResolvedLocalServiceConfig & {
   mode: 'remote-service'
-  host: string
-  port: number
 }
 
 type InvalidLocalServiceConfig = {
@@ -35,8 +35,7 @@ export type LocalServiceControllerConfig =
   | InvalidLocalServiceConfig
 
 export type ConfigurableLocalServiceControllerOptions = {
-  getSettings: () => AppSettings
-  localServicePath: string
+  managedRuntimePaths: ManagedRuntimePaths
   healthTimeoutMs?: number
   webSocketFactory?: (url: string) => WebSocketLike
   createManagedController?: (config: ManagedLocalServiceConfig) => LocalServiceController
@@ -60,9 +59,9 @@ export class ConfigurableLocalServiceController implements LocalServiceControlle
       options.createRemoteController ?? ((config) => this.createDefaultRemoteController(config))
   }
 
-  async start(): Promise<void> {
-    const controller = await this.resolveController()
-    await controller.start()
+  async start(target: ResolvedLocalServiceConfig): Promise<void> {
+    const controller = await this.resolveController(target)
+    await controller.start(target)
   }
 
   async stop(): Promise<void> {
@@ -75,13 +74,24 @@ export class ConfigurableLocalServiceController implements LocalServiceControlle
     this.activeSignature = null
   }
 
-  async healthCheck(): Promise<LocalServiceHealthResult> {
-    const controller = await this.resolveController()
-    return controller.healthCheck()
+  async healthCheck(target: ResolvedLocalServiceConfig): Promise<LocalServiceHealthResult> {
+    const controller = await this.resolveController(target)
+    return controller.healthCheck(target)
   }
 
-  private async resolveController(): Promise<LocalServiceController> {
-    const config = resolveLocalServiceControllerConfig(this.options.getSettings())
+  async prewarm(
+    target: ResolvedLocalServiceConfig,
+    input: {
+      mode: SessionMode
+      language: string
+    }
+  ): Promise<LocalServiceHealthResult> {
+    const controller = await this.resolveController(target)
+    return controller.prewarm(target, input)
+  }
+
+  private async resolveController(target: ResolvedLocalServiceConfig): Promise<LocalServiceController> {
+    const config = resolveLocalServiceControllerConfig(target, this.options.managedRuntimePaths)
     const signature = JSON.stringify(config)
 
     if (this.activeController && this.activeSignature === signature) {
@@ -114,8 +124,12 @@ export class ConfigurableLocalServiceController implements LocalServiceControlle
     return new PythonLocalServiceController({
       host: config.host,
       port: config.port,
-      scriptPath: path.join(this.options.localServicePath, 'service.py'),
-      workingDirectory: this.options.localServicePath,
+      modelName: config.modelIdentifier,
+      scriptPath: path.join(config.servicePath, 'service.py'),
+      workingDirectory: config.servicePath,
+      env: {
+        JUSTSAY_LOCAL_SERVICE_RUNTIME_FAMILY: config.runtimeFamilyId
+      },
       healthTimeoutMs: this.healthTimeoutMs,
       webSocketFactory: this.webSocketFactory
     })
@@ -123,8 +137,7 @@ export class ConfigurableLocalServiceController implements LocalServiceControlle
 
   private createDefaultRemoteController(config: RemoteLocalServiceConfig): LocalServiceController {
     return new RemoteLocalServiceController({
-      host: config.host,
-      port: config.port,
+      ...config,
       healthTimeoutMs: this.healthTimeoutMs,
       webSocketFactory: this.webSocketFactory
     })
@@ -136,9 +149,7 @@ export class RemoteLocalServiceController implements LocalServiceController {
   private readonly webSocketFactory: (url: string) => WebSocketLike
 
   constructor(
-    private readonly options: {
-      host: string
-      port: number
+    private readonly options: RemoteLocalServiceConfig & {
       healthTimeoutMs?: number
       webSocketFactory?: (url: string) => WebSocketLike
     }
@@ -147,11 +158,11 @@ export class RemoteLocalServiceController implements LocalServiceController {
     this.webSocketFactory = options.webSocketFactory ?? defaultWebSocketFactory
   }
 
-  async start(): Promise<void> {}
+  async start(_target: ResolvedLocalServiceConfig): Promise<void> {}
 
   async stop(): Promise<void> {}
 
-  async healthCheck(): Promise<LocalServiceHealthResult> {
+  async healthCheck(_target: ResolvedLocalServiceConfig): Promise<LocalServiceHealthResult> {
     const response = await sendLocalServiceRequest(
       this.webSocketFactory,
       createLocalServiceUrl(this.options.host, this.options.port),
@@ -162,6 +173,9 @@ export class RemoteLocalServiceController implements LocalServiceController {
     if (response.type !== 'health-status') {
       return {
         ok: false,
+        runtimeFamilyId: this.options.runtimeFamilyId,
+        modelIdentifier: this.options.modelIdentifier,
+        readiness: 'prewarm-required',
         detail: {
           reason: 'unexpected-response',
           responseType: response.type
@@ -171,6 +185,53 @@ export class RemoteLocalServiceController implements LocalServiceController {
 
     return {
       ok: response.ok,
+      runtimeFamilyId: response.runtimeFamilyId,
+      modelIdentifier: response.modelIdentifier,
+      readiness: response.readiness,
+      ...(response.detail ? { detail: response.detail } : {})
+    }
+  }
+
+  async prewarm(
+    target: ResolvedLocalServiceConfig,
+    input: {
+      mode: SessionMode
+      language: string
+    }
+  ): Promise<LocalServiceHealthResult> {
+    const response = await sendLocalServiceRequest(
+      this.webSocketFactory,
+      createLocalServiceUrl(this.options.host, this.options.port),
+      {
+        type: 'prewarm',
+        mode: input.mode,
+        language: input.language
+      },
+      this.healthTimeoutMs
+    )
+
+    if (response.type === 'prewarm-complete') {
+      return this.healthCheck(target)
+    }
+
+    if (response.type !== 'health-status') {
+      return {
+        ok: false,
+        runtimeFamilyId: this.options.runtimeFamilyId,
+        modelIdentifier: this.options.modelIdentifier,
+        readiness: 'prewarm-required',
+        detail: {
+          reason: 'unexpected-response',
+          responseType: response.type
+        }
+      }
+    }
+
+    return {
+      ok: response.ok,
+      runtimeFamilyId: response.runtimeFamilyId,
+      modelIdentifier: response.modelIdentifier,
+      readiness: response.readiness,
       ...(response.detail ? { detail: response.detail } : {})
     }
   }
@@ -179,15 +240,18 @@ export class RemoteLocalServiceController implements LocalServiceController {
 class InvalidLocalServiceController implements LocalServiceController {
   constructor(private readonly error: AppErrorPayload) {}
 
-  async start(): Promise<void> {
+  async start(_target: ResolvedLocalServiceConfig): Promise<void> {
     throw this.error
   }
 
   async stop(): Promise<void> {}
 
-  async healthCheck(): Promise<LocalServiceHealthResult> {
+  async healthCheck(_target: ResolvedLocalServiceConfig): Promise<LocalServiceHealthResult> {
     return {
       ok: false,
+      runtimeFamilyId: 'sensevoice',
+      modelIdentifier: 'unavailable',
+      readiness: 'prewarm-required',
       detail: {
         code: this.error.code,
         message: this.error.message,
@@ -195,38 +259,52 @@ class InvalidLocalServiceController implements LocalServiceController {
       }
     }
   }
+
+  async prewarm(
+    _target: ResolvedLocalServiceConfig,
+    _input: {
+      mode: SessionMode
+      language: string
+    }
+  ): Promise<LocalServiceHealthResult> {
+    throw this.error
+  }
 }
 
-export function resolveLocalServiceControllerConfig(settings: AppSettings): LocalServiceControllerConfig {
-  if (settings.advanced.localServiceMode === 'remote-service') {
-    const host = settings.advanced.remoteServiceHost?.trim()
+export function resolveLocalServiceControllerConfig(
+  target: ResolvedLocalServiceConfig,
+  managedRuntimePaths: ManagedRuntimePaths
+): LocalServiceControllerConfig {
+  if (target.mode === 'remote-service') {
+    return {
+      mode: 'remote-service',
+      host: target.host,
+      port: target.port,
+      runtimeFamilyId: target.runtimeFamilyId,
+      modelIdentifier: target.modelIdentifier
+    }
+  }
 
-    if (!host) {
-      return {
-        mode: 'invalid',
-        error: {
-          code: 'E_INVALID_SETTINGS',
-          message: 'Remote speech service host is required when remote service mode is enabled',
-          retryable: false,
-          detail: {
-            localServiceMode: settings.advanced.localServiceMode,
-            missingField: 'advanced.remoteServiceHost'
-          }
+  const servicePath = managedRuntimePaths[target.runtimeFamilyId as keyof ManagedRuntimePaths]
+
+  if (!servicePath) {
+    return {
+      mode: 'invalid',
+      error: {
+        code: 'E_ENGINE_UNAVAILABLE',
+        message: `No managed-local service project is configured for runtime "${target.runtimeFamilyId}"`,
+        retryable: false,
+        detail: {
+          runtimeFamilyId: target.runtimeFamilyId,
+          recommendedMode: 'remote-service'
         }
       }
-    }
-
-    return {
-      mode: settings.advanced.localServiceMode,
-      host,
-      port: settings.advanced.remoteServicePort ?? DEFAULT_LOCAL_SERVICE_PORT
     }
   }
 
   return {
-    mode: settings.advanced.localServiceMode,
-    host: settings.advanced.localServiceHost ?? DEFAULT_LOCAL_SERVICE_HOST,
-    port: settings.advanced.localServicePort ?? DEFAULT_LOCAL_SERVICE_PORT
+    ...target,
+    servicePath
   }
 }
 

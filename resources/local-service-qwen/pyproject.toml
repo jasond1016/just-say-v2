@@ -1,0 +1,15 @@
+[project]
+name = "justsay-local-service-qwen"
+version = "0.1.0"
+description = "Qwen3-ASR websocket sidecar for JustSay V2"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+  "numpy>=1.26.0",
+  "qwen-asr[vllm]",
+  "silero-vad>=5.1.2",
+  "torch>=2.3.0",
+  "websockets>=12.0",
+]
+
+[tool.uv]
+package = false

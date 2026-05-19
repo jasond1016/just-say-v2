@@ -759,6 +759,9 @@ function buildSavedTranscript(
     blocks: session.transcript.committedBlocks.map((block) => ({ ...block })),
     metadata: {
       engineProfileId: session.runtimeConfig.engineProfile.id,
+      runtimeFamilyId: session.runtimeConfig.engineProfile.runtimeFamilyId,
+      modelIdentifier: session.runtimeConfig.engineProfile.modelIdentifier,
+      deploymentMode: session.runtimeConfig.engineConfig.localService?.mode ?? 'managed-local',
       includeMicrophone: session.includeMicrophone,
       translationEnabled: Boolean(session.runtimeConfig.translationConfig),
       ...(audioMetadata ? { audio: { ...audioMetadata } } : {})

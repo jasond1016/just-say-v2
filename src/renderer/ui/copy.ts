@@ -3,6 +3,7 @@ import type {
   LocalServiceStatus,
   OutputMethod,
   PttHotkey,
+  RuntimeFamilyId,
   PttStatus,
   SavedTranscript
 } from '../../shared/api-types'
@@ -113,9 +114,9 @@ export function describeProfileLabel(profile: EngineProfile): string {
 export function describeProfileSummary(profile: EngineProfile): string {
   switch (profile.preset) {
     case 'local-fast':
-      return 'Fastest local preset, best for short dictation.'
+      return 'SenseVoice runtime for the quickest local turnaround.'
     case 'local-accurate':
-      return 'More stable local preset, better for longer sessions.'
+      return 'Qwen 1.7B runtime for higher accuracy. Check may load it or point you to a remote service.'
     case 'cloud-low-latency':
       return 'Fast cloud preset when low delay matters most.'
     case 'cloud-low-cost':
@@ -144,4 +145,23 @@ export function describeTranscriptSummary(transcript: SavedTranscript): string {
   const sources = [...new Set(transcript.blocks.map((block) => describeCaptureSource(block.source)))]
   const sourceLabel = sources.length === 0 ? 'Unknown source' : sources.join(' + ')
   return `${describeSessionMode(transcript.mode)} · ${sourceLabel}`
+}
+
+export function describeRuntimeFamily(runtimeFamilyId: RuntimeFamilyId): string {
+  switch (runtimeFamilyId) {
+    case 'sensevoice':
+      return 'SenseVoice'
+    case 'qwen3-asr':
+      return 'Qwen3 ASR'
+    case 'cloud-low-latency':
+      return 'Cloud Low Latency'
+    case 'cloud-low-cost':
+      return 'Cloud Low Cost'
+    default:
+      return runtimeFamilyId
+  }
+}
+
+export function describeDeploymentMode(mode: SavedTranscript['metadata']['deploymentMode']): string {
+  return mode === 'remote-service' ? 'Remote service' : 'Managed locally'
 }

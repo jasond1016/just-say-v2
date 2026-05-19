@@ -13,7 +13,8 @@ export function createRecognitionEngine(
 ): RecognitionEngine {
   if (config.engineProfile.kind === 'local') {
     return new LocalEngineAdapter(config, {
-      ensureLocalServiceReady: () => dependencies.localServiceSupervisor.ensureReady()
+      ensureLocalServiceReady: (target) => dependencies.localServiceSupervisor.ensureReady(target),
+      prewarmLocalService: (target, input) => dependencies.localServiceSupervisor.prewarm(target, input)
     })
   }
 

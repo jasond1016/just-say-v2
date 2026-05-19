@@ -163,7 +163,12 @@ function createRuntimeConfig(): ResolvedRuntimeConfig {
   return {
     engineProfile: profileCatalog[0]!,
     engineConfig: {
-      language: 'auto'
+      mode: 'meeting',
+      profileId: 'local-fast',
+      preset: 'local-fast',
+      language: 'auto',
+      diagnosticsEnabled: true,
+      experimentalFlags: []
     },
     translationConfig: {
       provider: 'openai-compatible',

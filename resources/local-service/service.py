@@ -20,6 +20,7 @@ HOST = os.environ.get("JUSTSAY_LOCAL_SERVICE_HOST", "127.0.0.1")
 PORT = int(os.environ.get("JUSTSAY_LOCAL_SERVICE_PORT", "8765"))
 MODEL_NAME = os.environ.get("JUSTSAY_LOCAL_SERVICE_MODEL", "iic/SenseVoiceSmall")
 DEVICE = os.environ.get("JUSTSAY_LOCAL_SERVICE_DEVICE", "auto")
+RUNTIME_FAMILY = os.environ.get("JUSTSAY_LOCAL_SERVICE_RUNTIME_FAMILY", "sensevoice")
 
 CAPABILITIES = {
     "streaming": True,
@@ -167,13 +168,43 @@ class JustSayLocalService:
                     {
                         "type": "health-status",
                         "ok": self.runtime.ready,
-                        "model": self.runtime.model_name,
+                        "runtimeFamilyId": RUNTIME_FAMILY,
+                        "modelIdentifier": self.runtime.model_name,
+                        "readiness": "ready" if self.runtime.ready else "prewarm-required",
                         "capabilities": CAPABILITIES,
                         **(
                             {"detail": {"error": self.runtime.error}}
                             if self.runtime.error
                             else {}
                         ),
+                    }
+                )
+            )
+            return
+
+        if message_type == "prewarm":
+            if not self.runtime.ready:
+                await websocket.send(
+                    json.dumps(
+                        {
+                            "type": "health-status",
+                            "ok": False,
+                            "runtimeFamilyId": RUNTIME_FAMILY,
+                            "modelIdentifier": self.runtime.model_name,
+                            "readiness": "prewarm-required",
+                            "capabilities": CAPABILITIES,
+                            "detail": {"error": self.runtime.error},
+                        }
+                    )
+                )
+                return
+
+            await websocket.send(
+                json.dumps(
+                    {
+                        "type": "prewarm-complete",
+                        "runtimeFamilyId": RUNTIME_FAMILY,
+                        "modelIdentifier": self.runtime.model_name,
                     }
                 )
             )

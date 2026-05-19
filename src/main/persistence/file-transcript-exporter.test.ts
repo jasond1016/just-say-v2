@@ -75,6 +75,9 @@ function createTranscript(overrides: Partial<SavedTranscript> & Pick<SavedTransc
       ],
     metadata: overrides.metadata ?? {
       engineProfileId: 'local-fast',
+      runtimeFamilyId: 'sensevoice',
+      modelIdentifier: 'iic/SenseVoiceSmall',
+      deploymentMode: 'managed-local',
       includeMicrophone: true,
       translationEnabled: Boolean(overrides.translatedPlainText)
     },

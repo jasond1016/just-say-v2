@@ -673,6 +673,9 @@ function createHistoryItem(id: string, mode: SavedTranscript['mode']): SavedTran
     blocks: [],
     metadata: {
       engineProfileId: 'local-fast',
+      runtimeFamilyId: 'sensevoice',
+      modelIdentifier: 'iic/SenseVoiceSmall',
+      deploymentMode: 'managed-local',
       includeMicrophone: mode === 'meeting',
       translationEnabled: false
     }
@@ -735,6 +738,8 @@ function createProfile() {
     label: 'Local Fast',
     kind: 'local' as const,
     preset: 'local-fast' as const,
+    runtimeFamilyId: 'sensevoice' as const,
+    modelIdentifier: 'iic/SenseVoiceSmall',
     capabilities: {
       streaming: true,
       translation: false,

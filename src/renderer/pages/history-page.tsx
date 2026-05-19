@@ -10,7 +10,14 @@ import type {
 } from '../../shared/api-types'
 import type { CaptureSource } from '../../shared/primitive-types'
 import { Button, TextInput } from '../ui/controls'
-import { describeCaptureSource, describeProfileId, describeSessionMode, describeTranscriptSummary } from '../ui/copy'
+import {
+  describeCaptureSource,
+  describeDeploymentMode,
+  describeProfileId,
+  describeRuntimeFamily,
+  describeSessionMode,
+  describeTranscriptSummary
+} from '../ui/copy'
 
 type HistoryTimeFilter = 'all' | 'today' | 'last_7_days' | 'last_30_days'
 type HistoryNotesState =
@@ -444,7 +451,9 @@ export function HistoryPage(props: {
           <span>{describeSessionMode(selectedTranscript.mode)}</span>
           <span>{describeTranscriptSources(selectedTranscript)}</span>
           <span>{formatDurationMs(selectedTranscript.endedAt - selectedTranscript.startedAt)}</span>
-          <span>Preset: {describeProfileId(selectedTranscript.metadata.engineProfileId)}</span>
+          <span>Profile: {describeProfileId(selectedTranscript.metadata.engineProfileId)}</span>
+          <span>Runtime: {describeRuntimeFamily(selectedTranscript.metadata.runtimeFamilyId)}</span>
+          <span>Deployment: {describeDeploymentMode(selectedTranscript.metadata.deploymentMode)}</span>
         </div>
         <p className="surface-header__body">
           The transcript is the source document. Notes are derived from it and stay in the same place without replacing the original record.

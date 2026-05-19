@@ -31,9 +31,18 @@ function createConfig(profile: ResolvedRuntimeConfig['engineProfile']): Resolved
   return {
     engineProfile: profile,
     engineConfig: {
+      mode: 'meeting',
+      profileId: profile.id,
+      preset: profile.preset,
+      language: 'auto',
+      diagnosticsEnabled: true,
+      experimentalFlags: [],
       localService: {
         host: '127.0.0.1',
-        port: 8765
+        port: 8765,
+        mode: 'managed-local',
+        runtimeFamilyId: 'sensevoice',
+        modelIdentifier: profile.modelIdentifier
       }
     },
     captureConfig: {
@@ -50,8 +59,21 @@ function createLocalServiceSupervisor(): LocalServiceSupervisor {
   return new LocalServiceSupervisor({
     async start() {},
     async stop() {},
-    async healthCheck() {
-      return { ok: true }
+    async healthCheck(target) {
+      return {
+        ok: true,
+        runtimeFamilyId: target.runtimeFamilyId,
+        modelIdentifier: target.modelIdentifier,
+        readiness: 'ready'
+      }
+    },
+    async prewarm(target) {
+      return {
+        ok: true,
+        runtimeFamilyId: target.runtimeFamilyId,
+        modelIdentifier: target.modelIdentifier,
+        readiness: 'ready'
+      }
     }
   })
 }

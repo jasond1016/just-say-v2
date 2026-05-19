@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AppSettings } from '../../shared/api-types'
+import type { ResolvedLocalServiceConfig } from '../../shared/api-types'
 import {
   ConfigurableLocalServiceController,
   resolveLocalServiceControllerConfig
@@ -8,26 +8,26 @@ import type { LocalServiceController } from './local-service-supervisor'
 
 describe('resolveLocalServiceControllerConfig', () => {
   it('defaults to a managed local service config', () => {
-    expect(resolveLocalServiceControllerConfig(createSettings())).toEqual({
+    expect(resolveLocalServiceControllerConfig(createManagedTarget(), createManagedRuntimePaths())).toEqual({
       mode: 'managed-local',
       host: '127.0.0.1',
-      port: 8765
+      port: 8765,
+      runtimeFamilyId: 'sensevoice',
+      modelIdentifier: 'iic/SenseVoiceSmall',
+      servicePath: 'C:\\local-service'
     })
   })
 
-  it('returns an invalid config when remote mode is missing a host', () => {
+  it('returns an invalid config when no managed runtime path exists for the target runtime', () => {
     expect(
-      resolveLocalServiceControllerConfig({
-        ...createSettings(),
-        advanced: {
-          ...createSettings().advanced,
-          localServiceMode: 'remote-service'
-        }
-      })
+      resolveLocalServiceControllerConfig(
+        createManagedTarget({ runtimeFamilyId: 'qwen3-asr' }),
+        { sensevoice: 'C:\\local-service' } as unknown as ReturnType<typeof createManagedRuntimePaths>
+      )
     ).toMatchObject({
       mode: 'invalid',
       error: {
-        code: 'E_INVALID_SETTINGS'
+        code: 'E_ENGINE_UNAVAILABLE'
       }
     })
   })
@@ -35,12 +35,11 @@ describe('resolveLocalServiceControllerConfig', () => {
 
 describe('ConfigurableLocalServiceController', () => {
   it('switches from a managed controller to a remote controller when settings change', async () => {
-    let settings = createSettings()
+    let target = createManagedTarget()
     const managedControllers: FakeLocalServiceController[] = []
     const remoteControllers: FakeLocalServiceController[] = []
     const controller = new ConfigurableLocalServiceController({
-      getSettings: () => settings,
-      localServicePath: 'C:\\local-service',
+      managedRuntimePaths: createManagedRuntimePaths(),
       createManagedController(config) {
         const fake = new FakeLocalServiceController(config)
         managedControllers.push(fake)
@@ -53,20 +52,13 @@ describe('ConfigurableLocalServiceController', () => {
       }
     })
 
-    await controller.start()
-    await expect(controller.healthCheck()).resolves.toEqual({ ok: true })
+    await controller.start(target)
+    await expect(controller.healthCheck(target)).resolves.toMatchObject({ ok: true, readiness: 'ready' })
 
-    settings = {
-      ...settings,
-      advanced: {
-        ...settings.advanced,
-        localServiceMode: 'remote-service',
-        remoteServiceHost: '10.0.0.42'
-      }
-    }
+    target = createRemoteTarget()
 
-    await controller.start()
-    await expect(controller.healthCheck()).resolves.toEqual({ ok: true })
+    await controller.start(target)
+    await expect(controller.healthCheck(target)).resolves.toMatchObject({ ok: true, readiness: 'ready' })
 
     expect(managedControllers).toHaveLength(1)
     expect(managedControllers[0]?.startCalls).toBe(1)
@@ -77,19 +69,13 @@ describe('ConfigurableLocalServiceController', () => {
 
   it('surfaces a structured error when remote mode is enabled without a host', async () => {
     const controller = new ConfigurableLocalServiceController({
-      getSettings: () => ({
-        ...createSettings(),
-        advanced: {
-          ...createSettings().advanced,
-          localServiceMode: 'remote-service'
-        }
-      }),
-      localServicePath: 'C:\\local-service'
+      managedRuntimePaths: {
+        sensevoice: 'C:\\local-service'
+      } as unknown as ReturnType<typeof createManagedRuntimePaths>
     })
 
-    await expect(controller.start()).rejects.toMatchObject({
-      code: 'E_INVALID_SETTINGS',
-      message: 'Remote speech service host is required when remote service mode is enabled'
+    await expect(controller.start(createManagedTarget({ runtimeFamilyId: 'qwen3-asr' }))).rejects.toMatchObject({
+      code: 'E_ENGINE_UNAVAILABLE'
     })
   })
 })
@@ -99,9 +85,26 @@ class FakeLocalServiceController implements LocalServiceController {
   stopCalls = 0
   healthCheckCalls = 0
 
-  constructor(readonly config: { mode: 'managed-local' | 'remote-service'; host: string; port: number }) {}
+  constructor(
+    readonly config:
+      | {
+          mode: 'managed-local'
+          host: string
+          port: number
+          runtimeFamilyId: 'sensevoice' | 'qwen3-asr'
+          modelIdentifier: string
+          servicePath: string
+        }
+      | {
+          mode: 'remote-service'
+          host: string
+          port: number
+          runtimeFamilyId: 'sensevoice' | 'qwen3-asr'
+          modelIdentifier: string
+        }
+  ) {}
 
-  async start(): Promise<void> {
+  async start(_target: ResolvedLocalServiceConfig): Promise<void> {
     this.startCalls += 1
   }
 
@@ -109,42 +112,52 @@ class FakeLocalServiceController implements LocalServiceController {
     this.stopCalls += 1
   }
 
-  async healthCheck() {
+  async healthCheck(target: ResolvedLocalServiceConfig) {
     this.healthCheckCalls += 1
-    return { ok: true }
+    return {
+      ok: true,
+      runtimeFamilyId: target.runtimeFamilyId,
+      modelIdentifier: target.modelIdentifier,
+      readiness: 'ready' as const
+    }
+  }
+
+  async prewarm(target: ResolvedLocalServiceConfig) {
+    return {
+      ok: true,
+      runtimeFamilyId: target.runtimeFamilyId,
+      modelIdentifier: target.modelIdentifier,
+      readiness: 'ready' as const
+    }
   }
 }
 
-function createSettings(): AppSettings {
+function createManagedRuntimePaths() {
   return {
-    general: {
-      language: 'zh-CN',
-      theme: 'system',
-      launchAtLogin: false,
-      minimizeToTray: true
-    },
-    speech: {
-      selectedProfileId: 'local-fast',
-      language: 'auto'
-    },
-    input: {
-      pttHotkey: 'RCtrl',
-      includeMicrophoneInMeeting: false,
-      microphoneDeviceId: 'default'
-    },
-    output: {
-      method: 'simulate_input'
-    },
-    translation: {
-      enabledForPtt: false,
-      enabledForMeeting: false,
-      targetLanguage: 'en',
-      provider: 'openai-compatible'
-    },
-    advanced: {
-      localServiceMode: 'managed-local',
-      diagnosticsEnabled: true,
-      experimentalFlags: []
-    }
+    sensevoice: 'C:\\local-service',
+    'qwen3-asr': 'C:\\qwen-local-service'
+  } as const
+}
+
+function createManagedTarget(
+  overrides: Partial<ResolvedLocalServiceConfig> = {}
+): ResolvedLocalServiceConfig {
+  return {
+    mode: 'managed-local',
+    host: '127.0.0.1',
+    port: 8765,
+    runtimeFamilyId: 'sensevoice',
+    modelIdentifier: 'iic/SenseVoiceSmall',
+    ...overrides
+  }
+}
+
+function createRemoteTarget(): ResolvedLocalServiceConfig {
+  return {
+    mode: 'remote-service',
+    host: '10.0.0.42',
+    port: 8765,
+    runtimeFamilyId: 'sensevoice',
+    modelIdentifier: 'iic/SenseVoiceSmall'
   }
 }

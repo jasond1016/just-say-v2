@@ -3,12 +3,13 @@ import { execFile as execFileCallback } from 'node:child_process'
 import path from 'node:path'
 import type { ChildProcessWithoutNullStreams, SpawnOptionsWithoutStdio } from 'node:child_process'
 import { promisify } from 'node:util'
-import type { EngineCapabilities } from '../../shared/api-types'
+import type { EngineCapabilities, LocalRuntimeFamilyId, ResolvedLocalServiceConfig } from '../../shared/api-types'
 import type { LocalServiceHealthResult, LocalServiceController } from './local-service-supervisor'
 import type {
   LocalServiceClientMessage,
   LocalServiceServerMessage
 } from '../../shared/local-service-types'
+import type { SessionMode } from '../../shared/primitive-types'
 
 const execFile = promisify(execFileCallback)
 
@@ -78,7 +79,7 @@ export class PythonLocalServiceController implements LocalServiceController {
     this.webSocketFactory = options.webSocketFactory ?? defaultWebSocketFactory
   }
 
-  async start(): Promise<void> {
+  async start(_target: ResolvedLocalServiceConfig): Promise<void> {
     if (this.childProcess && !this.childProcess.killed) {
       return
     }
@@ -100,7 +101,8 @@ export class PythonLocalServiceController implements LocalServiceController {
           ...this.options.env,
           JUSTSAY_LOCAL_SERVICE_HOST: this.options.host,
           JUSTSAY_LOCAL_SERVICE_PORT: String(this.options.port),
-          JUSTSAY_LOCAL_SERVICE_MODEL: this.modelName
+          JUSTSAY_LOCAL_SERVICE_MODEL: this.modelName,
+          JUSTSAY_LOCAL_SERVICE_RUNTIME_FAMILY: this.options.env?.JUSTSAY_LOCAL_SERVICE_RUNTIME_FAMILY ?? 'sensevoice'
         },
         stdio: 'pipe',
         windowsHide: true
@@ -128,7 +130,7 @@ export class PythonLocalServiceController implements LocalServiceController {
     await this.stopChildProcess(child)
   }
 
-  async healthCheck(): Promise<LocalServiceHealthResult> {
+  async healthCheck(_target: ResolvedLocalServiceConfig): Promise<LocalServiceHealthResult> {
     const response = await sendLocalServiceRequest(
       this.webSocketFactory,
       this.getServiceUrl(),
@@ -139,6 +141,9 @@ export class PythonLocalServiceController implements LocalServiceController {
     if (response.type !== 'health-status') {
       return {
         ok: false,
+        runtimeFamilyId: this.getRuntimeFamilyId(),
+        modelIdentifier: this.modelName,
+        readiness: 'prewarm-required',
         detail: {
           reason: 'unexpected-response',
           responseType: response.type
@@ -148,6 +153,53 @@ export class PythonLocalServiceController implements LocalServiceController {
 
     return {
       ok: response.ok,
+      runtimeFamilyId: response.runtimeFamilyId,
+      modelIdentifier: response.modelIdentifier,
+      readiness: response.readiness,
+      ...(response.detail ? { detail: response.detail } : {})
+    }
+  }
+
+  async prewarm(
+    target: ResolvedLocalServiceConfig,
+    input: {
+      mode: SessionMode
+      language: string
+    }
+  ): Promise<LocalServiceHealthResult> {
+    const response = await sendLocalServiceRequest(
+      this.webSocketFactory,
+      this.getServiceUrl(),
+      {
+        type: 'prewarm',
+        mode: input.mode,
+        language: input.language
+      },
+      this.healthTimeoutMs
+    )
+
+    if (response.type === 'prewarm-complete') {
+      return this.healthCheck(target)
+    }
+
+    if (response.type !== 'health-status') {
+      return {
+        ok: false,
+        runtimeFamilyId: this.getRuntimeFamilyId(),
+        modelIdentifier: this.modelName,
+        readiness: 'prewarm-required',
+        detail: {
+          reason: 'unexpected-response',
+          responseType: response.type
+        }
+      }
+    }
+
+    return {
+      ok: response.ok,
+      runtimeFamilyId: response.runtimeFamilyId,
+      modelIdentifier: response.modelIdentifier,
+      readiness: response.readiness,
       ...(response.detail ? { detail: response.detail } : {})
     }
   }
@@ -158,7 +210,13 @@ export class PythonLocalServiceController implements LocalServiceController {
 
     while (Date.now() - startedAt < this.healthTimeoutMs) {
       try {
-        const health = await this.healthCheck()
+        const health = await this.healthCheck({
+          mode: 'managed-local',
+          host: this.options.host,
+          port: this.options.port,
+          runtimeFamilyId: this.getRuntimeFamilyId(),
+          modelIdentifier: this.modelName
+        })
 
         if (health.ok) {
           return
@@ -177,6 +235,19 @@ export class PythonLocalServiceController implements LocalServiceController {
 
   private getServiceUrl(): string {
     return createLocalServiceUrl(this.options.host, this.options.port)
+  }
+
+  private getRuntimeFamilyId(): LocalRuntimeFamilyId {
+    const runtimeFamilyId = this.options.env?.JUSTSAY_LOCAL_SERVICE_RUNTIME_FAMILY
+
+    if (
+      runtimeFamilyId === 'sensevoice' ||
+      runtimeFamilyId === 'qwen3-asr'
+    ) {
+      return runtimeFamilyId
+    }
+
+    return 'sensevoice'
   }
 
   private attachChildLogging(child: SpawnedLocalServiceProcess): void {

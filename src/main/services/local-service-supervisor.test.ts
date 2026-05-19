@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { LocalServiceSupervisor } from './local-service-supervisor'
+import type { ResolvedLocalServiceConfig } from '../../shared/api-types'
 
 describe('LocalServiceSupervisor', () => {
   it('starts the local service and marks it healthy', async () => {
@@ -13,7 +14,7 @@ describe('LocalServiceSupervisor', () => {
       seenStatuses.push(status)
     })
 
-    await expect(supervisor.ensureReady()).resolves.toBe('healthy')
+    await expect(supervisor.ensureReady(createTarget())).resolves.toBe('healthy')
 
     expect(supervisor.getStatus()).toBe('healthy')
     expect(controller.startCalls).toBe(1)
@@ -27,7 +28,7 @@ describe('LocalServiceSupervisor', () => {
     })
     const supervisor = new LocalServiceSupervisor(controller)
 
-    await expect(supervisor.ensureReady()).resolves.toBe('degraded')
+    await expect(supervisor.ensureReady(createTarget())).resolves.toBe('degraded')
     expect(supervisor.getStatus()).toBe('degraded')
   })
 
@@ -37,7 +38,7 @@ describe('LocalServiceSupervisor', () => {
     })
     const supervisor = new LocalServiceSupervisor(controller)
 
-    await expect(supervisor.ensureReady()).rejects.toMatchObject({
+    await expect(supervisor.ensureReady(createTarget())).rejects.toMatchObject({
       code: 'E_LOCAL_SERVICE_START',
       message: 'Port is already in use'
     })
@@ -50,8 +51,8 @@ describe('LocalServiceSupervisor', () => {
     })
     const supervisor = new LocalServiceSupervisor(controller)
 
-    await supervisor.ensureReady()
-    await expect(supervisor.restart()).resolves.toBe('healthy')
+    await supervisor.ensureReady(createTarget())
+    await expect(supervisor.restart(createTarget())).resolves.toBe('healthy')
 
     expect(controller.startCalls).toBe(2)
     expect(controller.stopCalls).toBe(1)
@@ -63,7 +64,7 @@ describe('LocalServiceSupervisor', () => {
     })
     const supervisor = new LocalServiceSupervisor(controller)
 
-    await expect(supervisor.probe()).resolves.toBe('healthy')
+    await expect(supervisor.probe(createTarget())).resolves.toBe('healthy')
 
     expect(supervisor.getStatus()).toBe('healthy')
     expect(controller.startCalls).toBe(0)
@@ -76,7 +77,7 @@ describe('LocalServiceSupervisor', () => {
     })
     const supervisor = new LocalServiceSupervisor(controller)
 
-    await expect(supervisor.probe()).resolves.toBe('stopped')
+    await expect(supervisor.probe(createTarget())).resolves.toBe('stopped')
 
     expect(supervisor.getStatus()).toBe('stopped')
     expect(controller.startCalls).toBe(0)
@@ -105,7 +106,7 @@ class FakeLocalServiceController {
     }
   ) {}
 
-  async start(): Promise<void> {
+  async start(_target: ResolvedLocalServiceConfig): Promise<void> {
     this.startCalls += 1
 
     if (this.options.startFailure) {
@@ -117,13 +118,38 @@ class FakeLocalServiceController {
     this.stopCalls += 1
   }
 
-  async healthCheck(): Promise<{ ok: boolean; degraded?: boolean }> {
+  async healthCheck(target: ResolvedLocalServiceConfig) {
     this.healthCheckCalls += 1
 
     if (this.options.healthFailure) {
       throw this.options.healthFailure
     }
 
-    return this.options.health ?? { ok: true }
+    return {
+      ok: this.options.health?.ok ?? true,
+      runtimeFamilyId: target.runtimeFamilyId,
+      modelIdentifier: target.modelIdentifier,
+      readiness: 'ready' as const,
+      ...(this.options.health?.degraded ? { degraded: true } : {})
+    }
+  }
+
+  async prewarm(target: ResolvedLocalServiceConfig) {
+    return {
+      ok: true,
+      runtimeFamilyId: target.runtimeFamilyId,
+      modelIdentifier: target.modelIdentifier,
+      readiness: 'ready' as const
+    }
+  }
+}
+
+function createTarget(): ResolvedLocalServiceConfig {
+  return {
+    mode: 'managed-local',
+    host: '127.0.0.1',
+    port: 8765,
+    runtimeFamilyId: 'sensevoice',
+    modelIdentifier: 'iic/SenseVoiceSmall'
   }
 }

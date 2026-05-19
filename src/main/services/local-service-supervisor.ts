@@ -1,21 +1,38 @@
-import type { AppErrorPayload, LocalServiceStatus } from '../../shared/api-types'
+import type {
+  AppErrorPayload,
+  LocalServiceStatus,
+  ResolvedLocalServiceConfig,
+  RuntimeIdentity,
+  RuntimeReadiness
+} from '../../shared/api-types'
+import type { SessionMode } from '../../shared/primitive-types'
 
-export type LocalServiceHealthResult = {
+export type LocalServiceHealthResult = RuntimeIdentity & {
   ok: boolean
+  readiness: RuntimeReadiness
   degraded?: boolean
   detail?: Record<string, unknown>
 }
 
 export interface LocalServiceController {
-  start(): Promise<void>
+  start(target: ResolvedLocalServiceConfig): Promise<void>
   stop(): Promise<void>
-  healthCheck(): Promise<LocalServiceHealthResult>
+  healthCheck(target: ResolvedLocalServiceConfig): Promise<LocalServiceHealthResult>
+  prewarm(
+    target: ResolvedLocalServiceConfig,
+    input: {
+      mode: SessionMode
+      language: string
+    }
+  ): Promise<LocalServiceHealthResult>
 }
 
 export class LocalServiceSupervisor {
   private status: LocalServiceStatus = 'stopped'
   private lastError: AppErrorPayload | null = null
   private inFlightEnsureReady: Promise<LocalServiceStatus> | null = null
+  private inFlightTargetSignature: string | null = null
+  private activeTargetSignature: string | null = null
   private readonly listeners = new Set<(status: LocalServiceStatus) => void>()
 
   constructor(private readonly controller: LocalServiceController) {}
@@ -36,30 +53,38 @@ export class LocalServiceSupervisor {
     }
   }
 
-  async ensureReady(): Promise<LocalServiceStatus> {
-    if (this.status === 'healthy' || this.status === 'degraded') {
+  async ensureReady(target: ResolvedLocalServiceConfig): Promise<LocalServiceStatus> {
+    const targetSignature = getTargetSignature(target)
+
+    if (
+      this.activeTargetSignature === targetSignature &&
+      (this.status === 'healthy' || this.status === 'degraded')
+    ) {
       return this.status
     }
 
-    if (this.inFlightEnsureReady) {
+    if (this.inFlightEnsureReady && this.inFlightTargetSignature === targetSignature) {
       return this.inFlightEnsureReady
     }
 
     this.transitionTo('starting')
+    this.inFlightTargetSignature = targetSignature
+    this.activeTargetSignature = targetSignature
     this.inFlightEnsureReady = this.bootstrap().finally(() => {
       this.inFlightEnsureReady = null
+      this.inFlightTargetSignature = null
     })
 
     return this.inFlightEnsureReady
   }
 
-  async probe(): Promise<LocalServiceStatus> {
-    if (this.inFlightEnsureReady) {
+  async probe(target: ResolvedLocalServiceConfig): Promise<LocalServiceStatus> {
+    if (this.inFlightEnsureReady && this.inFlightTargetSignature === getTargetSignature(target)) {
       return this.inFlightEnsureReady
     }
 
     try {
-      const health = await this.controller.healthCheck()
+      const health = await this.controller.healthCheck(target)
 
       if (!health.ok) {
         this.lastError = createLocalServiceError('Local service health check failed', health.detail)
@@ -68,7 +93,9 @@ export class LocalServiceSupervisor {
       }
 
       this.lastError = null
-      const nextStatus: LocalServiceStatus = health.degraded ? 'degraded' : 'healthy'
+      this.activeTargetSignature = getTargetSignature(target)
+      const nextStatus: LocalServiceStatus =
+        health.degraded || health.readiness === 'prewarm-required' ? 'degraded' : 'healthy'
       this.transitionTo(nextStatus)
       return nextStatus
     } catch (errorLike) {
@@ -78,21 +105,67 @@ export class LocalServiceSupervisor {
     }
   }
 
+  async prewarm(
+    target: ResolvedLocalServiceConfig,
+    input: {
+      mode: SessionMode
+      language: string
+    }
+  ): Promise<LocalServiceHealthResult> {
+    await this.ensureReady(target)
+
+    try {
+      const health = await this.controller.prewarm(target, input)
+
+      if (!health.ok) {
+        const error = createLocalServiceError('Local service prewarm failed', health.detail)
+        this.lastError = error
+        this.transitionTo('failed')
+        throw error
+      }
+
+      this.lastError = null
+      this.activeTargetSignature = getTargetSignature(target)
+      const nextStatus: LocalServiceStatus =
+        health.degraded || health.readiness === 'prewarm-required' ? 'degraded' : 'healthy'
+      this.transitionTo(nextStatus)
+      return health
+    } catch (errorLike) {
+      const error = normalizeLocalServiceError(errorLike)
+      this.lastError = error
+      this.transitionTo('failed')
+      throw error
+    }
+  }
+
+  setFailure(error: AppErrorPayload): LocalServiceStatus {
+    this.lastError = { ...error }
+    this.transitionTo('failed')
+    return this.status
+  }
+
   async stop(): Promise<void> {
     await this.controller.stop()
     this.lastError = null
     this.transitionTo('stopped')
   }
 
-  async restart(): Promise<LocalServiceStatus> {
+  async restart(target: ResolvedLocalServiceConfig): Promise<LocalServiceStatus> {
     await this.stop()
-    return this.ensureReady()
+    return this.ensureReady(target)
   }
 
   private async bootstrap(): Promise<LocalServiceStatus> {
+    const targetSignature = this.activeTargetSignature
+
+    if (!targetSignature) {
+      throw createLocalServiceError('Local service target is unavailable')
+    }
+
     try {
-      await this.controller.start()
-      const health = await this.controller.healthCheck()
+      const target = JSON.parse(targetSignature) as ResolvedLocalServiceConfig
+      await this.controller.start(target)
+      const health = await this.controller.healthCheck(target)
 
       if (!health.ok) {
         const error = createLocalServiceError(
@@ -105,7 +178,8 @@ export class LocalServiceSupervisor {
       }
 
       this.lastError = null
-      const nextStatus: LocalServiceStatus = health.degraded ? 'degraded' : 'healthy'
+      const nextStatus: LocalServiceStatus =
+        health.degraded || health.readiness === 'prewarm-required' ? 'degraded' : 'healthy'
       this.transitionTo(nextStatus)
       return nextStatus
     } catch (errorLike) {
@@ -126,6 +200,10 @@ export class LocalServiceSupervisor {
       listener(status)
     }
   }
+}
+
+function getTargetSignature(target: ResolvedLocalServiceConfig): string {
+  return JSON.stringify(target)
 }
 
 function createLocalServiceError(

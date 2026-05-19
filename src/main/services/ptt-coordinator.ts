@@ -489,6 +489,9 @@ export class PttCoordinator {
         ],
         metadata: {
           engineProfileId: session.runtimeConfig.engineProfile.id,
+          runtimeFamilyId: session.runtimeConfig.engineProfile.runtimeFamilyId,
+          modelIdentifier: session.runtimeConfig.engineProfile.modelIdentifier,
+          deploymentMode: session.runtimeConfig.engineConfig.localService?.mode ?? 'managed-local',
           includeMicrophone: true,
           translationEnabled: Boolean(session.runtimeConfig.translationConfig)
         },

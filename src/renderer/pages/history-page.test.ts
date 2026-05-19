@@ -20,6 +20,9 @@ describe('HistoryPage audio detail', () => {
     const transcript = createTranscript({
       metadata: {
         engineProfileId: 'local-fast',
+        runtimeFamilyId: 'sensevoice',
+        modelIdentifier: 'iic/SenseVoiceSmall',
+        deploymentMode: 'managed-local',
         includeMicrophone: true,
         translationEnabled: false,
         audio: {
@@ -54,6 +57,9 @@ describe('HistoryPage audio detail', () => {
     const transcript = createTranscript({
       metadata: {
         engineProfileId: 'local-fast',
+        runtimeFamilyId: 'sensevoice',
+        modelIdentifier: 'iic/SenseVoiceSmall',
+        deploymentMode: 'managed-local',
         includeMicrophone: true,
         translationEnabled: false,
         audio: {
@@ -269,6 +275,9 @@ function createTranscript(overrides: Partial<SavedTranscript> = {}): SavedTransc
     ],
     metadata: overrides.metadata ?? {
       engineProfileId: 'local-fast',
+      runtimeFamilyId: 'sensevoice',
+      modelIdentifier: 'iic/SenseVoiceSmall',
+      deploymentMode: 'managed-local',
       includeMicrophone: true,
       translationEnabled: false
     }

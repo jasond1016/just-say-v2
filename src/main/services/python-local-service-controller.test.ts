@@ -31,13 +31,15 @@ describe('PythonLocalServiceController', () => {
       {
         type: 'health-status',
         ok: true,
-        model: 'iic/SenseVoiceSmall',
+        runtimeFamilyId: 'sensevoice',
+        modelIdentifier: 'iic/SenseVoiceSmall',
+        readiness: 'ready',
         capabilities: getDefaultLocalServiceCapabilities()
       }
     ])
     const controller = createController({ spawn, webSocketFactory })
 
-    await controller.start()
+    await controller.start(createTarget())
 
     expect(spawn).toHaveBeenCalledWith(
       'uv',
@@ -58,13 +60,20 @@ describe('PythonLocalServiceController', () => {
         {
           type: 'health-status',
           ok: true,
-          model: 'iic/SenseVoiceSmall',
+          runtimeFamilyId: 'sensevoice',
+          modelIdentifier: 'iic/SenseVoiceSmall',
+          readiness: 'ready',
           capabilities: getDefaultLocalServiceCapabilities()
         }
       ])
     })
 
-    await expect(controller.healthCheck()).resolves.toEqual({ ok: true })
+    await expect(controller.healthCheck(createTarget())).resolves.toEqual({
+      ok: true,
+      runtimeFamilyId: 'sensevoice',
+      modelIdentifier: 'iic/SenseVoiceSmall',
+      readiness: 'ready'
+    })
   })
 
   it('stops the spawned python process', async () => {
@@ -75,13 +84,15 @@ describe('PythonLocalServiceController', () => {
         {
           type: 'health-status',
           ok: true,
-          model: 'iic/SenseVoiceSmall',
+          runtimeFamilyId: 'sensevoice',
+          modelIdentifier: 'iic/SenseVoiceSmall',
+          readiness: 'ready',
           capabilities: getDefaultLocalServiceCapabilities()
         }
       ])
     })
 
-    await controller.start()
+    await controller.start(createTarget())
     await controller.stop()
 
     expect(child.kill).toHaveBeenCalledTimes(1)
@@ -99,13 +110,15 @@ describe('PythonLocalServiceController', () => {
         {
           type: 'health-status',
           ok: true,
-          model: 'iic/SenseVoiceSmall',
+          runtimeFamilyId: 'sensevoice',
+          modelIdentifier: 'iic/SenseVoiceSmall',
+          readiness: 'ready',
           capabilities: getDefaultLocalServiceCapabilities()
         }
       ])
     })
 
-    await controller.start()
+    await controller.start(createTarget())
     await controller.stop()
 
     expect(terminateProcessTree).toHaveBeenCalledWith(4242)
@@ -120,7 +133,7 @@ describe('PythonLocalServiceController', () => {
       webSocketFactory: createFailingWebSocketFactory()
     })
 
-    await expect(controller.start()).rejects.toThrow('Local service websocket request failed')
+    await expect(controller.start(createTarget())).rejects.toThrow('Local service websocket request failed')
     expect(child.kill).toHaveBeenCalledTimes(1)
   })
 
@@ -134,13 +147,15 @@ describe('PythonLocalServiceController', () => {
         {
           type: 'health-status',
           ok: true,
-          model: 'iic/SenseVoiceSmall',
+          runtimeFamilyId: 'sensevoice',
+          modelIdentifier: 'iic/SenseVoiceSmall',
+          readiness: 'ready',
           capabilities: getDefaultLocalServiceCapabilities()
         }
       ])
     })
 
-    const startPromise = controller.start()
+    const startPromise = controller.start(createTarget())
     child.stdout.emit('data', Buffer.from('hello from python\n{"type":"ready"}\n', 'utf8'))
     child.stderr.emit('data', Buffer.from('stderr line 1\nstderr line 2\n', 'utf8'))
     await startPromise
@@ -161,13 +176,15 @@ describe('PythonLocalServiceController', () => {
         {
           type: 'health-status',
           ok: true,
-          model: 'iic/SenseVoiceSmall',
+          runtimeFamilyId: 'sensevoice',
+          modelIdentifier: 'iic/SenseVoiceSmall',
+          readiness: 'ready',
           capabilities: getDefaultLocalServiceCapabilities()
         }
       ])
     })
 
-    await controller.start()
+    await controller.start(createTarget())
     child.stdout.emit('data', Buffer.from('partial stdout', 'utf8'))
     child.stderr.emit('data', Buffer.from('partial stderr', 'utf8'))
     await controller.stop()
@@ -188,6 +205,16 @@ function createController(
     healthTimeoutMs: 50,
     ...overrides
   })
+}
+
+function createTarget() {
+  return {
+    mode: 'managed-local' as const,
+    host: '127.0.0.1',
+    port: 8765,
+    runtimeFamilyId: 'sensevoice' as const,
+    modelIdentifier: 'iic/SenseVoiceSmall'
+  }
 }
 
 function createFakeChildProcess(overrides: { pid?: number } = {}): FakeChildProcess {

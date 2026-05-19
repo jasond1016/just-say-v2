@@ -159,6 +159,9 @@ function createTranscript(): SavedTranscript {
     ],
     metadata: {
       engineProfileId: 'local-fast',
+      runtimeFamilyId: 'sensevoice',
+      modelIdentifier: 'iic/SenseVoiceSmall',
+      deploymentMode: 'managed-local',
       includeMicrophone: true,
       translationEnabled: false
     }
