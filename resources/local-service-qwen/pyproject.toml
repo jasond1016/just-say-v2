@@ -5,7 +5,8 @@ description = "Qwen3-ASR websocket sidecar for JustSay V2"
 requires-python = ">=3.10,<3.13"
 dependencies = [
   "numpy>=1.26.0",
-  "qwen-asr[vllm]",
+  "qwen-asr ; platform_system == 'Windows'",
+  "qwen-asr[vllm] ; platform_system != 'Windows'",
   "silero-vad>=5.1.2",
   "torch>=2.3.0",
   "websockets>=12.0",

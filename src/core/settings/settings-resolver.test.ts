@@ -103,6 +103,29 @@ describe('resolveRuntimeConfig', () => {
     })
   })
 
+  it('allows local-accurate to resolve as managed-local when the platform supports qwen3-asr', () => {
+    const config = resolveRuntimeConfig({
+      settings: {
+        ...DEFAULT_SETTINGS,
+        speech: {
+          ...DEFAULT_SETTINGS.speech,
+          selectedProfileId: 'local-accurate'
+        }
+      },
+      mode: 'meeting',
+      platform: {
+        supportedManagedLocalRuntimes: ['sensevoice', 'qwen3-asr']
+      }
+    })
+
+    expect(config.engineProfile.id).toBe('local-accurate')
+    expect(config.engineConfig.localService).toMatchObject({
+      mode: 'managed-local',
+      runtimeFamilyId: 'qwen3-asr',
+      modelIdentifier: 'Qwen/Qwen3-ASR-1.7B'
+    })
+  })
+
   it('requires a remote host when remote service mode is selected', () => {
     expect(() =>
       resolveRuntimeConfig({

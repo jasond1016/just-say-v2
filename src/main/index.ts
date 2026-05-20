@@ -89,7 +89,7 @@ void wireAppLifecycle(app, {
     const baseSettingsService = new SettingsService(settingsRepository, {
       credentialsProvider: getRuntimeCredentials,
       platformProvider: () => ({
-        supportedManagedLocalRuntimes: process.platform === 'win32' ? ['sensevoice'] : ['sensevoice', 'qwen3-asr']
+        supportedManagedLocalRuntimes: ['sensevoice', 'qwen3-asr']
       })
     })
     const settingsListeners = new Set<(settings: AppSettings) => void>()
