@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import type {
   AudioChunk,
@@ -921,6 +921,44 @@ describe('SessionCoordinator + PTTCoordinator', () => {
     })
     unsubscribe()
   })
+
+  it('fails ptt instead of hanging when recognition never finishes after stop', async () => {
+    vi.useFakeTimers()
+
+    try {
+      const harness = createHarness({
+        pttCompletionTimeoutMs: 25
+      })
+
+      await harness.sessionCoordinator.startPtt()
+      harness.captureTransport.emit({
+        type: 'capture-started',
+        requestId: 'ptt-1',
+        sources: ['microphone']
+      })
+
+      const stopPromise = harness.sessionCoordinator.stopPtt()
+      harness.captureTransport.emit({
+        type: 'capture-stopped',
+        requestId: 'ptt-1'
+      })
+
+      await vi.advanceTimersByTimeAsync(25)
+      await stopPromise
+
+      expect(harness.sessionCoordinator.getRuntimeSnapshot().ptt).toMatchObject({
+        status: 'idle',
+        error: {
+          code: 'E_ENGINE_TIMEOUT',
+          message: 'Timed out waiting for dictation to finish.',
+          retryable: true
+        }
+      })
+      expect(harness.engine.abortSessionCalls).toBe(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
 
 type HarnessOptions = {
@@ -933,6 +971,7 @@ type HarnessOptions = {
   disableTranslationPipeline?: boolean
   meetingEngines?: FakeRecognitionEngine[]
   meetingAudioRecorder?: FakeMeetingAudioRecorder
+  pttCompletionTimeoutMs?: number
   recoveryTimeoutMs?: number
 }
 
@@ -992,6 +1031,9 @@ function createHarness(options: HarnessOptions = {}) {
     outputDispatcher,
     ...(translationPipeline ? { translationPipeline } : {}),
     diagnostics,
+    ...(options.pttCompletionTimeoutMs !== undefined
+      ? { completionTimeoutMs: options.pttCompletionTimeoutMs }
+      : {}),
     now: () => 2000,
     createSessionId: () => 'ptt-1'
   })

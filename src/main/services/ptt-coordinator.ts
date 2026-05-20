@@ -62,6 +62,7 @@ export type PttCoordinatorDependencies = {
   diagnostics?: {
     record(event: DiagnosticEvent): void
   }
+  completionTimeoutMs?: number
   now?: () => number
   createSessionId?: () => string
 }
@@ -82,6 +83,7 @@ type PttSessionContext = {
 }
 
 export class PttCoordinator {
+  private readonly completionTimeoutMs: number
   private readonly now: () => number
   private readonly createSessionId: () => string
   private status: PttRuntimeSnapshot['status'] = 'idle'
@@ -94,6 +96,7 @@ export class PttCoordinator {
   private readonly notificationListeners = new Set<(notification: RuntimeNotification) => void>()
 
   constructor(private readonly dependencies: PttCoordinatorDependencies) {
+    this.completionTimeoutMs = dependencies.completionTimeoutMs ?? 15_000
     this.now = dependencies.now ?? Date.now
     this.createSessionId = dependencies.createSessionId ?? (() => `ptt-${this.now()}`)
     this.dependencies.captureWindowService.onEvent((event) => {
@@ -210,7 +213,11 @@ export class PttCoordinator {
     this.transition({ type: 'PTT_HOTKEY_UP' })
     session.stopCapturePromise = this.dependencies.captureWindowService.stopCapture(session.sessionId)
     await session.stopCapturePromise
-    await session.completion.promise
+    try {
+      await waitForPttCompletion(session.completion.promise, this.completionTimeoutMs)
+    } catch (error) {
+      await this.fail(error)
+    }
   }
 
   async copyLatestText(): Promise<void> {
@@ -677,6 +684,29 @@ function createCompletionSignal(): { promise: Promise<void>; settle: () => void 
 
       settled = true
       resolvePromise()
+    }
+  }
+}
+
+async function waitForPttCompletion(promise: Promise<void>, timeoutMs: number): Promise<void> {
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined
+
+  try {
+    await Promise.race([
+      promise,
+      new Promise<void>((_, reject) => {
+        timeoutHandle = setTimeout(() => {
+          reject({
+            code: 'E_ENGINE_TIMEOUT',
+            message: 'Timed out waiting for dictation to finish.',
+            retryable: true
+          } satisfies AppErrorPayload)
+        }, timeoutMs)
+      })
+    ])
+  } finally {
+    if (timeoutHandle !== undefined) {
+      clearTimeout(timeoutHandle)
     }
   }
 }

@@ -170,9 +170,14 @@ class SourceState:
     vad_iterator: Any | None = None
     speaking: bool = False
 
-    def begin_utterance(self, runtime: QwenRuntime, vad_runtime: SileroRuntime, timestamp: int) -> None:
+    def begin_utterance(
+        self,
+        runtime: QwenRuntime,
+        timestamp: int,
+        vad_runtime: SileroRuntime | None = None,
+    ) -> None:
         self.stream_state = runtime.create_stream_state()
-        if self.vad_iterator is None:
+        if vad_runtime is not None and self.vad_iterator is None:
             self.vad_iterator = vad_runtime.create_iterator()
         self.started_at = timestamp
         self.last_updated_at = timestamp
@@ -351,7 +356,7 @@ class JustSayQwenService:
 
         if session.mode == "ptt":
             if source_state.stream_state is None:
-                source_state.begin_utterance(self.runtime, self.vad_runtime, timestamp)
+                source_state.begin_utterance(self.runtime, timestamp)
             source_state.append(samples, timestamp)
             await self.maybe_emit_streaming_draft(websocket, session, source, source_state)
             return
@@ -372,7 +377,7 @@ class JustSayQwenService:
             )
 
         if speech_started and source_state.stream_state is None:
-            source_state.begin_utterance(self.runtime, self.vad_runtime, timestamp)
+            source_state.begin_utterance(self.runtime, timestamp, self.vad_runtime)
 
         if source_state.stream_state is None:
             return
@@ -390,19 +395,7 @@ class JustSayQwenService:
     async def maybe_emit_streaming_draft(
         self, websocket: Any, session: SessionState, source: str, source_state: SourceState
     ) -> None:
-        if source_state.stream_state is None or not source_state.should_push():
-            return
-
-        chunk = source_state.take_push_buffer()
-        if chunk.size == 0:
-            return
-
-        text = await asyncio.to_thread(
-            self.runtime.streaming_transcribe,
-            chunk,
-            source_state.stream_state,
-        )
-        text = text.strip()
+        text = await self.consume_push_buffer(source_state)
         if not text:
             return
 
@@ -435,7 +428,9 @@ class JustSayQwenService:
             return
 
         if source_state.push_buffer:
-            await self.maybe_emit_streaming_draft(websocket, session, source, source_state)
+            text = await self.consume_push_buffer(source_state, force=True)
+            if text:
+                source_state.last_text = text
 
         text = await asyncio.to_thread(
             self.runtime.finish_streaming_transcribe,
@@ -467,6 +462,29 @@ class JustSayQwenService:
 
         source_state.block_index += 1
         source_state.clear()
+
+    async def consume_push_buffer(
+        self, source_state: SourceState, force: bool = False
+    ) -> str:
+        if source_state.stream_state is None:
+            return ""
+
+        if not source_state.push_buffer:
+            return ""
+
+        if not force and not source_state.should_push():
+            return ""
+
+        chunk = source_state.take_push_buffer()
+        if chunk.size == 0:
+            return ""
+
+        text = await asyncio.to_thread(
+            self.runtime.streaming_transcribe,
+            chunk,
+            source_state.stream_state,
+        )
+        return text.strip()
 
     async def finalize_session(self, websocket: Any, session: SessionState) -> None:
         for source, source_state in session.sources.items():
