@@ -25,6 +25,38 @@ The sidecar speaks the same JustSay WebSocket protocol as the SenseVoice service
 - `JUSTSAY_QWEN_PREWARM_POLICY=lazy` keeps the old behavior and waits for an explicit `prewarm`
 - `JUSTSAY_QWEN_PREWARM_POLICY=blocking` only reports ready after the model and VAD are fully loaded
 
+## Windows Docker Desktop + WSL2 with vLLM
+
+This is the practical way to get the Linux `vllm` backend on a Windows machine.
+
+Prerequisites:
+
+- Docker Desktop is running with the **WSL2 backend**
+- Docker Desktop GPU support is enabled
+- `docker run --rm --gpus all nvidia/cuda:12.8.1-base-ubuntu22.04 nvidia-smi` succeeds
+
+From the repository root:
+
+```powershell
+docker compose -f resources/local-service-qwen/docker-compose.vllm.yml up --build
+```
+
+The container publishes the sidecar on `127.0.0.1:8765` and persists Hugging Face downloads in the named Docker volume `huggingface-cache`.
+
+In the Windows client:
+
+- choose **Local Accurate**
+- switch **Deployment mode** to **Remote service**
+- set host to `127.0.0.1`
+- set port to `8765`
+- run **Check / Load**
+
+Notes:
+
+- This path runs the same JustSay websocket sidecar as the Linux remote deployment, but locally inside a Linux GPU container.
+- `JUSTSAY_QWEN_BACKEND` is pinned to `vllm` in the compose file.
+- The first startup may take a while because the container needs to build, install Python dependencies, and download the model weights.
+
 ## Hosted sidecar deployment
 
 1. Install Python 3.10-3.12 and `uv` on the Linux GPU machine.
@@ -63,5 +95,4 @@ The sidecar speaks the same JustSay WebSocket protocol as the SenseVoice service
 - The first successful `Check / Load` may take time because it triggers the explicit Qwen prewarm path.
 - With the default `background` policy, `Check / Load` should usually return quickly once the host has already started warming in the background.
 - On 16 GB GPUs, `JUSTSAY_QWEN_MAX_MODEL_LEN=32768` is a safer default than the vLLM/Qwen default of 65536.
-- This repository does not currently ship Docker manifests for the Qwen sidecar; if you host it in Docker, publish the chosen port back to the Windows client.
 - Timestamps are intentionally out of scope for this first batch.
