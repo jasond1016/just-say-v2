@@ -14,8 +14,16 @@ The sidecar speaks the same JustSay WebSocket protocol as the SenseVoice service
 
 - Health reports **runtime identity** and **runtime readiness**
 - `prewarm` explicitly loads Qwen and Silero VAD and keeps them resident
+- `JUSTSAY_QWEN_PREWARM_POLICY=background` is the default, so the hosted service starts warming itself as soon as it is up
+- Health can report `warming` while that background preload is still running
 - Meeting mode uses Silero VAD for utterance boundaries and native vLLM streaming state for incremental drafts.
 - PTT mode skips VAD and finalizes on key-up / `stop-session`
+
+## Startup prewarm policy
+
+- `JUSTSAY_QWEN_PREWARM_POLICY=background` starts the service quickly, then prewarms in the background
+- `JUSTSAY_QWEN_PREWARM_POLICY=lazy` keeps the old behavior and waits for an explicit `prewarm`
+- `JUSTSAY_QWEN_PREWARM_POLICY=blocking` only reports ready after the model and VAD are fully loaded
 
 ## Hosted sidecar deployment
 
@@ -33,6 +41,7 @@ The sidecar speaks the same JustSay WebSocket protocol as the SenseVoice service
    export JUSTSAY_LOCAL_SERVICE_PORT=8765
    export JUSTSAY_LOCAL_SERVICE_MODEL=Qwen/Qwen3-ASR-1.7B
    export JUSTSAY_LOCAL_SERVICE_RUNTIME_FAMILY=qwen3-asr
+   export JUSTSAY_QWEN_PREWARM_POLICY=background
    export JUSTSAY_QWEN_GPU_MEMORY_UTILIZATION=0.9
    export JUSTSAY_QWEN_MAX_MODEL_LEN=32768
    uv run --project resources/local-service-qwen python resources/local-service-qwen/service.py
@@ -52,6 +61,7 @@ The sidecar speaks the same JustSay WebSocket protocol as the SenseVoice service
 ## Notes
 
 - The first successful `Check / Load` may take time because it triggers the explicit Qwen prewarm path.
+- With the default `background` policy, `Check / Load` should usually return quickly once the host has already started warming in the background.
 - On 16 GB GPUs, `JUSTSAY_QWEN_MAX_MODEL_LEN=32768` is a safer default than the vLLM/Qwen default of 65536.
 - This repository does not currently ship Docker manifests for the Qwen sidecar; if you host it in Docker, publish the chosen port back to the Windows client.
 - Timestamps are intentionally out of scope for this first batch.

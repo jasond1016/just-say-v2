@@ -2,8 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { exposedProfileCatalog, profileCatalog } from '../../core/settings/profile-catalog'
 import type { RecognitionEngine } from '../../core/contracts/engine'
-import type { ResolvedRuntimeConfig } from '../../shared/api-types'
+import type { ResolvedRuntimeConfig, RuntimeReadiness } from '../../shared/api-types'
 import { EngineRegistry } from './engine-registry'
+import type { LocalServiceController } from './local-service-supervisor'
 import { LocalServiceSupervisor } from './local-service-supervisor'
 import { SpeechService } from './speech-service'
 
@@ -31,6 +32,56 @@ describe('SpeechService', () => {
         streaming: true
       }
     })
+  })
+
+  it('returns quickly when qwen is already warming in the background', async () => {
+    const prewarm = vi.fn(async (target) => ({
+      ok: true,
+      runtimeFamilyId: target.runtimeFamilyId,
+      modelIdentifier: target.modelIdentifier,
+      readiness: 'ready' as const
+    }))
+    const service = createSpeechService({
+      controller: createLocalServiceController({
+        healthReadiness: 'warming',
+        prewarm
+      })
+    })
+
+    await expect(service.testProfile('local-accurate')).resolves.toMatchObject({
+      ok: true,
+      profileId: 'local-accurate',
+      runtimeReadiness: 'warming',
+      prewarmTriggered: false,
+      localService: 'degraded'
+    })
+
+    expect(prewarm).not.toHaveBeenCalled()
+  })
+
+  it('triggers qwen prewarm when the service is reachable but still cold', async () => {
+    const prewarm = vi.fn(async (target) => ({
+      ok: true,
+      runtimeFamilyId: target.runtimeFamilyId,
+      modelIdentifier: target.modelIdentifier,
+      readiness: 'ready' as const
+    }))
+    const service = createSpeechService({
+      controller: createLocalServiceController({
+        healthReadiness: 'prewarm-required',
+        prewarm
+      })
+    })
+
+    await expect(service.testProfile('local-accurate')).resolves.toMatchObject({
+      ok: true,
+      profileId: 'local-accurate',
+      runtimeReadiness: 'ready',
+      prewarmTriggered: true,
+      localService: 'healthy'
+    })
+
+    expect(prewarm).toHaveBeenCalledTimes(1)
   })
 
   it('returns a structured error for an unknown profile', async () => {
@@ -71,28 +122,10 @@ describe('SpeechService', () => {
 function createSpeechService(overrides: {
   restart?: () => Promise<'healthy' | 'degraded' | 'starting' | 'stopped' | 'failed'>
   probe?: () => Promise<'healthy' | 'degraded' | 'starting' | 'stopped' | 'failed'>
+  controller?: LocalServiceController
 } = {}): SpeechService {
   const registry = new EngineRegistry(profileCatalog, (config) => new FakeRecognitionEngine(config))
-  const localServiceSupervisor = new LocalServiceSupervisor({
-    async start() {},
-    async stop() {},
-    async healthCheck(target) {
-      return {
-        ok: true,
-        runtimeFamilyId: target.runtimeFamilyId,
-        modelIdentifier: target.modelIdentifier,
-        readiness: 'ready'
-      }
-    },
-    async prewarm(target) {
-      return {
-        ok: true,
-        runtimeFamilyId: target.runtimeFamilyId,
-        modelIdentifier: target.modelIdentifier,
-        readiness: 'ready'
-      }
-    }
-  })
+  const localServiceSupervisor = new LocalServiceSupervisor(overrides.controller ?? createLocalServiceController())
   if (overrides.restart) {
     localServiceSupervisor.restart = overrides.restart as LocalServiceSupervisor['restart']
   }
@@ -146,6 +179,36 @@ function createSpeechService(overrides: {
       return resolveProfileRuntimeConfig(profileId)
     }
   })
+}
+
+function createLocalServiceController(overrides: {
+  healthReadiness?: RuntimeReadiness
+  prewarm?: LocalServiceController['prewarm']
+} = {}): LocalServiceController {
+  return {
+    async start() {},
+    async stop() {},
+    async healthCheck(target) {
+      return {
+        ok: true,
+        runtimeFamilyId: target.runtimeFamilyId,
+        modelIdentifier: target.modelIdentifier,
+        readiness: overrides.healthReadiness ?? 'ready'
+      }
+    },
+    async prewarm(target, input) {
+      if (overrides.prewarm) {
+        return overrides.prewarm(target, input)
+      }
+
+      return {
+        ok: true,
+        runtimeFamilyId: target.runtimeFamilyId,
+        modelIdentifier: target.modelIdentifier,
+        readiness: 'ready'
+      }
+    }
+  }
 }
 
 class FakeRecognitionEngine implements RecognitionEngine {

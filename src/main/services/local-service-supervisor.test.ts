@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { LocalServiceSupervisor } from './local-service-supervisor'
-import type { ResolvedLocalServiceConfig } from '../../shared/api-types'
+import type { ResolvedLocalServiceConfig, RuntimeReadiness } from '../../shared/api-types'
 
 describe('LocalServiceSupervisor', () => {
   it('starts the local service and marks it healthy', async () => {
@@ -71,6 +71,22 @@ describe('LocalServiceSupervisor', () => {
     expect(controller.healthCheckCalls).toBe(1)
   })
 
+  it('reports warming health as degraded without failing', async () => {
+    const controller = new FakeLocalServiceController({
+      health: { ok: true, readiness: 'warming' }
+    })
+    const supervisor = new LocalServiceSupervisor(controller)
+
+    await expect(supervisor.checkHealth(createTarget())).resolves.toMatchObject({
+      ok: true,
+      readiness: 'warming'
+    })
+
+    expect(supervisor.getStatus()).toBe('degraded')
+    expect(controller.startCalls).toBe(1)
+    expect(controller.healthCheckCalls).toBe(2)
+  })
+
   it('marks the local service stopped when probing cannot reach it', async () => {
     const controller = new FakeLocalServiceController({
       healthFailure: new Error('connect ECONNREFUSED 127.0.0.1:8765')
@@ -92,16 +108,16 @@ class FakeLocalServiceController {
 
   constructor(
     private readonly options: {
-      health: { ok: boolean; degraded?: boolean }
+      health: { ok: boolean; degraded?: boolean; readiness?: RuntimeReadiness }
       startFailure?: Error
       healthFailure?: Error
     } | {
       startFailure: Error
-      health?: { ok: boolean; degraded?: boolean }
+      health?: { ok: boolean; degraded?: boolean; readiness?: RuntimeReadiness }
       healthFailure?: Error
     } | {
       healthFailure: Error
-      health?: { ok: boolean; degraded?: boolean }
+      health?: { ok: boolean; degraded?: boolean; readiness?: RuntimeReadiness }
       startFailure?: Error
     }
   ) {}
@@ -129,7 +145,7 @@ class FakeLocalServiceController {
       ok: this.options.health?.ok ?? true,
       runtimeFamilyId: target.runtimeFamilyId,
       modelIdentifier: target.modelIdentifier,
-      readiness: 'ready' as const,
+      readiness: this.options.health?.readiness ?? ('ready' as const),
       ...(this.options.health?.degraded ? { degraded: true } : {})
     }
   }

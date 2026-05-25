@@ -914,10 +914,18 @@ function describeProfileTestResult(result: ProfileTestResult): string {
     return result.error?.message ?? 'Check failed.'
   }
 
-  if (result.runtimeIdentity?.runtimeFamilyId === 'qwen3-asr' && result.prewarmTriggered) {
-    return result.runtimeReadiness === 'ready'
-      ? 'Speech service ready. Qwen runtime loaded for this profile.'
-      : 'Speech service responded, but Qwen still needs prewarm.'
+  if (result.runtimeIdentity?.runtimeFamilyId === 'qwen3-asr') {
+    if (result.runtimeReadiness === 'warming') {
+      return 'Speech service is warming in background on the host.'
+    }
+
+    if (result.runtimeReadiness === 'ready') {
+      return result.prewarmTriggered
+        ? 'Speech service ready. Qwen runtime loaded for this profile.'
+        : 'Speech service ready. Qwen runtime is already loaded on the host.'
+    }
+
+    return 'Speech service responded, but Qwen still needs prewarm.'
   }
 
   if (result.localService) {

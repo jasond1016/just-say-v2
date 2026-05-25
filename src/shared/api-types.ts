@@ -28,7 +28,7 @@ export type RuntimeFamilyId =
 
 export type LocalRuntimeFamilyId = Extract<RuntimeFamilyId, 'sensevoice' | 'qwen3-asr'>
 
-export type RuntimeReadiness = 'ready' | 'prewarm-required'
+export type RuntimeReadiness = 'ready' | 'warming' | 'prewarm-required'
 
 export type RuntimeIdentity = {
   runtimeFamilyId: RuntimeFamilyId

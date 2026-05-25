@@ -26,12 +26,16 @@ UNFIXED_CHUNK_NUM = int(os.environ.get("JUSTSAY_QWEN_UNFIXED_CHUNK_NUM", "4"))
 UNFIXED_TOKEN_NUM = int(os.environ.get("JUSTSAY_QWEN_UNFIXED_TOKEN_NUM", "5"))
 VAD_THRESHOLD = float(os.environ.get("JUSTSAY_QWEN_VAD_THRESHOLD", "0.5"))
 VAD_WINDOW_SAMPLES = 512
+PREWARM_POLICY = os.environ.get("JUSTSAY_QWEN_PREWARM_POLICY", "background").strip().lower()
 
 if os.name == "nt":
     raise RuntimeError(
         "Native Windows hosting for the Qwen sidecar is unsupported. "
         "Run it inside WSL/Docker or on a Linux host and connect with Remote service."
     )
+
+if PREWARM_POLICY not in {"lazy", "background", "blocking"}:
+    PREWARM_POLICY = "background"
 
 CAPABILITIES = {
     "streaming": True,
@@ -246,9 +250,16 @@ class SessionState:
 
 
 class JustSayQwenService:
-    def __init__(self, runtime: QwenRuntime, vad_runtime: SileroRuntime) -> None:
+    def __init__(
+        self,
+        runtime: QwenRuntime,
+        vad_runtime: SileroRuntime,
+        prewarm_policy: str,
+    ) -> None:
         self.runtime = runtime
         self.vad_runtime = vad_runtime
+        self.prewarm_policy = prewarm_policy
+        self.prewarm_task: asyncio.Task[None] | None = None
         self.sessions: dict[str, SessionState] = {}
 
     async def handle_connection(self, websocket: Any) -> None:
@@ -278,7 +289,7 @@ class JustSayQwenService:
                             "type": "error",
                             "payload": {
                                 "code": "E_ENGINE_UNAVAILABLE",
-                                "message": "Qwen runtime is not ready. Run Check / Load before starting recognition.",
+                                "message": "Qwen runtime is not ready yet. Wait for background warmup to finish or run Check / Load.",
                                 "retryable": True,
                                 "detail": self.build_health_payload().get("detail", {}),
                             },
@@ -311,6 +322,8 @@ class JustSayQwenService:
                         }
                     )
                 )
+                return
+
             return
 
         if message_type == "audio-chunk":
@@ -335,11 +348,41 @@ class JustSayQwenService:
             await websocket.send(
                 json.dumps({"type": "session-ended", "sessionId": message["sessionId"]})
             )
+            return
+
+    async def await_prewarm(self) -> None:
+        if self.runtime.ready and self.vad_runtime.ready:
+            return
+
+        task = self.ensure_prewarm_task()
+        await task
+
+    def start_background_prewarm(self) -> None:
+        if self.prewarm_policy != "background":
+            return
+
+        self.ensure_prewarm_task()
+
+    def ensure_prewarm_task(self) -> asyncio.Task[None]:
+        if self.prewarm_task is None or self.prewarm_task.done():
+            self.prewarm_task = asyncio.create_task(self.run_prewarm())
+            self.prewarm_task.add_done_callback(self.consume_prewarm_task)
+
+        return self.prewarm_task
+
+    async def run_prewarm(self) -> None:
+        await asyncio.to_thread(self.runtime.prewarm)
+        await asyncio.to_thread(self.vad_runtime.prewarm)
+
+    def consume_prewarm_task(self, task: asyncio.Task[None]) -> None:
+        try:
+            task.exception()
+        except asyncio.CancelledError:
+            return
 
     async def handle_prewarm(self, websocket: Any) -> None:
         try:
-            await asyncio.to_thread(self.runtime.prewarm)
-            await asyncio.to_thread(self.vad_runtime.prewarm)
+            await self.await_prewarm()
         except Exception:  # pragma: no cover - depends on runtime environment
             await websocket.send(json.dumps(self.build_health_payload()))
             return
@@ -504,9 +547,12 @@ class JustSayQwenService:
         if self.vad_runtime.error:
             errors["vad"] = self.vad_runtime.error
 
+        state = self.get_prewarm_state()
         detail: dict[str, Any] = {}
         if self.runtime.backend != "uninitialized":
             detail["backend"] = self.runtime.backend
+        detail["prewarmPolicy"] = self.prewarm_policy
+        detail["state"] = state
         if errors:
             detail.update(errors)
 
@@ -515,10 +561,31 @@ class JustSayQwenService:
             "ok": not errors,
             "runtimeFamilyId": RUNTIME_FAMILY,
             "modelIdentifier": self.runtime.model_name,
-            "readiness": "ready" if self.runtime.ready and self.vad_runtime.ready else "prewarm-required",
+            "readiness": self.get_runtime_readiness(state),
             "capabilities": CAPABILITIES,
             **({"detail": detail} if detail else {}),
         }
+
+    def get_prewarm_state(self) -> str:
+        if self.runtime.ready and self.vad_runtime.ready:
+            return "ready"
+
+        if self.prewarm_task is not None and not self.prewarm_task.done():
+            return "warming"
+
+        if self.runtime.error or self.vad_runtime.error:
+            return "failed"
+
+        return "idle"
+
+    def get_runtime_readiness(self, state: str) -> str:
+        if state == "ready":
+            return "ready"
+
+        if state == "warming":
+            return "warming"
+
+        return "prewarm-required"
 
     def next_block_id(
         self,
@@ -559,9 +626,14 @@ def split_stable_preview(previous_text: str, current_text: str) -> tuple[str, st
 async def main() -> None:
     runtime = QwenRuntime(MODEL_NAME)
     vad_runtime = SileroRuntime()
-    service = JustSayQwenService(runtime, vad_runtime)
+    service = JustSayQwenService(runtime, vad_runtime, PREWARM_POLICY)
 
     async with serve(service.handle_connection, HOST, PORT, max_size=4 * 1024 * 1024):
+        if PREWARM_POLICY == "background":
+            service.start_background_prewarm()
+        elif PREWARM_POLICY == "blocking":
+            await service.await_prewarm()
+
         print(
             json.dumps(
                 {
@@ -570,6 +642,8 @@ async def main() -> None:
                     "port": PORT,
                     "model": MODEL_NAME,
                     "runtimeFamilyId": RUNTIME_FAMILY,
+                    "prewarmPolicy": PREWARM_POLICY,
+                    "readiness": service.get_runtime_readiness(service.get_prewarm_state()),
                     "ts": int(time.time() * 1000),
                 }
             ),

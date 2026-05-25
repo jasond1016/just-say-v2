@@ -87,7 +87,7 @@ export function describeLocalServiceStatus(status: LocalServiceStatus): string {
     case 'starting':
       return 'Speech service starting'
     case 'degraded':
-      return 'Speech service reconnecting'
+      return 'Speech service not ready'
     case 'failed':
       return 'Speech service unavailable'
     case 'stopped':

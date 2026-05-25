@@ -71,10 +71,24 @@ export class SpeechService {
           throw new Error(`Profile "${profileId}" is missing local service configuration`)
         }
 
-        const health = await this.localServiceSupervisor.prewarm(target, {
-          mode: 'meeting',
-          language: String(runtimeConfig.engineConfig.language)
-        })
+        let health = await this.localServiceSupervisor.checkHealth(target)
+        let prewarmTriggered = false
+
+        if (profile.runtimeFamilyId === 'qwen3-asr') {
+          if (health.readiness === 'prewarm-required') {
+            health = await this.localServiceSupervisor.prewarm(target, {
+              mode: 'meeting',
+              language: String(runtimeConfig.engineConfig.language)
+            })
+            prewarmTriggered = true
+          }
+        } else if (health.readiness !== 'ready') {
+          health = await this.localServiceSupervisor.prewarm(target, {
+            mode: 'meeting',
+            language: String(runtimeConfig.engineConfig.language)
+          })
+        }
+
         const engine = this.registry.createForRuntimeConfig(runtimeConfig)
         const capabilities = await engine.getCapabilities()
 
@@ -86,7 +100,7 @@ export class SpeechService {
             modelIdentifier: health.modelIdentifier
           },
           runtimeReadiness: health.readiness,
-          prewarmTriggered: profile.runtimeFamilyId === 'qwen3-asr',
+          prewarmTriggered,
           capabilities,
           localService: this.localServiceSupervisor.getStatus()
         }

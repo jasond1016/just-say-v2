@@ -92,16 +92,34 @@ export class LocalServiceSupervisor {
         return 'failed'
       }
 
-      this.lastError = null
-      this.activeTargetSignature = getTargetSignature(target)
-      const nextStatus: LocalServiceStatus =
-        health.degraded || health.readiness === 'prewarm-required' ? 'degraded' : 'healthy'
-      this.transitionTo(nextStatus)
-      return nextStatus
+      return this.applyHealthyState(target, health)
     } catch (errorLike) {
       this.lastError = normalizeLocalServiceError(errorLike)
       this.transitionTo('stopped')
       return 'stopped'
+    }
+  }
+
+  async checkHealth(target: ResolvedLocalServiceConfig): Promise<LocalServiceHealthResult> {
+    await this.ensureReady(target)
+
+    try {
+      const health = await this.controller.healthCheck(target)
+
+      if (!health.ok) {
+        const error = createLocalServiceError('Local service health check failed', health.detail)
+        this.lastError = error
+        this.transitionTo('failed')
+        throw error
+      }
+
+      this.applyHealthyState(target, health)
+      return health
+    } catch (errorLike) {
+      const error = normalizeLocalServiceError(errorLike)
+      this.lastError = error
+      this.transitionTo('failed')
+      throw error
     }
   }
 
@@ -124,11 +142,7 @@ export class LocalServiceSupervisor {
         throw error
       }
 
-      this.lastError = null
-      this.activeTargetSignature = getTargetSignature(target)
-      const nextStatus: LocalServiceStatus =
-        health.degraded || health.readiness === 'prewarm-required' ? 'degraded' : 'healthy'
-      this.transitionTo(nextStatus)
+      this.applyHealthyState(target, health)
       return health
     } catch (errorLike) {
       const error = normalizeLocalServiceError(errorLike)
@@ -177,11 +191,7 @@ export class LocalServiceSupervisor {
         throw error
       }
 
-      this.lastError = null
-      const nextStatus: LocalServiceStatus =
-        health.degraded || health.readiness === 'prewarm-required' ? 'degraded' : 'healthy'
-      this.transitionTo(nextStatus)
-      return nextStatus
+      return this.applyHealthyState(target, health)
     } catch (errorLike) {
       const error = normalizeLocalServiceError(errorLike)
       this.lastError = error
@@ -199,6 +209,18 @@ export class LocalServiceSupervisor {
     for (const listener of this.listeners) {
       listener(status)
     }
+  }
+
+  private applyHealthyState(
+    target: ResolvedLocalServiceConfig,
+    health: LocalServiceHealthResult
+  ): LocalServiceStatus {
+    this.lastError = null
+    this.activeTargetSignature = getTargetSignature(target)
+    const nextStatus: LocalServiceStatus =
+      health.degraded || health.readiness !== 'ready' ? 'degraded' : 'healthy'
+    this.transitionTo(nextStatus)
+    return nextStatus
   }
 }
 
