@@ -15,7 +15,6 @@ HOST = os.environ.get("JUSTSAY_LOCAL_SERVICE_HOST", "127.0.0.1")
 PORT = int(os.environ.get("JUSTSAY_LOCAL_SERVICE_PORT", "8765"))
 MODEL_NAME = os.environ.get("JUSTSAY_LOCAL_SERVICE_MODEL", "Qwen/Qwen3-ASR-1.7B")
 RUNTIME_FAMILY = os.environ.get("JUSTSAY_LOCAL_SERVICE_RUNTIME_FAMILY", "qwen3-asr")
-QWEN_BACKEND = os.environ.get("JUSTSAY_QWEN_BACKEND", "auto").strip().lower()
 GPU_MEMORY_UTILIZATION = float(os.environ.get("JUSTSAY_QWEN_GPU_MEMORY_UTILIZATION", "0.8"))
 MAX_MODEL_LEN = int(os.environ.get("JUSTSAY_QWEN_MAX_MODEL_LEN", "32768"))
 MAX_NEW_TOKENS = int(os.environ.get("JUSTSAY_QWEN_MAX_NEW_TOKENS", "32"))
@@ -27,6 +26,12 @@ UNFIXED_CHUNK_NUM = int(os.environ.get("JUSTSAY_QWEN_UNFIXED_CHUNK_NUM", "4"))
 UNFIXED_TOKEN_NUM = int(os.environ.get("JUSTSAY_QWEN_UNFIXED_TOKEN_NUM", "5"))
 VAD_THRESHOLD = float(os.environ.get("JUSTSAY_QWEN_VAD_THRESHOLD", "0.5"))
 VAD_WINDOW_SAMPLES = 512
+
+if os.name == "nt":
+    raise RuntimeError(
+        "Native Windows hosting for the Qwen sidecar is unsupported. "
+        "Run it inside WSL/Docker or on a Linux host and connect with Remote service."
+    )
 
 CAPABILITIES = {
     "streaming": True,
@@ -49,10 +54,6 @@ class QwenRuntime:
     def ready(self) -> bool:
         return self.model is not None and self.error is None
 
-    @property
-    def supports_native_streaming(self) -> bool:
-        return self.backend == "vllm"
-
     def prewarm(self) -> None:
         if self.ready:
             return
@@ -60,25 +61,13 @@ class QwenRuntime:
         try:
             from qwen_asr import Qwen3ASRModel
 
-            backend = resolve_qwen_backend()
-            self.backend = backend
-
-            if backend == "vllm":
-                self.model = Qwen3ASRModel.LLM(
-                    model=self.model_name,
-                    gpu_memory_utilization=GPU_MEMORY_UTILIZATION,
-                    max_model_len=MAX_MODEL_LEN,
-                    max_new_tokens=MAX_NEW_TOKENS,
-                )
-            else:
-                self.model = Qwen3ASRModel.from_pretrained(
-                    self.model_name,
-                    device_map=resolve_transformers_device_map(),
-                    torch_dtype=resolve_transformers_dtype(),
-                    trust_remote_code=True,
-                    max_inference_batch_size=1,
-                    max_new_tokens=MAX_NEW_TOKENS,
-                )
+            self.backend = "vllm"
+            self.model = Qwen3ASRModel.LLM(
+                model=self.model_name,
+                gpu_memory_utilization=GPU_MEMORY_UTILIZATION,
+                max_model_len=MAX_MODEL_LEN,
+                max_new_tokens=MAX_NEW_TOKENS,
+            )
             self.error = None
         except Exception as exc:  # pragma: no cover - depends on runtime environment
             self.model = None
@@ -88,9 +77,6 @@ class QwenRuntime:
     def create_stream_state(self) -> Any:
         if not self.model:
             raise RuntimeError(self.error or "Qwen runtime is not prewarmed")
-
-        if self.backend != "vllm":
-            return {"backend": self.backend}
 
         return self.model.init_streaming_state(
             unfixed_chunk_num=UNFIXED_CHUNK_NUM,
@@ -111,24 +97,6 @@ class QwenRuntime:
 
         self.model.finish_streaming_transcribe(state)
         return extract_state_text(state)
-
-    def transcribe(self, samples: np.ndarray, language: str) -> str:
-        if not self.model:
-            raise RuntimeError(self.error or "Qwen runtime is not prewarmed")
-
-        if samples.size == 0:
-            return ""
-
-        results = self.model.transcribe(
-            audio=(samples.astype(np.float32, copy=False), 16000),
-            language=normalize_runtime_language(language),
-        )
-
-        if not results:
-            return ""
-
-        text = getattr(results[0], "text", "")
-        return text if isinstance(text, str) else ""
 
 
 class SileroRuntime:
@@ -249,12 +217,6 @@ class SourceState:
         self.push_buffer.clear()
         return combined
 
-    def concatenate_utterance(self) -> np.ndarray:
-        if not self.utterance_samples:
-            return np.zeros((0,), dtype=np.float32)
-
-        return np.concatenate(self.utterance_samples).astype(np.float32, copy=False)
-
     def clear(self) -> None:
         self.started_at = None
         self.last_updated_at = 0
@@ -343,7 +305,7 @@ class JustSayQwenService:
                             "sessionId": session.session_id,
                             "payload": {
                                 "code": "W_TRANSLATION_DISABLED",
-                                "message": "Cloud translation is disabled for the local Qwen service.",
+                                "message": "Cloud translation is disabled for the Qwen service.",
                                 "recoverable": True,
                             },
                         }
@@ -441,7 +403,7 @@ class JustSayQwenService:
     async def maybe_emit_streaming_draft(
         self, websocket: Any, session: SessionState, source: str, source_state: SourceState
     ) -> None:
-        text = await self.consume_push_buffer(source_state, session.language)
+        text = await self.consume_push_buffer(source_state)
         if not text:
             return
 
@@ -474,21 +436,14 @@ class JustSayQwenService:
             return
 
         if source_state.push_buffer:
-            text = await self.consume_push_buffer(source_state, session.language, force=True)
+            text = await self.consume_push_buffer(source_state, force=True)
             if text:
                 source_state.last_text = text
 
-        if self.runtime.supports_native_streaming:
-            text = await asyncio.to_thread(
-                self.runtime.finish_streaming_transcribe,
-                source_state.stream_state,
-            )
-        else:
-            text = await asyncio.to_thread(
-                self.runtime.transcribe,
-                source_state.concatenate_utterance(),
-                session.language,
-            )
+        text = await asyncio.to_thread(
+            self.runtime.finish_streaming_transcribe,
+            source_state.stream_state,
+        )
         text = text.strip()
         if not text:
             text = source_state.last_text.strip()
@@ -516,9 +471,7 @@ class JustSayQwenService:
         source_state.block_index += 1
         source_state.clear()
 
-    async def consume_push_buffer(
-        self, source_state: SourceState, language: str, force: bool = False
-    ) -> str:
+    async def consume_push_buffer(self, source_state: SourceState, force: bool = False) -> str:
         if source_state.stream_state is None:
             return ""
 
@@ -532,18 +485,11 @@ class JustSayQwenService:
         if chunk.size == 0:
             return ""
 
-        if self.runtime.supports_native_streaming:
-            text = await asyncio.to_thread(
-                self.runtime.streaming_transcribe,
-                chunk,
-                source_state.stream_state,
-            )
-        else:
-            text = await asyncio.to_thread(
-                self.runtime.transcribe,
-                source_state.concatenate_utterance(),
-                language,
-            )
+        text = await asyncio.to_thread(
+            self.runtime.streaming_transcribe,
+            chunk,
+            source_state.stream_state,
+        )
         return text.strip()
 
     async def finalize_session(self, websocket: Any, session: SessionState) -> None:
@@ -592,55 +538,6 @@ def decode_chunk(data_base64: str) -> np.ndarray:
 def extract_state_text(state: Any) -> str:
     text = getattr(state, "text", "")
     return text if isinstance(text, str) else ""
-
-
-def normalize_runtime_language(language: str) -> str | None:
-    normalized = language.strip().lower()
-
-    if normalized in {"", "auto"}:
-        return None
-
-    language_map = {
-        "zh": "Chinese",
-        "zh-cn": "Chinese",
-        "en": "English",
-        "en-us": "English",
-        "ja": "Japanese",
-        "ja-jp": "Japanese",
-        "ko": "Korean",
-        "ko-kr": "Korean",
-    }
-
-    return language_map.get(normalized, language)
-
-
-def resolve_qwen_backend() -> str:
-    if QWEN_BACKEND in {"vllm", "transformers"}:
-        return QWEN_BACKEND
-
-    if os.name == "nt":
-        return "transformers"
-
-    try:
-        import vllm  # noqa: F401
-
-        return "vllm"
-    except Exception:
-        return "transformers"
-
-
-def resolve_transformers_device_map() -> str:
-    return "cuda:0" if torch.cuda.is_available() else "cpu"
-
-
-def resolve_transformers_dtype() -> torch.dtype:
-    if not torch.cuda.is_available():
-        return torch.float32
-
-    if hasattr(torch.cuda, "is_bf16_supported") and torch.cuda.is_bf16_supported():
-        return torch.bfloat16
-
-    return torch.float16
 
 
 def split_stable_preview(previous_text: str, current_text: str) -> tuple[str, str]:

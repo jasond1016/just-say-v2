@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { SettingsResolverError } from '../../core/settings/settings-resolver'
 import { InMemorySettingsRepository } from '../persistence/settings-repository'
 import { SettingsService } from './settings-service'
 
@@ -122,6 +123,19 @@ describe('SettingsService', () => {
         id: 'cloud-low-cost'
       }
     })
+  })
+
+  it('applies platform-managed-local restrictions when resolving a profile runtime config', async () => {
+    const repository = new InMemorySettingsRepository()
+    const service = new SettingsService(repository, {
+      platformProvider: () => ({
+        supportedManagedLocalRuntimes: ['sensevoice']
+      })
+    })
+
+    await expect(service.resolveProfileRuntimeConfig('local-accurate', 'meeting')).rejects.toBeInstanceOf(
+      SettingsResolverError
+    )
   })
 
   it('marks translation credentials as configured when the provider supplies an API key', async () => {

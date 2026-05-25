@@ -126,6 +126,36 @@ describe('resolveRuntimeConfig', () => {
     })
   })
 
+  it('requires remote service for local-accurate when qwen managed-local is not supported on this machine', () => {
+    try {
+      resolveRuntimeConfig({
+        settings: {
+          ...DEFAULT_SETTINGS,
+          speech: {
+            ...DEFAULT_SETTINGS.speech,
+            selectedProfileId: 'local-accurate'
+          }
+        },
+        mode: 'meeting',
+        platform: {
+          supportedManagedLocalRuntimes: ['sensevoice']
+        }
+      })
+      throw new Error('Expected local-accurate managed-local resolution to fail')
+    } catch (errorLike) {
+      expect(errorLike).toBeInstanceOf(SettingsResolverError)
+      expect((errorLike as SettingsResolverError).payload).toMatchObject({
+        code: 'E_ENGINE_UNAVAILABLE',
+        detail: {
+          profileId: 'local-accurate',
+          runtimeFamilyId: 'qwen3-asr',
+          recommendedMode: 'remote-service'
+        }
+      })
+      expect((errorLike as SettingsResolverError).message).toContain('WSL/Docker vLLM host')
+    }
+  })
+
   it('requires a remote host when remote service mode is selected', () => {
     expect(() =>
       resolveRuntimeConfig({

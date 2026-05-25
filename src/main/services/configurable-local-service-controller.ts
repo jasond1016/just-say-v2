@@ -12,7 +12,7 @@ import type { SessionMode } from '../../shared/primitive-types'
 
 type ManagedRuntimePaths = {
   sensevoice: string
-  'qwen3-asr': string
+  'qwen3-asr'?: string
 }
 
 type ManagedLocalServiceConfig = ResolvedLocalServiceConfig & {

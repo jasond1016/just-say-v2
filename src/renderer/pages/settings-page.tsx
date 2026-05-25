@@ -587,7 +587,7 @@ export function SettingsPage(props: {
 
                 <SettingRow
                   title="Deployment mode"
-                  hint="Choose whether JustSay should launch the Python speech service on this machine or connect to another machine over the LAN."
+                  hint="Choose whether JustSay should launch the built-in SenseVoice service on this machine or connect to another host over the LAN or localhost, such as a WSL/Docker Qwen host."
                 >
                   <SelectField
                     value={localServiceMode}
@@ -598,6 +598,11 @@ export function SettingsPage(props: {
                     <option value="managed-local">Managed locally</option>
                     <option value="remote-service">Remote service</option>
                   </SelectField>
+                  {selectedProfile?.runtimeFamilyId === 'qwen3-asr' && localServiceMode === 'managed-local' ? (
+                    <div className="field-note">
+                      Local Accurate no longer uses the app-managed Windows sidecar. On Windows, switch to Remote service and point it at your WSL/Docker vLLM host.
+                    </div>
+                  ) : null}
                 </SettingRow>
 
                 {localServiceMode === 'managed-local' ? (
@@ -711,7 +716,7 @@ export function SettingsPage(props: {
                 </SettingRow>
 
                 <div className="advanced-warning">
-                  Advanced stays visible so it can be found quickly, but it should feel lower-confidence than the rest of the page. Use managed locally for the built-in Python sidecar, or remote service when another LAN machine is hosting transcription for this client.
+                  Advanced stays visible so it can be found quickly, but it should feel lower-confidence than the rest of the page. Use managed locally for the built-in SenseVoice sidecar. For Local Accurate on Windows, use Remote service and point it at your WSL/Docker host.
                 </div>
 
                 <div className="settings-section__footer">

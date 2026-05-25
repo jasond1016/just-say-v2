@@ -3,6 +3,7 @@ import path from 'node:path'
 import { getProfileById, profileCatalog } from '../core/settings/profile-catalog'
 import type {
   AppSettings,
+  LocalRuntimeFamilyId,
   ResolvedRuntimeConfig,
   SettingsPatch,
   TranscriptNotesRuntimeConfig,
@@ -86,10 +87,12 @@ void wireAppLifecycle(app, {
 
       return merged.cloudApiKey || merged.translationApiKey ? merged : undefined
     }
+    const supportedManagedLocalRuntimes: LocalRuntimeFamilyId[] =
+      process.platform === 'win32' ? ['sensevoice'] : ['sensevoice', 'qwen3-asr']
     const baseSettingsService = new SettingsService(settingsRepository, {
       credentialsProvider: getRuntimeCredentials,
       platformProvider: () => ({
-        supportedManagedLocalRuntimes: ['sensevoice', 'qwen3-asr']
+        supportedManagedLocalRuntimes: [...supportedManagedLocalRuntimes]
       })
     })
     const settingsListeners = new Set<(settings: AppSettings) => void>()
@@ -155,7 +158,11 @@ void wireAppLifecycle(app, {
       new ConfigurableLocalServiceController({
         managedRuntimePaths: {
           sensevoice: localServicePath,
-          'qwen3-asr': qwenLocalServicePath
+          ...(process.platform === 'win32'
+            ? {}
+            : {
+                'qwen3-asr': qwenLocalServicePath
+              })
         },
         healthTimeoutMs: 60_000
       })

@@ -22,7 +22,7 @@ describe('resolveLocalServiceControllerConfig', () => {
     expect(
       resolveLocalServiceControllerConfig(
         createManagedTarget({ runtimeFamilyId: 'qwen3-asr' }),
-        { sensevoice: 'C:\\local-service' } as unknown as ReturnType<typeof createManagedRuntimePaths>
+        { sensevoice: 'C:\\local-service' }
       )
     ).toMatchObject({
       mode: 'invalid',
@@ -71,7 +71,7 @@ describe('ConfigurableLocalServiceController', () => {
     const controller = new ConfigurableLocalServiceController({
       managedRuntimePaths: {
         sensevoice: 'C:\\local-service'
-      } as unknown as ReturnType<typeof createManagedRuntimePaths>
+      }
     })
 
     await expect(controller.start(createManagedTarget({ runtimeFamilyId: 'qwen3-asr' }))).rejects.toMatchObject({

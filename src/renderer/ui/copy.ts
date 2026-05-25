@@ -116,7 +116,7 @@ export function describeProfileSummary(profile: EngineProfile): string {
     case 'local-fast':
       return 'SenseVoice runtime for the quickest local turnaround.'
     case 'local-accurate':
-      return 'Qwen 1.7B runtime for higher accuracy. Check may load it or point you to a remote service.'
+      return 'Qwen 1.7B runtime for higher accuracy. On Windows, use Remote service via WSL/Docker and then run Check / Load.'
     case 'cloud-low-latency':
       return 'Fast cloud preset when low delay matters most.'
     case 'cloud-low-cost':

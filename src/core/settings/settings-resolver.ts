@@ -37,10 +37,13 @@ export class SettingsResolverError extends Error {
   }
 }
 
+const DEFAULT_SUPPORTED_MANAGED_LOCAL_RUNTIMES: LocalRuntimeFamilyId[] =
+  process.platform === 'win32' ? ['sensevoice'] : ['sensevoice', 'qwen3-asr']
+
 const DEFAULT_PLATFORM_CAPABILITIES: PlatformCapabilities = {
   hasNetwork: true,
   localServiceAvailable: true,
-  supportedManagedLocalRuntimes: ['sensevoice', 'qwen3-asr']
+  supportedManagedLocalRuntimes: DEFAULT_SUPPORTED_MANAGED_LOCAL_RUNTIMES
 }
 
 const DEFAULT_CAPTURE_CONFIG: ResolvedRuntimeConfig['captureConfig'] = {
@@ -140,7 +143,7 @@ function resolveLocalServiceConfig(
   if (!platform.supportedManagedLocalRuntimes.includes(runtimeFamilyId)) {
     throw createSettingsResolverError(
       'E_ENGINE_UNAVAILABLE',
-      `Profile "${profile.id}" requires Remote service because runtime "${runtimeFamilyId}" is not supported for managed-local deployment on this machine`,
+      createManagedLocalUnsupportedMessage(profile.id, runtimeFamilyId),
       false,
       {
         profileId: profile.id,
@@ -158,6 +161,18 @@ function resolveLocalServiceConfig(
     runtimeFamilyId,
     modelIdentifier: profile.modelIdentifier
   }
+}
+
+function createManagedLocalUnsupportedMessage(
+  profileId: string,
+  runtimeFamilyId: LocalRuntimeFamilyId
+): string {
+  const guidance =
+    runtimeFamilyId === 'qwen3-asr'
+      ? ' On Windows, use Remote service and point it at your WSL/Docker vLLM host.'
+      : ''
+
+  return `Profile "${profileId}" requires Remote service because runtime "${runtimeFamilyId}" is not supported for managed-local deployment on this machine.${guidance}`
 }
 
 function toLocalRuntimeFamilyId(runtimeFamilyId: EngineProfile['runtimeFamilyId'], profileId: string): LocalRuntimeFamilyId {
