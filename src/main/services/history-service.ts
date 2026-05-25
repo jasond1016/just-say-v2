@@ -13,6 +13,8 @@ import type {
 import type { TranscriptExporter, TranscriptNotesRepository, TranscriptRepository } from '../../core/contracts/storage'
 import type { NotesGenerationService } from './notes-generation-service'
 
+const LEGACY_INVALID_NOTES_OVERVIEW = 'No concise summary was available.'
+
 export class HistoryService {
   constructor(
     private readonly repository: TranscriptRepository,
@@ -48,7 +50,8 @@ export class HistoryService {
       return null
     }
 
-    return this.notes.repository.getNotesByTranscriptId(id)
+    const notes = await this.notes.repository.getNotesByTranscriptId(id)
+    return isLegacyInvalidNotes(notes) ? null : notes
   }
 
   async generateNotes(id: string, options: HistoryNotesGenerateOptions = {}): Promise<TranscriptNotes> {
@@ -63,7 +66,7 @@ export class HistoryService {
     }
 
     const runtimeConfig = this.notes.configProvider()
-    const cachedNotes = options.force ? null : await this.notes.repository.getNotesByTranscriptId(id)
+    const cachedNotes = options.force ? null : await this.getNotes(id)
     const transcriptHash = this.notes.generationService.computeTranscriptHash(transcript)
     const resolvedModel = runtimeConfig.model?.trim() || 'gpt-4o-mini'
 
@@ -149,4 +152,14 @@ export class HistoryService {
 
     return this.audioStorage.getPlayback(transcript)
   }
+}
+
+function isLegacyInvalidNotes(notes: TranscriptNotes | null): boolean {
+  return (
+    notes !== null &&
+    notes.overview === LEGACY_INVALID_NOTES_OVERVIEW &&
+    notes.decisions.length === 0 &&
+    notes.actionItems.length === 0 &&
+    notes.openQuestions.length === 0
+  )
 }

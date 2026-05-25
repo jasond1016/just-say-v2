@@ -50,9 +50,18 @@ type ProviderOpenQuestion = {
   sourceBlockIds?: unknown
 }
 
-const DEFAULT_PROMPT_VERSION = 'notes-v1'
+type ValidatedProviderNotesPayload = {
+  overview: string
+  decisions: unknown[]
+  actionItems: unknown[]
+  openQuestions: unknown[]
+}
+
+const DEFAULT_PROMPT_VERSION = 'notes-v2'
 const DEFAULT_MAX_CHUNK_CHARS = 12_000
 export const DEFAULT_NOTES_TIMEOUT_MS = 60_000
+const NOTES_JSON_SHAPE =
+  '{"overview":"string","decisions":[{"summary":"string","sourceBlockIds":["block-id"]}],"actionItems":[{"task":"string","owner":"string","due":"string","sourceBlockIds":["block-id"]}],"openQuestions":[{"question":"string","sourceBlockIds":["block-id"]}]}'
 
 export class NotesGenerationService {
   private readonly createProvider: (config: TranscriptNotesRuntimeConfig) => NotesProviderClient
@@ -148,8 +157,9 @@ export class NotesGenerationService {
         formatBlocksForPrompt(chunk)
       ].join('\n\n')
     })
-
-    return parseNotesPayload(response)
+    const payload = parseNotesPayload(response)
+    validateNotesPayload(payload)
+    return payload
   }
 
   private async mergeChunks(
@@ -159,16 +169,11 @@ export class NotesGenerationService {
   ): Promise<ProviderNotesPayload> {
     const response = await provider.generateJson({
       systemPrompt: buildMergeSystemPrompt(language),
-      userPrompt: JSON.stringify(
-        {
-          summaries: chunkPayloads
-        },
-        null,
-        2
-      )
+      userPrompt: JSON.stringify(chunkPayloads, null, 2)
     })
-
-    return parseNotesPayload(response)
+    const payload = parseNotesPayload(response)
+    validateNotesPayload(payload)
+    return payload
   }
 }
 
@@ -248,7 +253,7 @@ function buildChunkSystemPrompt(language: string): string {
     'Do not invent owners, dates, or decisions.',
     'If an owner or due date is missing, return an empty string for that field.',
     'Return JSON only with this exact shape:',
-    '{"overview":"string","decisions":[{"summary":"string","sourceBlockIds":["block-id"]}],"actionItems":[{"task":"string","owner":"string","due":"string","sourceBlockIds":["block-id"]}],"openQuestions":[{"question":"string","sourceBlockIds":["block-id"]}]}'
+    NOTES_JSON_SHAPE
   ].join(' ')
 }
 
@@ -256,10 +261,16 @@ function buildMergeSystemPrompt(language: string): string {
   return [
     'You merge structured transcript note fragments into one clean final notes object.',
     `Write the notes in ${language}.`,
+    'The user message is a JSON array of note fragments.',
     'Deduplicate overlapping items.',
     'Preserve sourceBlockIds from the input.',
     'Use only what is present in the provided JSON.',
-    'Return JSON only with the same exact shape as the input fragments.'
+    'If an owner or due date is missing, return an empty string for that field.',
+    'Return JSON only as one object with this exact shape:',
+    NOTES_JSON_SHAPE,
+    'Do not return an array.',
+    'Do not wrap the result in summaries, fragments, or any other top-level property.',
+    'Do not echo the input.'
   ].join(' ')
 }
 
@@ -352,19 +363,53 @@ function mapNotesPayloadToNotes(input: {
       } satisfies TranscriptNoteSourceRef
     ])
   )
+  const payload = validateNotesPayload(input.payload)
 
   return {
     transcriptId: input.transcript.id,
     transcriptHash: input.transcriptHash,
     language: input.language,
-    overview: normalizeRequiredText(input.payload.overview, 'No concise summary was available.'),
-    decisions: normalizeDecisionList(input.payload.decisions, blockIndex),
-    actionItems: normalizeActionItemList(input.payload.actionItems, blockIndex),
-    openQuestions: normalizeOpenQuestionList(input.payload.openQuestions, blockIndex),
+    overview: payload.overview,
+    decisions: normalizeDecisionList(payload.decisions, blockIndex),
+    actionItems: normalizeActionItemList(payload.actionItems, blockIndex),
+    openQuestions: normalizeOpenQuestionList(payload.openQuestions, blockIndex),
     generatedAt: input.generatedAt,
     promptVersion: input.promptVersion,
     provider: input.provider,
     model: input.model
+  }
+}
+
+function validateNotesPayload(value: unknown): ValidatedProviderNotesPayload {
+  if (!isRecord(value)) {
+    throw new Error('Notes provider returned JSON with an unexpected shape')
+  }
+
+  if (
+    Array.isArray(value.summaries) &&
+    value.overview === undefined &&
+    value.decisions === undefined &&
+    value.actionItems === undefined &&
+    value.openQuestions === undefined
+  ) {
+    throw new Error('Notes provider returned a summaries wrapper instead of a final notes object')
+  }
+
+  const overview = normalizeOptionalText(value.overview)
+
+  if (!overview) {
+    throw new Error('Notes provider returned notes without an overview')
+  }
+
+  if (!Array.isArray(value.decisions) || !Array.isArray(value.actionItems) || !Array.isArray(value.openQuestions)) {
+    throw new Error('Notes provider returned JSON with an unexpected shape')
+  }
+
+  return {
+    overview,
+    decisions: value.decisions,
+    actionItems: value.actionItems,
+    openQuestions: value.openQuestions
   }
 }
 
@@ -480,10 +525,6 @@ function normalizeSourceRefs(
     })
 }
 
-function normalizeRequiredText(value: unknown, fallback: string): string {
-  return normalizeOptionalText(value) ?? fallback
-}
-
 function normalizeOptionalText(value: unknown): string | undefined {
   if (typeof value !== 'string') {
     return undefined
@@ -491,6 +532,10 @@ function normalizeOptionalText(value: unknown): string | undefined {
 
   const normalized = value.trim()
   return normalized ? normalized : undefined
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function assertNever(value: never): never {

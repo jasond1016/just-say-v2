@@ -73,10 +73,135 @@ describe('NotesGenerationService', () => {
         }
       ],
       generatedAt: 5000,
-      promptVersion: 'notes-v1',
+      promptVersion: 'notes-v2',
       provider: 'openai-compatible',
       model: 'demo-model'
     })
+  })
+
+  it('uses a fragment array for merge requests and demands one final notes object', async () => {
+    const generateJson = vi
+      .fn()
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          overview: 'Chunk 1 summary.',
+          decisions: [],
+          actionItems: [],
+          openQuestions: []
+        })
+      )
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          overview: 'Chunk 2 summary.',
+          decisions: [],
+          actionItems: [],
+          openQuestions: []
+        })
+      )
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          overview: 'Merged summary.',
+          decisions: [],
+          actionItems: [],
+          openQuestions: []
+        })
+      )
+    const service = new NotesGenerationService({
+      maxChunkChars: 140,
+      createProvider: () => ({
+        getModel: () => 'demo-model',
+        generateJson
+      })
+    })
+
+    await expect(
+      service.generate({
+        transcript: createChunkedTranscript(),
+        config: createConfig()
+      })
+    ).resolves.toMatchObject({
+      overview: 'Merged summary.'
+    })
+
+    expect(generateJson).toHaveBeenCalledTimes(3)
+    expect(generateJson).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({
+        userPrompt: expect.stringMatching(/^\s*\[/),
+        systemPrompt: expect.stringContaining(
+          'Do not wrap the result in summaries, fragments, or any other top-level property.'
+        )
+      })
+    )
+    expect(generateJson.mock.calls[2]?.[0].userPrompt).not.toContain('"summaries"')
+  })
+
+  it('fails when the merge response wraps notes inside summaries', async () => {
+    const service = new NotesGenerationService({
+      maxChunkChars: 140,
+      createProvider: () => ({
+        getModel: () => 'demo-model',
+        generateJson: vi
+          .fn()
+          .mockResolvedValueOnce(
+            JSON.stringify({
+              overview: 'Chunk 1 summary.',
+              decisions: [],
+              actionItems: [],
+              openQuestions: []
+            })
+          )
+          .mockResolvedValueOnce(
+            JSON.stringify({
+              overview: 'Chunk 2 summary.',
+              decisions: [],
+              actionItems: [],
+              openQuestions: []
+            })
+          )
+          .mockResolvedValueOnce(
+            JSON.stringify({
+              summaries: [
+                {
+                  overview: 'Merged summary.',
+                  decisions: [],
+                  actionItems: [],
+                  openQuestions: []
+                }
+              ]
+            })
+          )
+      })
+    })
+
+    await expect(
+      service.generate({
+        transcript: createChunkedTranscript(),
+        config: createConfig()
+      })
+    ).rejects.toThrow('summaries wrapper')
+  })
+
+  it('fails when the provider omits the required overview', async () => {
+    const service = new NotesGenerationService({
+      createProvider: () => ({
+        getModel: () => 'demo-model',
+        generateJson: vi.fn(async () =>
+          JSON.stringify({
+            decisions: [],
+            actionItems: [],
+            openQuestions: []
+          })
+        )
+      })
+    })
+
+    await expect(
+      service.generate({
+        transcript: createTranscript(),
+        config: createConfig()
+      })
+    ).rejects.toThrow('without an overview')
   })
 
   it('uses translation env defaults when endpoint and model are not set in the runtime config', async () => {
@@ -175,5 +300,28 @@ function createConfig(): TranscriptNotesRuntimeConfig {
     credentials: {
       translationApiKey: 'translation-secret'
     }
+  }
+}
+
+function createChunkedTranscript(): SavedTranscript {
+  return {
+    ...createTranscript(),
+    plainText: ['A'.repeat(120), 'B'.repeat(120)].join('\n'),
+    blocks: [
+      {
+        id: 'chunk-1',
+        source: 'system',
+        text: 'A'.repeat(120),
+        startedAt: 1000,
+        endedAt: 1500
+      },
+      {
+        id: 'chunk-2',
+        source: 'system',
+        text: 'B'.repeat(120),
+        startedAt: 1500,
+        endedAt: 2200
+      }
+    ]
   }
 }

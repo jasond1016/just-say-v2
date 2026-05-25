@@ -125,7 +125,7 @@ describe('RuntimeStore', () => {
         actionItems: [],
         openQuestions: [],
         generatedAt: 1000,
-        promptVersion: 'notes-v1',
+        promptVersion: 'notes-v2',
         provider: 'openai-compatible',
         model: 'gpt-4o-mini'
       }),
@@ -193,7 +193,7 @@ describe('RuntimeStore', () => {
         actionItems: [],
         openQuestions: [],
         generatedAt: 1000,
-        promptVersion: 'notes-v1',
+        promptVersion: 'notes-v2',
         provider: 'openai-compatible',
         model: 'gpt-4o-mini'
       }),

@@ -130,6 +130,48 @@ describe('HistoryService', () => {
     expect(generationService.generate).not.toHaveBeenCalled()
   })
 
+  it('hides legacy placeholder notes from history detail loading', async () => {
+    const repository = new InMemoryTranscriptRepository()
+    await repository.save(createTranscript({ id: 'tx-legacy-notes' }))
+    await repository.saveNotes(createLegacyInvalidTranscriptNotes('tx-legacy-notes'))
+    const service = new HistoryService(repository, undefined, undefined, undefined, {
+      repository,
+      generationService: {
+        computeTranscriptHash: vi.fn(() => 'hash-tx-legacy-notes'),
+        getPromptVersion: vi.fn(() => 'notes-v2'),
+        generate: vi.fn()
+      } as unknown as import('./notes-generation-service').NotesGenerationService,
+      configProvider: () => createNotesConfig()
+    })
+
+    await expect(service.getNotes('tx-legacy-notes')).resolves.toBeNull()
+  })
+
+  it('regenerates notes instead of reusing a legacy placeholder cache entry', async () => {
+    const repository = new InMemoryTranscriptRepository()
+    const transcript = createTranscript({
+      id: 'tx-legacy-refresh',
+      plainText: 'Review blockers. Mina will send the checklist before Friday.'
+    })
+    const generatedNotes = createTranscriptNotes('tx-legacy-refresh')
+    await repository.save(transcript)
+    await repository.saveNotes(createLegacyInvalidTranscriptNotes('tx-legacy-refresh'))
+    const generationService = {
+      computeTranscriptHash: vi.fn(() => generatedNotes.transcriptHash),
+      getPromptVersion: vi.fn(() => generatedNotes.promptVersion),
+      generate: vi.fn(async () => generatedNotes)
+    }
+    const service = new HistoryService(repository, undefined, undefined, undefined, {
+      repository,
+      generationService: generationService as unknown as import('./notes-generation-service').NotesGenerationService,
+      configProvider: () => createNotesConfig()
+    })
+
+    await expect(service.generateNotes('tx-legacy-refresh')).resolves.toEqual(generatedNotes)
+    expect(generationService.generate).toHaveBeenCalledTimes(1)
+    await expect(repository.getNotesByTranscriptId('tx-legacy-refresh')).resolves.toEqual(generatedNotes)
+  })
+
   it('generates and persists notes when no valid cache exists', async () => {
     const repository = new InMemoryTranscriptRepository()
     const transcript = createTranscript({
@@ -234,9 +276,17 @@ function createTranscriptNotes(transcriptId: string): TranscriptNotes {
     actionItems: [],
     openQuestions: [],
     generatedAt: 2_000,
-    promptVersion: 'notes-v1',
+    promptVersion: 'notes-v2',
     provider: 'openai-compatible',
     model: 'gpt-4o-mini'
+  }
+}
+
+function createLegacyInvalidTranscriptNotes(transcriptId: string): TranscriptNotes {
+  return {
+    ...createTranscriptNotes(transcriptId),
+    overview: 'No concise summary was available.',
+    promptVersion: 'notes-v1'
   }
 }
 
