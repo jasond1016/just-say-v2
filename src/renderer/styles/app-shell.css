@@ -12,12 +12,29 @@
   padding: 22px 16px 16px;
   border-right: 1px solid var(--border-subtle);
   background: color-mix(in oklab, var(--bg-elevated) 78%, var(--bg-surface));
+  -webkit-app-region: drag;
+}
+
+.app-sidebar button,
+.app-sidebar a {
+  -webkit-app-region: no-drag;
+}
+
+[data-theme="light"] .app-sidebar {
+  background: #f7f2ee;
+  border-right-color: #ebe5e0;
 }
 
 .app-sidebar__brand {
-  display: grid;
-  gap: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 0 8px 8px;
+}
+
+.app-sidebar__brand-icon {
+  color: var(--accent-text);
+  flex-shrink: 0;
 }
 
 .app-sidebar__brand-mark {
@@ -26,13 +43,6 @@
   font-weight: 700;
   letter-spacing: -0.03em;
   color: var(--text-primary);
-}
-
-.app-sidebar__brand-sub {
-  font-size: 11px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--text-tertiary);
 }
 
 .app-sidebar__nav {
@@ -167,27 +177,24 @@
 .app-nav-button {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
-  min-height: 34px;
+  gap: 10px;
+  min-height: 36px;
   width: 100%;
   padding: 0 10px;
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 13px;
   text-align: left;
   letter-spacing: 0.01em;
   cursor: pointer;
   font-family: inherit;
 }
 
-.app-nav-button__dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: color-mix(in oklab, var(--border) 80%, transparent);
-  opacity: 0;
+.app-nav-button svg {
+  flex-shrink: 0;
+  opacity: 0.6;
 }
 
 .app-nav-button[data-active] {
@@ -197,9 +204,13 @@
   font-weight: 600;
 }
 
-.app-nav-button[data-active] .app-nav-button__dot {
+[data-theme="light"] .app-nav-button[data-active] {
+  background: #f4e8e1;
+  border-color: #ecddd4;
+}
+
+.app-nav-button[data-active] svg {
   opacity: 1;
-  background: var(--accent);
 }
 
 .app-main {
@@ -207,6 +218,18 @@
   max-height: 100vh;
   overflow: auto;
   background: color-mix(in oklab, var(--bg-surface) 96%, transparent);
+  position: relative;
+}
+
+.app-main::before {
+  content: '';
+  display: block;
+  height: 36px;
+  -webkit-app-region: drag;
+}
+
+[data-theme="light"] .app-main {
+  background: oklch(0.995 0.002 80);
 }
 
 .app-main__notes {

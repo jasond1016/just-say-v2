@@ -2,11 +2,11 @@ import type { AppRuntimeSnapshot, SavedTranscript } from '../../shared/api-types
 
 export type AppSection = 'quick-dictation' | 'live-session' | 'history' | 'settings'
 
-export const APP_SECTIONS: Array<{ id: AppSection; label: string }> = [
-  { id: 'quick-dictation', label: 'Quick Dictation' },
-  { id: 'live-session', label: 'Live Session' },
-  { id: 'history', label: 'History' },
-  { id: 'settings', label: 'Settings' }
+export const APP_SECTIONS: Array<{ id: AppSection; label: string; icon: string }> = [
+  { id: 'quick-dictation', label: 'Speak', icon: 'mic' },
+  { id: 'live-session', label: 'Session', icon: 'session' },
+  { id: 'history', label: 'Archive', icon: 'archive' },
+  { id: 'settings', label: 'Settings', icon: 'settings' }
 ]
 
 export function getPreferredSection(runtime: AppRuntimeSnapshot): AppSection {

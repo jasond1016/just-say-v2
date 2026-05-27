@@ -35,6 +35,12 @@ describe('createCaptureApi', () => {
     })
     unsubscribe()
 
+    // After unsubscribe, commands are no longer forwarded
+    handlers.get(IPC_CHANNELS.captureCommand)?.({}, {
+      type: 'abort',
+      requestId: 'cap-2'
+    } satisfies CaptureCommand)
+
     expect(seenCommands).toEqual([
       {
         type: 'stop',
@@ -46,6 +52,5 @@ describe('createCaptureApi', () => {
       type: 'capture-stopped',
       requestId: 'cap-1'
     })
-    expect(ipcRenderer.off).toHaveBeenCalledWith(IPC_CHANNELS.captureCommand, expect.any(Function))
   })
 })

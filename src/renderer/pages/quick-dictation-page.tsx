@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 import type { AppSettings, AppRuntimeSnapshot, LocalServiceStatus, SavedTranscript } from '../../shared/api-types'
-import { describeOutputMethod, describePttHotkey } from '../ui/copy'
+import { describePttHotkey } from '../ui/copy'
 
 export function QuickDictationPage(props: {
   runtime: AppRuntimeSnapshot
@@ -11,51 +11,42 @@ export function QuickDictationPage(props: {
   onCopyText: (id: string) => void
   onOpenHistory: () => void
 }) {
-  const stateLabel = describeState(props.runtime.ptt.status, props.localServiceStatus)
-  const stateClass = stateLabel.tone === 'ready' ? 'qd-state--ready'
-    : stateLabel.tone === 'active' ? 'qd-state--active'
-    : 'qd-state--unavailable'
+  const hotkeyLabel = describePttHotkey(props.settings.input.pttHotkey)
+  const shortLabel = props.settings.input.pttHotkey === 'RCtrl' ? 'R Ctrl' : 'R Alt'
 
   return (
-    <div className="page page--wide">
-      <header className="surface-header">
-        <div className="surface-header__eyebrow">Quick Dictation</div>
+    <div className="page page--speak">
+      <header className="speak-header">
+        <h1 className="speak-header__title">Speak</h1>
+        <p className="speak-header__subtitle">按住快捷键开始说话，松开后自动插入内容</p>
       </header>
 
-      <section className="qd-config" aria-label="Dictation configuration">
-        <div className="qd-config__item">
-          <span className="qd-config__label">Hotkey</span>
-          <span className="qd-config__value qd-config__value--mono">
-            {describePttHotkey(props.settings.input.pttHotkey)}
-          </span>
-          <span className="qd-config__sub">Hold to dictate</span>
+      <section className="speak-keycap-area" aria-label={`Press ${hotkeyLabel} to dictate`}>
+        <div className="speak-keycap">
+          <div className="speak-keycap__face">
+            <span className="speak-keycap__label">{shortLabel}</span>
+          </div>
         </div>
-        <div className="qd-config__item">
-          <span className="qd-config__label">Delivery</span>
-          <span className="qd-config__value">{describeOutputMethod(props.settings.output.method)}</span>
-        </div>
-        <div className="qd-config__item">
-          <span className="qd-config__label">State</span>
-          <span className={`qd-config__value ${stateClass}`}>{stateLabel.text}</span>
-        </div>
+        <span className="speak-keycap-area__hint">Hold to Talk</span>
       </section>
 
-      <section className="qd-results" aria-label="Recent dictation results">
-        <div className="qd-results__header">
-          <span className="qd-results__eyebrow">Recent results</span>
-        </div>
+      <section className="speak-recent" aria-label="Recent dictation output">
+        <h2 className="speak-recent__heading">最近输出</h2>
         {props.recentDictations.length > 0 ? (
-          <div className="qd-results__list">
+          <div className="speak-recent__list">
             {props.recentDictations.map((item) => (
-              <ResultRow key={item.id} item={item} onCopy={props.onCopyText} />
+              <RecentRow key={item.id} item={item} onCopy={props.onCopyText} />
             ))}
           </div>
         ) : (
-          <div className="qd-results__empty">No recent dictations.</div>
+          <div className="speak-recent__empty">尚无输出记录</div>
         )}
-        <div className="qd-results__footer">
-          <button type="button" className="qd-results__history-link" onClick={props.onOpenHistory}>
-            View all in History
+        <div className="speak-recent__footer">
+          <button type="button" className="speak-recent__history-link" onClick={props.onOpenHistory}>
+            查看全部历史
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </button>
         </div>
       </section>
@@ -63,46 +54,67 @@ export function QuickDictationPage(props: {
   )
 }
 
-function ResultRow(props: { item: SavedTranscript; onCopy: (id: string) => void }) {
+function RecentRow(props: { item: SavedTranscript; onCopy: (id: string) => void }) {
+  const [menuOpen, setMenuOpen] = useState(false)
   const [copied, setCopied] = useState(false)
-  const displayText = props.item.plainText.length > 120
-    ? props.item.plainText.slice(0, 120) + '…'
+  const displayText = props.item.plainText.length > 100
+    ? props.item.plainText.slice(0, 100) + '…'
     : props.item.plainText
+
+  const timeLabel = formatRelativeTime(props.item.endedAt)
 
   const handleCopy = () => {
     props.onCopy(props.item.id)
     setCopied(true)
+    setMenuOpen(false)
     window.setTimeout(() => setCopied(false), 1500)
   }
 
   return (
-    <div className="qd-result-row">
-      <span className="qd-result-row__text">{displayText}</span>
-      <button
-        type="button"
-        className={`qd-result-row__copy ${copied ? 'qd-result-row__copy--done' : ''}`}
-        onClick={handleCopy}
-      >
-        {copied ? 'Copied' : 'Copy'}
-      </button>
+    <div className="speak-row">
+      <span className="speak-row__time">{timeLabel}</span>
+      <span className="speak-row__text">{displayText}</span>
+      <div className="speak-row__actions">
+        <button
+          type="button"
+          className="speak-row__menu-trigger"
+          aria-label="Actions"
+          onClick={() => setMenuOpen(!menuOpen)}
+        >
+          {copied ? '✓' : '⋯'}
+        </button>
+        {menuOpen && !copied ? (
+          <div className="speak-row__menu">
+            <button type="button" className="speak-row__menu-item" onClick={handleCopy}>
+              Copy text
+            </button>
+          </div>
+        ) : null}
+      </div>
     </div>
   )
 }
 
-function describeState(pttStatus: string, serviceStatus: LocalServiceStatus) {
-  if (serviceStatus === 'failed' || serviceStatus === 'stopped') {
-    return { text: 'Unavailable', tone: 'unavailable' as const }
-  }
+function formatRelativeTime(timestamp: number): string {
+  const now = Date.now()
+  const diff = now - timestamp
+  const date = new Date(timestamp)
+  const today = new Date()
 
-  switch (pttStatus) {
-    case 'capturing':
-    case 'arming':
-      return { text: 'Recording', tone: 'active' as const }
-    case 'recognizing':
-    case 'post_processing':
-    case 'delivering':
-      return { text: 'Processing', tone: 'active' as const }
-    default:
-      return { text: 'Ready', tone: 'ready' as const }
+  const isToday = date.toDateString() === today.toDateString()
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+  const isYesterday = date.toDateString() === yesterday.toDateString()
+
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  const time = `${hours}:${minutes}`
+
+  if (isToday) {
+    return time
   }
+  if (isYesterday) {
+    return `昨天 ${time}`
+  }
+  return `${date.getMonth() + 1}/${date.getDate()} ${time}`
 }

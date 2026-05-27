@@ -465,6 +465,19 @@ function createWindowByKind(
     height: kind === 'capture' ? 600 : 860,
     backgroundColor: '#10161f',
     icon: input.iconPath,
-    ...(input.webPreferences ? { webPreferences: input.webPreferences } : {})
+    ...(kind === 'main' ? {
+      titleBarStyle: 'hidden',
+      titleBarOverlay: {
+        color: '#ffffff',
+        symbolColor: '#5c4a3a',
+        height: 36
+      }
+    } : {}),
+    ...(input.webPreferences ? {
+      webPreferences: {
+        ...input.webPreferences,
+        ...(kind === 'capture' ? { backgroundThrottling: false } : {})
+      }
+    } : {})
   })
 }

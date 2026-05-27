@@ -14,16 +14,21 @@ export type IpcRendererCaptureLike = {
 }
 
 export function createCaptureApi(ipcRenderer: IpcRendererCaptureLike): CaptureApi {
+  // Use a single persistent IPC handler to avoid contextBridge issues with off()
+  let activeListener: ((command: CaptureCommand) => void) | null = null
+
+  ipcRenderer.on(IPC_CHANNELS.captureCommand, (_event: unknown, payload: unknown) => {
+    activeListener?.(payload as CaptureCommand)
+  })
+
   return {
     onCommand(listener) {
-      const handler = (_event: unknown, payload: unknown) => {
-        listener(payload as CaptureCommand)
-      }
-
-      ipcRenderer.on(IPC_CHANNELS.captureCommand, handler)
+      activeListener = listener
 
       return () => {
-        ipcRenderer.off(IPC_CHANNELS.captureCommand, handler)
+        if (activeListener === listener) {
+          activeListener = null
+        }
       }
     },
     sendEvent(event) {

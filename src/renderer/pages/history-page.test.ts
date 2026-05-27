@@ -48,12 +48,12 @@ describe('HistoryPage audio detail', () => {
       }))
     )
 
-    expect(markup).toContain('Partial audio')
+    expect(markup).toContain('archive-audio-bar')
     expect(markup).toContain('<audio')
     expect(markup).toContain('file:///C:/audio/meeting-1.wav')
   })
 
-  it('shows an unavailable state when metadata exists but playback url is missing', () => {
+  it('shows the audio bar only when playback is available', () => {
     const transcript = createTranscript({
       metadata: {
         engineProfileId: 'local-fast',
@@ -81,11 +81,11 @@ describe('HistoryPage audio detail', () => {
       }))
     )
 
-    expect(markup).toContain('Audio unavailable')
-    expect(markup).toContain('saved meeting audio file is no longer available on disk')
+    expect(markup).not.toContain('<audio')
+    expect(markup).not.toContain('archive-audio-bar')
   })
 
-  it('renders a compact Actions trigger instead of the inline More summary', () => {
+  it('renders a more-actions menu in the detail header', () => {
     const transcript = createTranscript()
 
     const markup = renderToStaticMarkup(
@@ -95,7 +95,7 @@ describe('HistoryPage audio detail', () => {
       }))
     )
 
-    expect(markup).toContain('Actions')
+    expect(markup).toContain('More actions')
     expect(markup).not.toContain('Copy, export, delete')
   })
 })

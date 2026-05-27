@@ -14,7 +14,7 @@ const env = {
 }
 
 await import('./build.mjs')
-await run(electronBinary, [`--remote-debugging-port=${remoteDebuggingPort}`, '.'], env)
+await run(electronBinary, [`--remote-debugging-port=${remoteDebuggingPort}`, '--remote-allow-origins=*', '.'], env)
 
 function run(command, args, childEnv) {
   return new Promise((resolve, reject) => {

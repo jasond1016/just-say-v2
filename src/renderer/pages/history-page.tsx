@@ -10,16 +10,9 @@ import type {
 } from '../../shared/api-types'
 import type { CaptureSource } from '../../shared/primitive-types'
 import { Button, TextInput } from '../ui/controls'
-import {
-  describeCaptureSource,
-  describeDeploymentMode,
-  describeProfileId,
-  describeRuntimeFamily,
-  describeSessionMode,
-  describeTranscriptSummary
-} from '../ui/copy'
 
 type HistoryTimeFilter = 'all' | 'today' | 'last_7_days' | 'last_30_days'
+const ITEMS_PER_PAGE = 15
 type HistoryNotesState =
   | { status: 'idle' }
   | { status: 'loading' }
@@ -173,7 +166,6 @@ export function HistoryPage(props: {
   const selectedCount = selectedIds.size
   const hasActiveFilters =
     props.searchQuery.trim().length > 0 ||
-    props.selectedMode !== 'all' ||
     props.selectedSource !== 'all' ||
     props.selectedTimeFilter !== 'all'
 
@@ -220,96 +212,73 @@ export function HistoryPage(props: {
     />
   ) : null
 
+  const [modeTab, setModeTab] = useState<'all' | 'ptt' | 'meeting'>('all')
+  const pttCount = props.items.filter((item) => item.mode === 'ptt').length
+  const meetingCount = props.items.filter((item) => item.mode === 'meeting').length
+  const displayItems = modeTab === 'all'
+    ? props.items
+    : props.items.filter((item) => item.mode === modeTab)
+  const [currentPage, setCurrentPage] = useState(1)
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [props.searchQuery, modeTab, props.selectedSource, props.selectedTimeFilter])
+
+  const totalPages = Math.max(1, Math.ceil(displayItems.length / ITEMS_PER_PAGE))
+  const pageItems = displayItems.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  )
+
   if (!selectedTranscript) {
     return (
       <>
-        <div className="page page--wide">
-          <header className="surface-header">
-            <div className="surface-header__eyebrow">History</div>
-            <div className="surface-header__row">
-              <div className="surface-header__headline-group">
-                <h1 className="surface-header__title">Archive</h1>
-              </div>
-              <div className="surface-header__meta">
-                <span>{props.total} records</span>
-                {props.items.length > 0 ? (
-                  <Button
-                    label={bulkMode ? 'Done' : 'Select'}
-                    variant="ghost"
-                    size="small"
-                    onClick={() => {
-                      setBulkMode(!bulkMode)
-                      setSelectedIds(new Set())
-                      setConfirmBulkDelete(false)
-                    }}
-                  />
-                ) : null}
-              </div>
-            </div>
-
-          </header>
-
-          <section className="archive-controls" aria-labelledby={headingId}>
-            <div className="archive-controls__search">
+        <div className="page page--wide archive-page">
+          <header className="archive-header">
+            <h1 className="archive-header__title">Archive</h1>
+            <div className="archive-header__toolbar">
               <TextInput
                 ref={searchInputRef}
                 value={props.searchQuery}
                 onChange={(event) => props.onSearchQueryChange(event.target.value)}
-                placeholder="Search transcripts"
-                ariaLabel="Search transcripts"
-                className="field-input--full archive-search"
+                placeholder="搜索记录内容..."
+                ariaLabel="搜索记录内容"
+                className="field-input--full archive-search-input"
               />
             </div>
+          </header>
 
-            <div className="archive-filter-row">
-              <FilterGroup
-                label="Mode"
-                options={[
-                  { value: 'all', label: 'All' },
-                  { value: 'ptt', label: 'Quick Dictation' },
-                  { value: 'meeting', label: 'Live Session' }
-                ]}
-                selected={props.selectedMode}
-                onSelect={(value) => props.onModeChange(value as 'all' | SavedTranscript['mode'])}
-              />
-              <FilterGroup
-                label="Source"
-                options={[
-                  { value: 'all', label: 'All sources' },
-                  { value: 'microphone', label: 'Microphone' },
-                  { value: 'system', label: 'System audio' }
-                ]}
-                selected={props.selectedSource}
-                onSelect={(value) => props.onSourceChange(value as 'all' | CaptureSource)}
-              />
-              <FilterGroup
-                label="Time"
-                options={[
-                  { value: 'all', label: 'All time' },
-                  { value: 'today', label: 'Today' },
-                  { value: 'last_7_days', label: '7 days' },
-                  { value: 'last_30_days', label: '30 days' }
-                ]}
-                selected={props.selectedTimeFilter}
-                onSelect={(value) => props.onTimeFilterChange(value as HistoryTimeFilter)}
-              />
-              {hasActiveFilters ? (
-                <Button
-                  label="Clear filters"
-                  variant="ghost"
-                  size="small"
-                  onClick={() => {
-                    props.onSearchQueryChange('')
-                    props.onModeChange('all')
-                    props.onSourceChange('all')
-                    props.onTimeFilterChange('all')
-                  }}
-                />
-              ) : null}
-            </div>
-          </section>
+          <div className="archive-tabs" role="tablist" aria-label="Filter by mode">
+            <button
+              type="button"
+              role="tab"
+              className={`archive-tab ${modeTab === 'all' ? 'archive-tab--active' : ''}`}
+              aria-selected={modeTab === 'all'}
+              onClick={() => setModeTab('all')}
+            >
+              全部 <span className="archive-tab__count">{props.items.length}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              className={`archive-tab ${modeTab === 'ptt' ? 'archive-tab--active' : ''}`}
+              aria-selected={modeTab === 'ptt'}
+              onClick={() => setModeTab('ptt')}
+            >
+              PTT <span className="archive-tab__count">{pttCount}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              className={`archive-tab ${modeTab === 'meeting' ? 'archive-tab--active' : ''}`}
+              aria-selected={modeTab === 'meeting'}
+              onClick={() => setModeTab('meeting')}
+            >
+              会议 <span className="archive-tab__count">{meetingCount}</span>
+            </button>
+          </div>
 
-          <section className="archive-list" aria-labelledby={headingId}>
+          <section className="archive-table-wrap" aria-labelledby={headingId}>
             <div id={headingId} className="sr-only">Archive results</div>
 
             {bulkMode ? (
@@ -360,17 +329,17 @@ export function HistoryPage(props: {
               </div>
             ) : null}
 
-            {props.items.length === 0 ? (
+            {displayItems.length === 0 ? (
               <div className="empty-state empty-state--archive" role="status" aria-live="polite">
                 <div className="empty-state__title">
-                  {hasActiveFilters ? 'No transcripts match these filters.' : 'No transcripts yet.'}
+                  {hasActiveFilters || modeTab !== 'all' ? 'No transcripts match these filters.' : 'No transcripts yet.'}
                 </div>
                 <p className="empty-state__body">
-                  {hasActiveFilters
+                  {hasActiveFilters || modeTab !== 'all'
                     ? 'Clear filters or search for a broader phrase to see more of the archive again.'
                     : 'Finished dictation and live sessions will land here automatically after capture is done.'}
                 </p>
-                {!hasActiveFilters ? (
+                {!hasActiveFilters && modeTab === 'all' ? (
                   <div className="empty-state__actions">
                     <Button label="Open quick dictation" size="small" onClick={props.onOpenQuickDictation} />
                     <Button label="Open live session" size="small" variant="secondary" onClick={props.onOpenLiveSession} />
@@ -378,52 +347,96 @@ export function HistoryPage(props: {
                 ) : null}
               </div>
             ) : (
-              props.items.map((item) => {
-                const isSelected = selectedIds.has(item.id)
-                const preview = getArchivePreview(item, props.searchQuery)
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => {
-                      if (bulkMode) {
-                        setSelectedIds((prev) => {
-                          const next = new Set(prev)
-                          if (next.has(item.id)) {
-                            next.delete(item.id)
-                          } else {
-                            next.add(item.id)
-                          }
-                          return next
-                        })
-                      } else {
-                        props.onOpen(item.id)
-                      }
-                    }}
-                    className={`archive-row ${bulkMode ? 'archive-row--selectable' : ''} ${isSelected ? 'archive-row--selected' : ''}`}
-                  >
-                    {bulkMode ? (
-                      <div className="archive-row__check">
-                        <div className={`archive-row__checkbox ${isSelected ? 'archive-row__checkbox--checked' : ''}`} />
-                      </div>
-                    ) : null}
-                    <div className="archive-row__content">
-                      <div className="archive-row__head">
-                        <div className="archive-row__title">{item.title}</div>
-                        <div className="archive-row__time">{formatArchiveTime(item.startedAt)}</div>
-                      </div>
-                      <div className="archive-row__meta">
-                        <span>{describeTranscriptSummary(item)}</span>
-                        <span>{formatDurationMs(item.endedAt - item.startedAt)}</span>
-                      </div>
-                      {preview.kind === 'match' ? (
-                        <div className="archive-row__preview-kicker">Search hit</div>
-                      ) : null}
-                      <div className="archive-row__preview">{preview.text}</div>
-                    </div>
-                  </button>
-                )
-              })
+              <>
+                <table className="archive-table">
+                  <thead>
+                    <tr>
+                      {bulkMode ? <th className="archive-table__th-check"></th> : null}
+                      <th className="archive-table__th-title">标题</th>
+                      <th className="archive-table__th-time">时间</th>
+                      <th className="archive-table__th-duration">时长</th>
+                      <th className="archive-table__th-type">类型</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pageItems.map((item) => {
+                      const isSelected = selectedIds.has(item.id)
+                      return (
+                        <tr
+                          key={item.id}
+                          className={`archive-table__row ${isSelected ? 'archive-table__row--selected' : ''}`}
+                          onClick={() => {
+                            if (bulkMode) {
+                              setSelectedIds((prev) => {
+                                const next = new Set(prev)
+                                if (next.has(item.id)) {
+                                  next.delete(item.id)
+                                } else {
+                                  next.add(item.id)
+                                }
+                                return next
+                              })
+                            } else {
+                              props.onOpen(item.id)
+                            }
+                          }}
+                        >
+                          {bulkMode ? (
+                            <td className="archive-table__td-check">
+                              <div className={`archive-row__checkbox ${isSelected ? 'archive-row__checkbox--checked' : ''}`} />
+                            </td>
+                          ) : null}
+                          <td className="archive-table__td-title">{item.title}</td>
+                          <td className="archive-table__td-time">{formatArchiveTime(item.startedAt)}</td>
+                          <td className="archive-table__td-duration">{formatDurationMs(item.endedAt - item.startedAt)}</td>
+                          <td className="archive-table__td-type">
+                            <span className={`archive-badge ${item.mode === 'ptt' ? 'archive-badge--ptt' : 'archive-badge--meeting'}`}>
+                              {item.mode === 'ptt' ? 'PTT' : '会议'}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+
+                {totalPages > 1 ? (
+                  <nav className="archive-pagination" aria-label="Pagination">
+                    <button
+                      type="button"
+                      className="archive-pagination__btn"
+                      disabled={currentPage <= 1}
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      aria-label="Previous page"
+                    >
+                      ←
+                    </button>
+                    {buildPageNumbers(currentPage, totalPages).map((page, index) =>
+                      page === '...' ? (
+                        <span key={`ellipsis-${index}`} className="archive-pagination__ellipsis">...</span>
+                      ) : (
+                        <button
+                          key={page}
+                          type="button"
+                          className={`archive-pagination__btn ${page === currentPage ? 'archive-pagination__btn--active' : ''}`}
+                          onClick={() => setCurrentPage(page as number)}
+                        >
+                          {page}
+                        </button>
+                      )
+                    )}
+                    <button
+                      type="button"
+                      className="archive-pagination__btn"
+                      disabled={currentPage >= totalPages}
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      aria-label="Next page"
+                    >
+                      →
+                    </button>
+                  </nav>
+                ) : null}
+              </>
             )}
           </section>
         </div>
@@ -434,178 +447,152 @@ export function HistoryPage(props: {
 
   return (
     <>
-      <div className="page page--wide">
-        <header className="detail-header">
-        <button type="button" className="detail-header__back" onClick={props.onCloseDetail}>
-          Back to archive
-        </button>
-        <div className="surface-header__row">
-          <div className="surface-header__headline-group">
-            <div id={headingId} className="surface-header__title" ref={detailHeadingRef} tabIndex={-1}>
-              {selectedTranscript.title}
+      <div className="page page--wide archive-detail">
+        <header className="archive-detail__header">
+          <div className="archive-detail__top-row">
+            <button type="button" className="archive-detail__back" onClick={props.onCloseDetail}>
+              <span aria-hidden="true">←</span> 返回归档列表
+            </button>
+            <div className="archive-detail__top-actions">
+              <button
+                type="button"
+                className="archive-detail__export-btn"
+                disabled={Boolean(props.busyAction)}
+                onClick={() => props.onExport(selectedTranscript.id, 'plain_text')}
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M8 1v9m0 0L5 7m3 3 3-3M2 11v2a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                导出
+              </button>
+              <div
+                ref={actionMenuRef}
+                className={`detail-actions-menu ${actionMenuOpen ? 'detail-actions-menu--open' : ''}`}
+              >
+                <button
+                  type="button"
+                  className="archive-detail__more-btn"
+                  aria-haspopup="true"
+                  aria-expanded={actionMenuOpen}
+                  aria-controls={actionMenuOpen ? actionMenuId : undefined}
+                  onClick={() => setActionMenuOpen((current) => !current)}
+                  aria-label="More actions"
+                >
+                  ···
+                </button>
+
+                {actionMenuOpen ? (
+                  <div id={actionMenuId} className="detail-actions-menu__popover">
+                    {getHistoryDetailActionGroups().map((group) => (
+                      <section key={group.label} className="detail-actions-menu__section" aria-label={group.label}>
+                        <div className="detail-actions-menu__section-label">{group.label}</div>
+                        <div className="detail-actions-menu__items">
+                          {group.items.map((item) => (
+                            <button
+                              key={item.id}
+                              type="button"
+                              className={`detail-actions-menu__item ${item.danger ? 'detail-actions-menu__item--danger' : ''}`}
+                              disabled={Boolean(props.busyAction)}
+                              onClick={() => {
+                                closeActionMenu()
+                                runHistoryDetailAction(item.id, {
+                                  onCopy: (format) => props.onCopy(selectedTranscript.id, format),
+                                  onExport: (format) => props.onExport(selectedTranscript.id, format),
+                                  onDelete: () => setConfirmDelete(true)
+                                })
+                              }}
+                            >
+                              {item.label}
+                            </button>
+                          ))}
+                        </div>
+                      </section>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
             </div>
           </div>
-          <div className="surface-header__meta">{formatArchiveTime(selectedTranscript.startedAt)}</div>
-        </div>
-        <div className="detail-header__meta">
-          <span>{describeSessionMode(selectedTranscript.mode)}</span>
-          <span>{describeTranscriptSources(selectedTranscript)}</span>
-          <span>{formatDurationMs(selectedTranscript.endedAt - selectedTranscript.startedAt)}</span>
-          <span>Profile: {describeProfileId(selectedTranscript.metadata.engineProfileId)}</span>
-          <span>Runtime: {describeRuntimeFamily(selectedTranscript.metadata.runtimeFamilyId)}</span>
-          <span>Deployment: {describeDeploymentMode(selectedTranscript.metadata.deploymentMode)}</span>
-        </div>
-        <p className="surface-header__body">
-          The transcript is the source document. Notes are derived from it and stay in the same place without replacing the original record.
-        </p>
-      </header>
 
-      {selectedTranscript.mode === 'meeting' && selectedTranscript.metadata.audio ? (
-        <section className="history-audio" aria-label="Meeting audio">
-          <div className="history-audio__meta">
-            <div className="history-audio__eyebrow">Meeting audio</div>
-            <div className="history-audio__row">
-              <span className={`status-pill ${props.selectedAudio ? 'status-pill--saved' : 'status-pill--warning'}`}>
-                {props.selectedAudio
-                  ? selectedTranscript.metadata.audio.status === 'partial'
-                    ? 'Partial audio'
-                    : 'Complete audio'
-                  : 'Audio unavailable'}
-              </span>
-              <span>{formatDurationMs(selectedTranscript.metadata.audio.durationMs)}</span>
-              <span>{formatAudioSpec(selectedTranscript.metadata.audio.sampleRate, selectedTranscript.metadata.audio.channels)}</span>
-            </div>
+          <h1 className="archive-detail__title" id={headingId} ref={detailHeadingRef} tabIndex={-1}>
+            {selectedTranscript.title}
+          </h1>
+
+          <div className="archive-detail__meta">
+            <span className="archive-detail__meta-item">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <rect x="2" y="3" width="12" height="11" rx="2" stroke="currentColor" strokeWidth="1.2"/>
+                <path d="M5 1v3M11 1v3M2 7h12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              </svg>
+              {formatArchiveDate(selectedTranscript.startedAt)}
+            </span>
+            <span className="archive-detail__meta-sep">·</span>
+            <span className="archive-detail__meta-item">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.2"/>
+                <path d="M8 5v3.5l2.5 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              {formatDurationMs(selectedTranscript.endedAt - selectedTranscript.startedAt)}
+            </span>
+            <span className="archive-detail__meta-sep">·</span>
+            <span className={`archive-badge ${selectedTranscript.mode === 'ptt' ? 'archive-badge--ptt' : 'archive-badge--meeting'}`}>
+              {selectedTranscript.mode === 'ptt' ? 'PTT' : '会议'}
+            </span>
+            <span className="archive-detail__meta-sep">·</span>
+            <span className="archive-detail__meta-item archive-detail__meta-status">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.2"/>
+                <path d="M5.5 8l2 2 3.5-3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              已归档
+            </span>
           </div>
+        </header>
 
-          {props.selectedAudio ? (
-            <audio
-              className="history-audio__player"
-              controls
-              preload="metadata"
-              src={props.selectedAudio.url}
-            />
-          ) : (
-            <p className="history-audio__body">
-              The transcript record still exists, but the saved meeting audio file is no longer available on disk.
-            </p>
-          )}
-        </section>
-      ) : null}
-
-      <section className="detail-toolbar">
-        <div className="detail-tabs" role="tablist" aria-label="Record views">
+        <div className="archive-detail__tabs" role="tablist" aria-label="Record views">
           <button
             type="button"
-            className={`detail-tab ${detailView === 'transcript' ? 'detail-tab--active' : ''}`}
+            role="tab"
+            className={`archive-tab ${detailView === 'transcript' ? 'archive-tab--active' : ''}`}
             aria-selected={detailView === 'transcript'}
             onClick={() => setDetailView('transcript')}
           >
-            Transcript
+            {selectedTranscript.mode === 'meeting' ? '会议转录' : '语音转录'}
           </button>
           <button
             type="button"
-            className={`detail-tab ${detailView === 'notes' ? 'detail-tab--active' : ''}`}
+            role="tab"
+            className={`archive-tab ${detailView === 'notes' ? 'archive-tab--active' : ''}`}
             aria-selected={detailView === 'notes'}
             onClick={() => setDetailView('notes')}
           >
-            Notes
+            AI Notes
           </button>
         </div>
 
-        <div className="detail-toolbar__actions">
-          {detailView === 'notes' && notesState?.status === 'ready' ? (
-            <Button
-              label="Regenerate notes"
-              size="small"
-              variant="secondary"
-              disabled={Boolean(props.busyAction)}
-              onClick={() => props.onGenerateNotes(selectedTranscript.id, { force: true })}
-            />
-          ) : null}
-
-          <div
-            ref={actionMenuRef}
-            className={`detail-actions-menu ${actionMenuOpen ? 'detail-actions-menu--open' : ''}`}
-          >
-            <button
-              type="button"
-              className="detail-actions-menu__trigger"
-              aria-haspopup="true"
-              aria-expanded={actionMenuOpen}
-              aria-controls={actionMenuOpen ? actionMenuId : undefined}
-              onClick={() => setActionMenuOpen((current) => !current)}
-            >
-              <span>Actions</span>
-              <span aria-hidden="true" className="detail-actions-menu__chevron">v</span>
-            </button>
-
-            {actionMenuOpen ? (
-              <div id={actionMenuId} className="detail-actions-menu__popover">
-                {getHistoryDetailActionGroups().map((group) => (
-                  <section key={group.label} className="detail-actions-menu__section" aria-label={group.label}>
-                    <div className="detail-actions-menu__section-label">{group.label}</div>
-                    <div className="detail-actions-menu__items">
-                      {group.items.map((item) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          className={`detail-actions-menu__item ${item.danger ? 'detail-actions-menu__item--danger' : ''}`}
-                          disabled={Boolean(props.busyAction)}
-                          onClick={() => {
-                            closeActionMenu()
-                            runHistoryDetailAction(item.id, {
-                              onCopy: (format) => props.onCopy(selectedTranscript.id, format),
-                              onExport: (format) => props.onExport(selectedTranscript.id, format),
-                              onDelete: () => setConfirmDelete(true)
-                            })
-                          }}
-                        >
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                  </section>
-                ))}
-              </div>
-            ) : null}
+        {props.exportMessage ? (
+          <div className="inline-note inline-note--neutral" role="status" aria-live="polite">
+            {props.exportMessage}
           </div>
-        </div>
-      </section>
+        ) : null}
 
-      {props.exportMessage ? (
-        <div className="inline-note inline-note--neutral" role="status" aria-live="polite">
-          {props.exportMessage}
-        </div>
-      ) : null}
-
-      {detailView === 'transcript' ? (
-        <>
-          <section className="detail-search">
-            <TextInput
-              value={detailQuery}
-              onChange={(event) => setDetailQuery(event.target.value)}
-              placeholder="Search within this transcript"
-              ariaLabel="Search within this transcript"
-              className="field-input--full detail-search__input"
-            />
-            <div className="detail-search__count">
-              {filteredBlocks.length} of {selectedTranscript.blocks.length} lines
-            </div>
-          </section>
-
-          <section className="transcript-canvas transcript-canvas--history">
-            <div className="transcript-stack">
+        {detailView === 'transcript' ? (
+          <section className="archive-detail__transcript">
+            <div className="archive-detail__transcript-stack">
               {filteredBlocks.map((block) => (
-                <article key={block.id} className="transcript-entry">
-                  <div className="transcript-entry__time">{formatClockTime(block.startedAt)}</div>
-                  <div className="transcript-entry__body">
-                    <div className="transcript-entry__meta">
-                      <span>{describeCaptureSource(block.source)}</span>
-                      {block.speakerLabel ? <span>{block.speakerLabel}</span> : null}
+                <article key={block.id} className="archive-transcript-entry">
+                  <div className="archive-transcript-entry__time">
+                    {formatRelativeTimestamp(block.startedAt, selectedTranscript.startedAt)}
+                  </div>
+                  <div className="archive-transcript-entry__body">
+                    <div className="archive-transcript-entry__primary">
+                      {block.speakerLabel ? (
+                        <strong className="archive-transcript-entry__speaker">{block.speakerLabel}：</strong>
+                      ) : null}
+                      {block.text}
                     </div>
-                    <div className="transcript-entry__primary">{block.text}</div>
                     {block.translatedText ? (
-                      <div className="transcript-entry__secondary">{block.translatedText}</div>
+                      <div className="archive-transcript-entry__secondary">{block.translatedText}</div>
                     ) : null}
                   </div>
                 </article>
@@ -617,162 +604,148 @@ export function HistoryPage(props: {
               ) : null}
             </div>
           </section>
-        </>
-      ) : (
-        <section className="notes-canvas">
-          {notesState?.status === 'idle' ? (
-            <div className="notes-state">
-              <div className="notes-state__eyebrow">Not generated yet</div>
-              <div className="notes-state__title">No notes yet for this transcript.</div>
-              <p className="notes-state__body">
-                Generate one readable notes view that merges summary, decisions, and follow-up items while leaving the source transcript untouched.
-              </p>
-              <div className="notes-state__actions">
-                <Button
-                  label="Generate notes"
-                  variant="primary"
-                  size="small"
-                  disabled={Boolean(props.busyAction)}
-                  onClick={() => props.onGenerateNotes(selectedTranscript.id)}
-                />
-              </div>
-            </div>
-          ) : null}
-
-          {notesState?.status === 'loading' || notesState?.status === 'generating' ? (
-            <div className="notes-state">
-              <div className="notes-state__eyebrow">
-                {notesState.status === 'loading' ? 'Loading' : 'Generating'}
-              </div>
-              <div className="notes-state__title">
-                {notesState.status === 'loading' ? 'Loading saved notes for this transcript.' : 'Building notes from the transcript.'}
-              </div>
-              <p className="notes-state__body">
-                {notesState.status === 'loading'
-                  ? 'If a notes snapshot already exists, it will appear here without changing the underlying transcript.'
-                  : 'The transcript stays available in the other tab while JustSay condenses the conversation into a lighter derived view.'}
-              </p>
-              <div className="notes-dots" aria-hidden="true">
-                <span />
-                <span />
-                <span />
-              </div>
-            </div>
-          ) : null}
-
-          {notesState?.status === 'failed' ? (
-            <div className="notes-state">
-              <div className="notes-state__eyebrow">Generation failed</div>
-              <div className="notes-state__title">Notes could not be generated this time.</div>
-              <p className="notes-state__body">
-                {notesState.message}
-              </p>
-              <div className="notes-state__actions">
-                <Button
-                  label="Try again"
-                  variant="primary"
-                  size="small"
-                  disabled={Boolean(props.busyAction)}
-                  onClick={() => props.onGenerateNotes(selectedTranscript.id, { force: true })}
-                />
-                <Button
-                  label="Back to transcript"
-                  variant="ghost"
-                  size="small"
-                  onClick={() => setDetailView('transcript')}
-                />
-              </div>
-            </div>
-          ) : null}
-
-          {notesState?.status === 'ready' ? (
-            <div className="notes-stack">
-              <div className="notes-state__eyebrow">
-                Generated {formatRelativeTime(notesState.notes.generatedAt)} · {notesState.notes.model}
-              </div>
-              <section className="notes-card">
-                <div className="notes-card__eyebrow">Overview</div>
-                <div className="notes-overview">
-                  {formatNotesOverview(notesState.notes.overview).map((paragraph, index) => (
-                    <p key={`${paragraph}-${index}`}>{paragraph}</p>
-                  ))}
+        ) : (
+          <section className="notes-canvas">
+            {notesState?.status === 'idle' ? (
+              <div className="notes-state">
+                <div className="notes-state__eyebrow">Not generated yet</div>
+                <div className="notes-state__title">No notes yet for this transcript.</div>
+                <p className="notes-state__body">
+                  Generate one readable notes view that merges summary, decisions, and follow-up items while leaving the source transcript untouched.
+                </p>
+                <div className="notes-state__actions">
+                  <Button
+                    label="Generate notes"
+                    variant="primary"
+                    size="small"
+                    disabled={Boolean(props.busyAction)}
+                    onClick={() => props.onGenerateNotes(selectedTranscript.id)}
+                  />
                 </div>
-              </section>
-              <section className="notes-card">
-                <div className="notes-card__eyebrow">Decisions</div>
-                <ul className="notes-list">
-                  {notesState.notes.decisions.map((decision, index) => (
-                    <li key={`${decision.summary}-${index}`}>
-                      <div>{decision.summary}</div>
-                      {decision.sourceRefs.length > 0 ? (
-                        <div className="notes-list__meta">{formatNotesSourceRefs(decision.sourceRefs)}</div>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-              </section>
-              <section className="notes-card">
-                <div className="notes-card__eyebrow">Action Items</div>
-                <ul className="notes-list">
-                  {notesState.notes.actionItems.map((action, index) => (
-                    <li key={`${action.task}-${index}`}>
-                      <div>{action.task}</div>
-                      <div className="notes-list__meta">
-                        {buildActionItemMeta(action.owner, action.due, action.sourceRefs)}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-              {notesState.notes.openQuestions.length > 0 ? (
+              </div>
+            ) : null}
+
+            {notesState?.status === 'loading' || notesState?.status === 'generating' ? (
+              <div className="notes-state">
+                <div className="notes-state__eyebrow">
+                  {notesState.status === 'loading' ? 'Loading' : 'Generating'}
+                </div>
+                <div className="notes-state__title">
+                  {notesState.status === 'loading' ? 'Loading saved notes for this transcript.' : 'Building notes from the transcript.'}
+                </div>
+                <p className="notes-state__body">
+                  {notesState.status === 'loading'
+                    ? 'If a notes snapshot already exists, it will appear here without changing the underlying transcript.'
+                    : 'The transcript stays available in the other tab while JustSay condenses the conversation into a lighter derived view.'}
+                </p>
+                <div className="notes-dots" aria-hidden="true">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+              </div>
+            ) : null}
+
+            {notesState?.status === 'failed' ? (
+              <div className="notes-state">
+                <div className="notes-state__eyebrow">Generation failed</div>
+                <div className="notes-state__title">Notes could not be generated this time.</div>
+                <p className="notes-state__body">
+                  {notesState.message}
+                </p>
+                <div className="notes-state__actions">
+                  <Button
+                    label="Try again"
+                    variant="primary"
+                    size="small"
+                    disabled={Boolean(props.busyAction)}
+                    onClick={() => props.onGenerateNotes(selectedTranscript.id, { force: true })}
+                  />
+                  <Button
+                    label="Back to transcript"
+                    variant="ghost"
+                    size="small"
+                    onClick={() => setDetailView('transcript')}
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            {notesState?.status === 'ready' ? (
+              <div className="notes-stack">
+                <div className="notes-state__eyebrow">
+                  Generated {formatRelativeTime(notesState.notes.generatedAt)} · {notesState.notes.model}
+                </div>
                 <section className="notes-card">
-                  <div className="notes-card__eyebrow">Open Questions</div>
+                  <div className="notes-card__eyebrow">Overview</div>
+                  <div className="notes-overview">
+                    {formatNotesOverview(notesState.notes.overview).map((paragraph, index) => (
+                      <p key={`${paragraph}-${index}`}>{paragraph}</p>
+                    ))}
+                  </div>
+                </section>
+                <section className="notes-card">
+                  <div className="notes-card__eyebrow">Decisions</div>
                   <ul className="notes-list">
-                    {notesState.notes.openQuestions.map((question, index) => (
-                      <li key={`${question.question}-${index}`}>
-                        <div>{question.question}</div>
-                        {question.sourceRefs.length > 0 ? (
-                          <div className="notes-list__meta">{formatNotesSourceRefs(question.sourceRefs)}</div>
+                    {notesState.notes.decisions.map((decision, index) => (
+                      <li key={`${decision.summary}-${index}`}>
+                        <div>{decision.summary}</div>
+                        {decision.sourceRefs.length > 0 ? (
+                          <div className="notes-list__meta">{formatNotesSourceRefs(decision.sourceRefs)}</div>
                         ) : null}
                       </li>
                     ))}
                   </ul>
                 </section>
-              ) : null}
-            </div>
-          ) : null}
-        </section>
-      )}
+                <section className="notes-card">
+                  <div className="notes-card__eyebrow">Action Items</div>
+                  <ul className="notes-list">
+                    {notesState.notes.actionItems.map((action, index) => (
+                      <li key={`${action.task}-${index}`}>
+                        <div>{action.task}</div>
+                        <div className="notes-list__meta">
+                          {buildActionItemMeta(action.owner, action.due, action.sourceRefs)}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+                {notesState.notes.openQuestions.length > 0 ? (
+                  <section className="notes-card">
+                    <div className="notes-card__eyebrow">Open Questions</div>
+                    <ul className="notes-list">
+                      {notesState.notes.openQuestions.map((question, index) => (
+                        <li key={`${question.question}-${index}`}>
+                          <div>{question.question}</div>
+                          {question.sourceRefs.length > 0 ? (
+                            <div className="notes-list__meta">{formatNotesSourceRefs(question.sourceRefs)}</div>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ) : null}
+              </div>
+            ) : null}
+          </section>
+        )}
+
+        {selectedTranscript.mode === 'meeting' && selectedTranscript.metadata.audio && props.selectedAudio ? (
+          <div className="archive-audio-bar">
+            <audio
+              className="archive-audio-bar__player"
+              controls
+              preload="metadata"
+              src={props.selectedAudio.url}
+            />
+          </div>
+        ) : null}
       </div>
       {deleteDialog}
     </>
   )
 }
 
-function FilterGroup(props: {
-  label: string
-  options: Array<{ value: string; label: string }>
-  selected: string
-  onSelect: (value: string) => void
-}) {
-  return (
-    <div className="filter-group" aria-label={props.label}>
-      <span className="filter-group__label">{props.label}</span>
-      <div className="filter-group__chips">
-        {props.options.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            className={`filter-chip ${props.selected === option.value ? 'filter-chip--active' : ''}`}
-            onClick={() => props.onSelect(option.value)}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-}
 
 export function getArchivePreview(transcript: SavedTranscript, query: string): ArchivePreview {
   const normalizedQuery = normalizeWhitespace(query).toLowerCase()
@@ -823,10 +796,6 @@ export function getHistoryDetailActionGroups(): HistoryDetailActionGroup[] {
   ]
 }
 
-function describeTranscriptSources(transcript: SavedTranscript): string {
-  const sources = [...new Set(transcript.blocks.map((block) => describeCaptureSource(block.source)))]
-  return sources.length === 0 ? 'Unknown source' : sources.join(' + ')
-}
 
 function formatArchiveTime(timestamp: number): string {
   return new Date(timestamp).toLocaleString([], {
@@ -835,6 +804,24 @@ function formatArchiveTime(timestamp: number): string {
     hour: '2-digit',
     minute: '2-digit'
   })
+}
+
+function formatArchiveDate(timestamp: number): string {
+  return new Date(timestamp).toLocaleString([], {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+function formatRelativeTimestamp(blockTimestamp: number, sessionStart: number): string {
+  const elapsed = Math.max(0, Math.floor((blockTimestamp - sessionStart) / 1000))
+  const hours = Math.floor(elapsed / 3600)
+  const minutes = Math.floor((elapsed % 3600) / 60)
+  const seconds = elapsed % 60
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
 function formatClockTime(timestamp: number): string {
@@ -858,10 +845,6 @@ function formatDurationMs(durationMs: number): string {
   return `${minutes}m ${seconds}s`
 }
 
-function formatAudioSpec(sampleRate: number, channels: number): string {
-  const channelLabel = channels === 1 ? 'Mono' : `${channels}ch`
-  return `${sampleRate / 1000} kHz · ${channelLabel}`
-}
 
 function formatRelativeTime(timestamp: number): string {
   const deltaSec = Math.max(0, Math.floor((Date.now() - timestamp) / 1000))
@@ -1114,4 +1097,30 @@ function runHistoryDetailAction(
 
 function assertNever(value: never): never {
   throw new Error(`Unhandled history detail action: ${String(value)}`)
+}
+
+function buildPageNumbers(current: number, total: number): (number | '...')[] {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1)
+  }
+
+  const pages: (number | '...')[] = [1]
+
+  if (current > 3) {
+    pages.push('...')
+  }
+
+  const start = Math.max(2, current - 1)
+  const end = Math.min(total - 1, current + 1)
+
+  for (let i = start; i <= end; i++) {
+    pages.push(i)
+  }
+
+  if (current < total - 2) {
+    pages.push('...')
+  }
+
+  pages.push(total)
+  return pages
 }

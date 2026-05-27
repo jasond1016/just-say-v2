@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 
 import type {
   AppSettings,
@@ -12,7 +12,7 @@ import type {
   ThemeSetting,
   TranslationProvider
 } from '../../shared/api-types'
-import { Button, SelectField, TextInput } from '../ui/controls'
+import { Button } from '../ui/controls'
 import {
   describeLocalServiceStatus,
   describeOutputMethod,
@@ -21,7 +21,7 @@ import {
   describePttHotkey
 } from '../ui/copy'
 
-type SettingsSectionId = 'workspace' | 'dictation' | 'meetings' | 'translation' | 'recognition' | 'advanced'
+type SettingsSectionId = 'general' | 'recording' | 'recognition' | 'shortcuts' | 'advanced'
 export type TranslationTargetOption = 'zh' | 'en' | 'ja'
 
 export const TRANSLATION_TARGET_OPTIONS: Array<{ value: TranslationTargetOption; label: string }> = [
@@ -34,12 +34,6 @@ type TextSettingsDraft = {
   host: string
   port: string
 }
-
-type SettingsHeaderState =
-  | { tone: 'saved'; label: string }
-  | { tone: 'warning'; label: string }
-  | { tone: 'danger'; label: string }
-  | null
 
 export function SettingsPage(props: {
   settings: AppSettings
@@ -71,8 +65,7 @@ export function SettingsPage(props: {
   onRemoteServicePortChange: (port: number | undefined) => void
   onExportDiagnostics: () => void
 }) {
-  const sectionId = useId()
-  const [selectedSection, setSelectedSection] = useState<SettingsSectionId>('workspace')
+  const [selectedSection, setSelectedSection] = useState<SettingsSectionId>('general')
   const [draftManagedHost, setDraftManagedHost] = useState(props.settings.advanced.localServiceHost ?? '')
   const [draftManagedPort, setDraftManagedPort] = useState(
     props.settings.advanced.localServicePort?.toString() ?? ''
@@ -84,9 +77,6 @@ export function SettingsPage(props: {
   const [draftTranslationEndpoint, setDraftTranslationEndpoint] = useState(props.settings.translation.endpoint ?? '')
   const [draftTranslationModel, setDraftTranslationModel] = useState(props.settings.translation.model ?? '')
   const [draftTranslationApiKey, setDraftTranslationApiKey] = useState('')
-  const [showSavedState, setShowSavedState] = useState(false)
-  const previousSettingsSignature = useRef<string | null>(null)
-  const isCheckingProfile = props.busyAction?.startsWith('profile-test:') ?? false
   const disabled = Boolean(props.busyAction)
   const translationEnabled = props.settings.translation.enabledForPtt || props.settings.translation.enabledForMeeting
   const translationApiKeyConfigured = Boolean(props.settings.translation.apiKeyConfigured)
@@ -95,8 +85,6 @@ export function SettingsPage(props: {
   const remotePortValue = draftRemotePort.trim()
   const invalidManagedPort = managedPortValue.length > 0 && !/^\d+$/.test(managedPortValue)
   const invalidRemotePort = remotePortValue.length > 0 && !/^\d+$/.test(remotePortValue)
-  const invalidPort = localServiceMode === 'managed-local' ? invalidManagedPort : invalidRemotePort
-  const selectedProfile = props.profiles.find((profile) => profile.id === props.settings.speech.selectedProfileId) ?? null
   const selectedTranslationTarget = getTranslationTargetSelectValue(props.settings.translation.targetLanguage)
   const translationDraftDirty = hasTranslationDraftChanges(props.settings.translation, {
     endpoint: draftTranslationEndpoint,
@@ -143,62 +131,6 @@ export function SettingsPage(props: {
     setDraftTranslationEndpoint(props.settings.translation.endpoint ?? '')
     setDraftTranslationModel(props.settings.translation.model ?? '')
   }, [props.settings.translation.endpoint, props.settings.translation.model])
-
-  useEffect(() => {
-    const signature = JSON.stringify(props.settings)
-    if (previousSettingsSignature.current === null) {
-      previousSettingsSignature.current = signature
-      return
-    }
-
-    if (previousSettingsSignature.current !== signature) {
-      previousSettingsSignature.current = signature
-      setShowSavedState(true)
-      const timeoutId = window.setTimeout(() => setShowSavedState(false), 2200)
-      return () => window.clearTimeout(timeoutId)
-    }
-
-    return
-  }, [props.settings])
-
-  const headerState = useMemo<SettingsHeaderState>(() => {
-    if (selectedSection === 'recognition' && isCheckingProfile) {
-      return { tone: 'warning', label: 'Checking profile' }
-    }
-
-    if (selectedSection === 'advanced' && invalidPort) {
-      return { tone: 'danger', label: 'Invalid input' }
-    }
-
-    if (
-      selectedSection === 'advanced' &&
-      props.localServiceStatus !== 'healthy' &&
-      props.localServiceStatus !== 'starting'
-    ) {
-      return { tone: 'warning', label: 'Service degraded' }
-    }
-
-    if (
-      (selectedSection === 'translation' && translationDraftDirty) ||
-      (selectedSection === 'advanced' && activeConnectionDraftDirty)
-    ) {
-      return { tone: 'warning', label: 'Unsaved changes' }
-    }
-
-    if (showSavedState) {
-      return { tone: 'saved', label: 'Saved just now' }
-    }
-
-    return null
-  }, [
-    activeConnectionDraftDirty,
-    invalidPort,
-    isCheckingProfile,
-    props.localServiceStatus,
-    selectedSection,
-    showSavedState,
-    translationDraftDirty
-  ])
 
   const discardTranslationDrafts = () => {
     setDraftTranslationEndpoint(props.settings.translation.endpoint ?? '')
@@ -269,510 +201,490 @@ export function SettingsPage(props: {
     }
   }
 
-  const selectedSectionMeta = describeSettingsSection(selectedSection)
-
   return (
     <div className="page page--settings">
-      <div className="settings-layout">
-        <aside className="settings-directory" aria-labelledby={`${sectionId}-directory`}>
-          <div id={`${sectionId}-directory`} className="settings-directory__eyebrow">Sections</div>
+      <div className="settings-page">
+        <h1 className="settings-page__title">Settings</h1>
+
+        <div className="settings-tabs" role="tablist">
           {SETTINGS_SECTIONS.map((section) => (
             <button
               key={section.id}
               type="button"
-              className={`settings-directory__link ${selectedSection === section.id ? 'settings-directory__link--active' : ''} ${section.id === 'advanced' ? 'settings-directory__link--advanced' : ''}`}
+              role="tab"
+              aria-selected={selectedSection === section.id}
+              className={`settings-tabs__tab ${selectedSection === section.id ? 'settings-tabs__tab--active' : ''}`}
               onClick={() => setSelectedSection(section.id)}
             >
-              <span className="settings-directory__dot" aria-hidden="true" />
-              <span>{section.label}</span>
+              {section.label}
             </button>
           ))}
-        </aside>
+        </div>
 
-        <section className="settings-content" aria-labelledby={`${sectionId}-title`}>
-          <header className="surface-header surface-header--settings">
-            <div className="surface-header__eyebrow">Settings</div>
-            <div className="surface-header__row">
-              <div className="surface-header__headline-group">
-                <h1 id={`${sectionId}-title`} className="surface-header__title">{selectedSectionMeta.title}</h1>
+        <div className="settings-panel">
+          {selectedSection === 'general' ? (
+            <div className="settings-grid">
+              {/* 应用设置 */}
+              <div className="settings-card">
+                <h2 className="settings-card__title">应用设置</h2>
+                <div className="settings-card__body">
+                  <CardRow label="开机自动启动">
+                    <ToggleSwitch
+                      checked={props.settings.general.launchAtLogin}
+                      disabled={disabled}
+                      onClick={() => {/* launchAtLogin toggle - needs backend wiring */}}
+                    />
+                  </CardRow>
+                  <CardRow label="最小化到系统托盘">
+                    <ToggleSwitch
+                      checked={props.settings.general.minimizeToTray}
+                      disabled={disabled}
+                      onClick={() => props.onMinimizeToTrayChange(!props.settings.general.minimizeToTray)}
+                    />
+                  </CardRow>
+                  <CardRow label="启动后显示">
+                    <select className="settings-select" disabled={disabled}>
+                      <option value="speak">Speak 页面</option>
+                      <option value="session">Session 页面</option>
+                    </select>
+                  </CardRow>
+                </div>
               </div>
-              <div className="surface-header__meta">
-                {headerState ? (
-                  <span className={`status-pill status-pill--${headerState.tone}`}>{headerState.label}</span>
-                ) : null}
+
+              {/* 主题外观 */}
+              <div className="settings-card">
+                <h2 className="settings-card__title">主题外观</h2>
+                <div className="settings-card__body">
+                  <CardRow label="主题模式">
+                    <select
+                      className="settings-select"
+                      value={props.settings.general.theme}
+                      disabled={disabled}
+                      onChange={(e) => props.onThemeChange(e.target.value as ThemeSetting)}
+                    >
+                      <option value="system">跟随系统</option>
+                      <option value="light">浅色模式</option>
+                      <option value="dark">深色模式</option>
+                    </select>
+                  </CardRow>
+                  <CardRow label="字体大小">
+                    <select className="settings-select" value="medium" disabled={disabled} onChange={() => {}}>
+                      <option value="small">小</option>
+                      <option value="medium">中（推荐）</option>
+                      <option value="large">大</option>
+                    </select>
+                  </CardRow>
+                  <CardRow label="界面语言">
+                    <select
+                      className="settings-select"
+                      value={props.settings.general.language}
+                      disabled={disabled}
+                      onChange={(e) => props.onGeneralLanguageChange(e.target.value as AppSettings['general']['language'])}
+                    >
+                      <option value="zh-CN">跟随系统</option>
+                      <option value="en-US">English</option>
+                    </select>
+                  </CardRow>
+                </div>
+              </div>
+
+              {/* 数据与存储 */}
+              <div className="settings-card">
+                <h2 className="settings-card__title">数据与存储</h2>
+                <div className="settings-card__body">
+                  <div className="settings-card__field-label">本地存储位置</div>
+                  <div className="settings-card__path-row">
+                    <input
+                      type="text"
+                      className="settings-path-input"
+                      value="D:\\JustSay\\Transcripts"
+                      readOnly
+                      disabled={disabled}
+                    />
+                    <button type="button" className="settings-path-btn" disabled={disabled} aria-label="选择文件夹">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                      </svg>
+                    </button>
+                  </div>
+                  <CardRow label="自动清理">
+                    <select className="settings-select" disabled={disabled}>
+                      <option value="never">从不</option>
+                      <option value="30d">30天前</option>
+                      <option value="90d">90天前</option>
+                    </select>
+                  </CardRow>
+                </div>
+              </div>
+
+              {/* 关于 JustSay */}
+              <div className="settings-card">
+                <h2 className="settings-card__title">关于 JustSay</h2>
+                <div className="settings-card__body">
+                  <CardRow label="版本">
+                    <span className="settings-card__value">v1.2.0</span>
+                  </CardRow>
+                  <CardRow label="检查更新">
+                    <span className="settings-card__value">已是最新版本</span>
+                  </CardRow>
+                  <CardRow label="用户反馈">
+                    <a href="#" className="settings-card__link" onClick={(e) => e.preventDefault()}>发送反馈</a>
+                  </CardRow>
+                </div>
               </div>
             </div>
-          </header>
+          ) : null}
 
-          <div className="settings-sheet">
-            {selectedSection === 'workspace' ? (
-              <SettingsSection>
-                <SettingRow title="App language" hint="The interface language for the desktop app.">
-                  <SelectField
-                    value={props.settings.general.language}
-                    disabled={disabled}
-                    onChange={(event) => props.onGeneralLanguageChange(event.target.value as AppSettings['general']['language'])}
-                    className="field-select--wide"
-                  >
-                    <option value="zh-CN">Chinese (Simplified)</option>
-                    <option value="en-US">English (US)</option>
-                  </SelectField>
-                </SettingRow>
-
-                <SettingRow title="Theme" hint="Usually this should follow the operating system.">
-                  <Segmented>
-                    <Segment
-                      active={props.settings.general.theme === 'system'}
+          {selectedSection === 'recording' ? (
+            <div className="settings-grid">
+              <div className="settings-card settings-card--wide">
+                <h2 className="settings-card__title">录音设置</h2>
+                <div className="settings-card__body">
+                  <CardRow label="语音语言">
+                    <select
+                      className="settings-select"
+                      value={props.settings.speech.language}
                       disabled={disabled}
-                      onClick={() => props.onThemeChange('system')}
+                      onChange={(e) => props.onSpeechLanguageChange(e.target.value as SpeechLanguage)}
                     >
-                      Match system
-                    </Segment>
-                    <Segment
-                      active={props.settings.general.theme === 'light'}
+                      <option value="auto">自动检测</option>
+                      <option value="zh">中文</option>
+                      <option value="en">English</option>
+                      <option value="ja">日本語</option>
+                      <option value="ko">한국어</option>
+                    </select>
+                  </CardRow>
+                  <CardRow label="会议中捕获麦克风">
+                    <ToggleSwitch
+                      checked={props.settings.input.includeMicrophoneInMeeting}
                       disabled={disabled}
-                      onClick={() => props.onThemeChange('light')}
-                    >
-                      Light
-                    </Segment>
-                    <Segment
-                      active={props.settings.general.theme === 'dark'}
-                      disabled={disabled}
-                      onClick={() => props.onThemeChange('dark')}
-                    >
-                      Dark
-                    </Segment>
-                  </Segmented>
-                </SettingRow>
-
-                <SettingRow title="Keep JustSay in the tray" hint="Useful if you want dictation and meetings ready without reopening the app." learnMore>
-                  <ToggleButton
-                    checked={props.settings.general.minimizeToTray}
-                    disabled={disabled}
-                    onClick={() => props.onMinimizeToTrayChange(!props.settings.general.minimizeToTray)}
-                    onLabel="Enabled"
-                    offLabel="Disabled"
-                  />
-                </SettingRow>
-              </SettingsSection>
-            ) : null}
-
-            {selectedSection === 'dictation' ? (
-              <SettingsSection>
-                <SettingRow title="Push-to-talk key" hint="Pick the one least likely to conflict with your normal shortcuts.">
-                  <Segmented>
-                    <Segment
-                      active={props.settings.input.pttHotkey === 'RCtrl'}
-                      disabled={disabled}
-                      onClick={() => props.onPttHotkeyChange('RCtrl')}
-                    >
-                      {describePttHotkey('RCtrl')}
-                    </Segment>
-                    <Segment
-                      active={props.settings.input.pttHotkey === 'RAlt'}
-                      disabled={disabled}
-                      onClick={() => props.onPttHotkeyChange('RAlt')}
-                    >
-                      {describePttHotkey('RAlt')}
-                    </Segment>
-                  </Segmented>
-                </SettingRow>
-
-                <SettingRow title="When dictation finishes" hint="Choose how the final text reaches the active app.">
-                  <SelectField
-                    value={props.settings.output.method}
-                    disabled={disabled}
-                    onChange={(event) => props.onOutputMethodChange(event.target.value as OutputMethod)}
-                    className="field-select--wide"
-                  >
-                    <option value="simulate_input">{describeOutputMethod('simulate_input')}</option>
-                    <option value="clipboard">{describeOutputMethod('clipboard')}</option>
-                    <option value="popup">{describeOutputMethod('popup')}</option>
-                  </SelectField>
-                </SettingRow>
-              </SettingsSection>
-            ) : null}
-
-            {selectedSection === 'meetings' ? (
-              <SettingsSection>
-                <SettingRow title="Speech language" hint="Leave this on auto unless your meetings stay in one language.">
-                  <SelectField
-                    value={props.settings.speech.language}
-                    disabled={disabled}
-                    onChange={(event) => props.onSpeechLanguageChange(event.target.value as SpeechLanguage)}
-                    className="field-select--wide"
-                  >
-                    <option value="auto">Detect automatically</option>
-                    <option value="zh">Chinese</option>
-                    <option value="en">English</option>
-                    <option value="ja">Japanese</option>
-                    <option value="ko">Korean</option>
-                  </SelectField>
-                </SettingRow>
-
-                <SettingRow title="Also capture your microphone" hint="Turn this on when your own voice should join the meeting transcript.">
-                  <ToggleButton
-                    checked={props.settings.input.includeMicrophoneInMeeting}
-                    disabled={disabled}
-                    onClick={() => props.onIncludeMicrophoneChange(!props.settings.input.includeMicrophoneInMeeting)}
-                    onLabel="Included"
-                    offLabel="System audio only"
-                  />
-                </SettingRow>
-              </SettingsSection>
-            ) : null}
-
-            {selectedSection === 'translation' ? (
-              <SettingsSection>
-                <SettingRow title="Quick Dictation" hint="Keep this off unless you regularly dictate in one language and deliver in another.">
-                  <ToggleButton
-                    checked={props.settings.translation.enabledForPtt}
-                    disabled={disabled}
-                    onClick={() => props.onTranslatePttChange(!props.settings.translation.enabledForPtt)}
-                    onLabel="Enabled"
-                    offLabel="Off"
-                  />
-                </SettingRow>
-
-                <SettingRow title="Live Session" hint="Useful for bilingual review after meetings, not just during capture.">
-                  <ToggleButton
-                    checked={props.settings.translation.enabledForMeeting}
-                    disabled={disabled}
-                    onClick={() => props.onTranslateMeetingChange(!props.settings.translation.enabledForMeeting)}
-                    onLabel="Enabled"
-                    offLabel="Off"
-                  />
-                </SettingRow>
-
-                <SettingRow title="Translate to" hint="Choose the output language for translation.">
-                  <SelectField
-                    value={selectedTranslationTarget}
-                    disabled={disabled || !translationEnabled}
-                    onChange={(event) => props.onTranslationTargetLanguageChange(event.target.value as TranslationTargetOption)}
-                    className="field-select--wide"
-                  >
-                    {TRANSLATION_TARGET_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </SelectField>
-                  {!translationEnabled ? (
-                    <div className="field-note">Translation stays off until you enable it for dictation or meetings.</div>
-                  ) : null}
-                </SettingRow>
-
-                <SettingRow title="Provider" hint="Current builds use the OpenAI-compatible translation path.">
-                  <SelectField
-                    value={props.settings.translation.provider}
-                    disabled={disabled}
-                    onChange={(event) => props.onTranslationProviderChange(event.target.value as TranslationProvider)}
-                    className="field-select--wide"
-                  >
-                    <option value="openai-compatible">OpenAI-compatible</option>
-                  </SelectField>
-                </SettingRow>
-
-                <SettingRow title="Endpoint" hint="Use the API base URL for your OpenAI-compatible provider.">
-                  <TextInput
-                    value={draftTranslationEndpoint}
-                    disabled={disabled}
-                    placeholder="https://api.openai.com/v1"
-                    onChange={(event) => setDraftTranslationEndpoint(event.target.value)}
-                    className="field-input--wide"
-                  />
-                </SettingRow>
-
-                <SettingRow title="Model" hint="Leave blank to use the default translation model.">
-                  <TextInput
-                    value={draftTranslationModel}
-                    disabled={disabled}
-                    placeholder="gpt-4o-mini"
-                    onChange={(event) => setDraftTranslationModel(event.target.value)}
-                    className="field-input--wide"
-                  />
-                </SettingRow>
-
-                <SettingRow title="API key" hint="Saved locally with device encryption and never written into settings.json.">
-                  <TextInput
-                    type="password"
-                    value={draftTranslationApiKey}
-                    disabled={disabled}
-                    placeholder={translationApiKeyConfigured ? 'Saved locally. Enter a new key to replace it.' : 'sk-...'}
-                    onChange={(event) => setDraftTranslationApiKey(event.target.value)}
-                    className="field-input--wide"
-                  />
-                  <div className="field-note">
-                    {translationApiKeyConfigured
-                      ? 'Translation credentials are configured.'
-                      : 'No translation API key is saved yet. Meeting translation will fail until you save one.'}
-                  </div>
-                </SettingRow>
-
-                {translationDraftDirty ? (
-                  <DraftActionRow
-                    label="Unsaved translation settings"
-                    description="Endpoint, model, and credentials save together."
-                    disabled={disabled}
-                    onDiscard={discardTranslationDrafts}
-                    onSave={() => { void saveTranslationDrafts() }}
-                    saveLabel="Save translation settings"
-                  />
-                ) : null}
-              </SettingsSection>
-            ) : null}
-
-            {selectedSection === 'recognition' ? (
-              <SettingsSection>
-                <div className="settings-subhead">
-                  <div className="settings-subhead__title">Available profiles</div>
-                  <div className="settings-subhead__body">
-                    Pick the profile you want to compare. Deployment mode stays separate, and the Qwen profile may load its runtime when you check it.
-                  </div>
+                      onClick={() => props.onIncludeMicrophoneChange(!props.settings.input.includeMicrophoneInMeeting)}
+                    />
+                  </CardRow>
                 </div>
+              </div>
 
-                <div className="preset-list">
-                  {props.profiles.map((profile) => {
-                    const isSelected = props.settings.speech.selectedProfileId === profile.id
-                    const testResult = props.profileTests[profile.id]
-                    const checking = props.busyAction === `profile-test:${profile.id}`
+              <div className="settings-card settings-card--wide">
+                <h2 className="settings-card__title">翻译</h2>
+                <div className="settings-card__body">
+                  <CardRow label="PTT 翻译">
+                    <ToggleSwitch
+                      checked={props.settings.translation.enabledForPtt}
+                      disabled={disabled}
+                      onClick={() => props.onTranslatePttChange(!props.settings.translation.enabledForPtt)}
+                    />
+                  </CardRow>
+                  <CardRow label="会议翻译">
+                    <ToggleSwitch
+                      checked={props.settings.translation.enabledForMeeting}
+                      disabled={disabled}
+                      onClick={() => props.onTranslateMeetingChange(!props.settings.translation.enabledForMeeting)}
+                    />
+                  </CardRow>
+                  <CardRow label="翻译目标语言">
+                    <select
+                      className="settings-select"
+                      value={selectedTranslationTarget}
+                      disabled={disabled || !translationEnabled}
+                      onChange={(e) => props.onTranslationTargetLanguageChange(e.target.value as TranslationTargetOption)}
+                    >
+                      {TRANSLATION_TARGET_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </CardRow>
+                  <CardRow label="翻译服务">
+                    <select
+                      className="settings-select"
+                      value={props.settings.translation.provider}
+                      disabled={disabled}
+                      onChange={(e) => props.onTranslationProviderChange(e.target.value as TranslationProvider)}
+                    >
+                      <option value="openai-compatible">OpenAI-compatible</option>
+                    </select>
+                  </CardRow>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
-                    return (
-                      <div key={profile.id} className="preset-card">
-                        <div className="preset-card__row">
-                          <div className="preset-card__copy">
-                            <div className="preset-card__name">
-                              {describeProfileLabel(profile)}
-                              {isSelected ? <span className="preset-card__current">Current</span> : null}
+          {selectedSection === 'recognition' ? (
+            <div className="settings-grid">
+              <div className="settings-card settings-card--full">
+                <h2 className="settings-card__title">识别引擎</h2>
+                <div className="settings-card__body">
+                  <div className="preset-list">
+                    {props.profiles.map((profile) => {
+                      const isSelected = props.settings.speech.selectedProfileId === profile.id
+                      const testResult = props.profileTests[profile.id]
+                      const checking = props.busyAction === `profile-test:${profile.id}`
+
+                      return (
+                        <div key={profile.id} className="preset-card">
+                          <div className="preset-card__row">
+                            <div className="preset-card__copy">
+                              <div className="preset-card__name">
+                                {describeProfileLabel(profile)}
+                                {isSelected ? <span className="preset-card__current">当前</span> : null}
+                              </div>
+                              <div className="preset-card__summary">{describeProfileSummary(profile)}</div>
                             </div>
-                            <div className="preset-card__summary">{describeProfileSummary(profile)}</div>
+                            <div className="preset-card__actions">
+                              <Button
+                                label={isSelected ? '当前' : '使用'}
+                                disabled={disabled || isSelected}
+                                size="small"
+                                variant={isSelected ? 'secondary' : 'primary'}
+                                onClick={() => props.onSelectProfile(profile.id)}
+                              />
+                              <Button
+                                label={checking ? '检测中...' : '检测'}
+                                disabled={disabled}
+                                size="small"
+                                variant="secondary"
+                                onClick={() => props.onTestProfile(profile.id)}
+                              />
+                            </div>
                           </div>
-                          <div className="preset-card__actions">
-                            <Button
-                              label={isSelected ? 'Current' : 'Use'}
-                              disabled={disabled || isSelected}
-                              size="small"
-                              variant={isSelected ? 'secondary' : 'primary'}
-                              onClick={() => props.onSelectProfile(profile.id)}
-                            />
-                            <Button
-                              label={checking ? 'Checking...' : profile.runtimeFamilyId === 'qwen3-asr' ? 'Check / Load' : 'Check'}
-                              disabled={disabled}
-                              size="small"
-                              variant="secondary"
-                              onClick={() => props.onTestProfile(profile.id)}
-                            />
-                          </div>
+                          {testResult ? (
+                            <div className={`result-line ${testResult.ok ? '' : 'result-line--danger'}`}>
+                              {describeProfileTestResult(testResult)}
+                            </div>
+                          ) : null}
                         </div>
-                        {testResult ? (
-                          <div className={`result-line ${testResult.ok ? '' : 'result-line--danger'}`}>
-                            {describeProfileTestResult(testResult)}
-                          </div>
-                        ) : null}
-                      </div>
-                    )
-                  })}
-                </div>
-              </SettingsSection>
-            ) : null}
-
-            {selectedSection === 'advanced' ? (
-              <SettingsSection>
-                <div className="advanced-summary">
-                  <div className="advanced-summary__title">
-                    {localServiceMode === 'remote-service' ? 'Remote speech service' : 'Managed local speech service'}
+                      )
+                    })}
                   </div>
-                  <div className="advanced-summary__meta">
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {selectedSection === 'shortcuts' ? (
+            <div className="settings-grid">
+              <div className="settings-card settings-card--wide">
+                <h2 className="settings-card__title">快捷键设置</h2>
+                <div className="settings-card__body">
+                  <CardRow label="PTT 按键">
+                    <Segmented>
+                      <Segment
+                        active={props.settings.input.pttHotkey === 'RCtrl'}
+                        disabled={disabled}
+                        onClick={() => props.onPttHotkeyChange('RCtrl')}
+                      >
+                        {describePttHotkey('RCtrl')}
+                      </Segment>
+                      <Segment
+                        active={props.settings.input.pttHotkey === 'RAlt'}
+                        disabled={disabled}
+                        onClick={() => props.onPttHotkeyChange('RAlt')}
+                      >
+                        {describePttHotkey('RAlt')}
+                      </Segment>
+                    </Segmented>
+                  </CardRow>
+                  <CardRow label="输出方式">
+                    <select
+                      className="settings-select"
+                      value={props.settings.output.method}
+                      disabled={disabled}
+                      onChange={(e) => props.onOutputMethodChange(e.target.value as OutputMethod)}
+                    >
+                      <option value="simulate_input">{describeOutputMethod('simulate_input')}</option>
+                      <option value="clipboard">{describeOutputMethod('clipboard')}</option>
+                      <option value="popup">{describeOutputMethod('popup')}</option>
+                    </select>
+                  </CardRow>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {selectedSection === 'advanced' ? (
+            <div className="settings-grid">
+              <div className="settings-card settings-card--wide">
+                <h2 className="settings-card__title">语音服务</h2>
+                <div className="settings-card__body">
+                  <div className="settings-card__status">
                     {describeLocalServiceStatus(props.localServiceStatus)}
                   </div>
-                </div>
+                  <CardRow label="部署模式">
+                    <select
+                      className="settings-select"
+                      value={localServiceMode}
+                      disabled={disabled}
+                      onChange={(e) => props.onLocalServiceModeChange(e.target.value as LocalServiceMode)}
+                    >
+                      <option value="managed-local">本地托管</option>
+                      <option value="remote-service">远程服务</option>
+                    </select>
+                  </CardRow>
 
-                <SettingRow
-                  title="Deployment mode"
-                  hint="Choose whether JustSay should launch the built-in SenseVoice service on this machine or connect to another host over the LAN or localhost, such as a WSL/Docker Qwen host."
-                >
-                  <SelectField
-                    value={localServiceMode}
-                    disabled={disabled}
-                    onChange={(event) => props.onLocalServiceModeChange(event.target.value as LocalServiceMode)}
-                    className="field-select--wide"
-                  >
-                    <option value="managed-local">Managed locally</option>
-                    <option value="remote-service">Remote service</option>
-                  </SelectField>
-                  {selectedProfile?.runtimeFamilyId === 'qwen3-asr' && localServiceMode === 'managed-local' ? (
-                    <div className="field-note">
-                      Local Accurate no longer uses the app-managed Windows sidecar. On Windows, switch to Remote service and point it at your WSL/Docker vLLM host.
+                  {localServiceMode === 'managed-local' ? (
+                    <>
+                      <CardRow label="本地绑定地址">
+                        <input
+                          type="text"
+                          className="settings-text-input"
+                          value={draftManagedHost}
+                          disabled={disabled}
+                          placeholder="127.0.0.1"
+                          onChange={(e) => setDraftManagedHost(e.target.value)}
+                        />
+                      </CardRow>
+                      <CardRow label="本地绑定端口">
+                        <input
+                          type="text"
+                          className={`settings-text-input ${invalidManagedPort ? 'settings-text-input--invalid' : ''}`}
+                          value={draftManagedPort}
+                          disabled={disabled}
+                          placeholder="8765"
+                          inputMode="numeric"
+                          onChange={(e) => setDraftManagedPort(e.target.value)}
+                        />
+                      </CardRow>
+                      {managedConnectionDraftDirty ? (
+                        <div className="settings-card__actions-row">
+                          <Button label="放弃" size="small" variant="ghost" disabled={disabled} onClick={discardManagedConnectionDrafts} />
+                          <Button label="保存" size="small" disabled={disabled || invalidManagedPort} onClick={saveManagedConnectionDrafts} />
+                        </div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      <CardRow label="远程服务地址">
+                        <input
+                          type="text"
+                          className="settings-text-input"
+                          value={draftRemoteHost}
+                          disabled={disabled}
+                          placeholder="10.0.0.8"
+                          onChange={(e) => setDraftRemoteHost(e.target.value)}
+                        />
+                      </CardRow>
+                      <CardRow label="远程服务端口">
+                        <input
+                          type="text"
+                          className={`settings-text-input ${invalidRemotePort ? 'settings-text-input--invalid' : ''}`}
+                          value={draftRemotePort}
+                          disabled={disabled}
+                          placeholder="8765"
+                          inputMode="numeric"
+                          onChange={(e) => setDraftRemotePort(e.target.value)}
+                        />
+                      </CardRow>
+                      {remoteConnectionDraftDirty ? (
+                        <div className="settings-card__actions-row">
+                          <Button label="放弃" size="small" variant="ghost" disabled={disabled} onClick={discardRemoteConnectionDrafts} />
+                          <Button label="保存" size="small" disabled={disabled || invalidRemotePort} onClick={saveRemoteConnectionDrafts} />
+                        </div>
+                      ) : null}
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="settings-card settings-card--wide">
+                <h2 className="settings-card__title">翻译服务配置</h2>
+                <div className="settings-card__body">
+                  <CardRow label="Endpoint">
+                    <input
+                      type="text"
+                      className="settings-text-input"
+                      value={draftTranslationEndpoint}
+                      disabled={disabled}
+                      placeholder="https://api.openai.com/v1"
+                      onChange={(e) => setDraftTranslationEndpoint(e.target.value)}
+                    />
+                  </CardRow>
+                  <CardRow label="Model">
+                    <input
+                      type="text"
+                      className="settings-text-input"
+                      value={draftTranslationModel}
+                      disabled={disabled}
+                      placeholder="gpt-4o-mini"
+                      onChange={(e) => setDraftTranslationModel(e.target.value)}
+                    />
+                  </CardRow>
+                  <CardRow label="API Key">
+                    <input
+                      type="password"
+                      className="settings-text-input"
+                      value={draftTranslationApiKey}
+                      disabled={disabled}
+                      placeholder={translationApiKeyConfigured ? '已保存，输入新值替换' : 'sk-...'}
+                      onChange={(e) => setDraftTranslationApiKey(e.target.value)}
+                    />
+                  </CardRow>
+                  {translationDraftDirty ? (
+                    <div className="settings-card__actions-row">
+                      <Button label="放弃" size="small" variant="ghost" disabled={disabled} onClick={discardTranslationDrafts} />
+                      <Button label="保存翻译设置" size="small" disabled={disabled} onClick={() => { void saveTranslationDrafts() }} />
                     </div>
                   ) : null}
-                </SettingRow>
+                </div>
+              </div>
 
-                {localServiceMode === 'managed-local' ? (
-                  <>
-                    <SettingRow
-                      title="Local bind host"
-                      hint="This is the address the Python service launched by this app listens on. It usually stays on this machine."
-                      learnMore
-                    >
-                      <TextInput
-                        value={draftManagedHost}
-                        disabled={disabled}
-                        placeholder="127.0.0.1"
-                        onChange={(event) => setDraftManagedHost(event.target.value)}
-                        className="field-input--wide"
-                      />
-                    </SettingRow>
-
-                    <SettingRow
-                      title="Local bind port"
-                      hint="A wrong value here can stop the managed Python speech service from starting."
-                      learnMore
-                    >
-                      <TextInput
-                        value={draftManagedPort}
-                        disabled={disabled}
-                        placeholder="8765"
-                        inputMode="numeric"
-                        onChange={(event) => setDraftManagedPort(event.target.value)}
-                        className={`field-input--wide ${invalidManagedPort ? 'field-input--invalid' : ''}`}
-                      />
-                      {invalidManagedPort ? (
-                        <div className="field-note field-note--danger">Port must be numeric. The current value cannot be used.</div>
-                      ) : null}
-                    </SettingRow>
-
-                    {managedConnectionDraftDirty ? (
-                      <DraftActionRow
-                        label="Unsaved connection settings"
-                        description="Host and port save together for the managed service."
-                        disabled={disabled}
-                        saveDisabled={invalidManagedPort}
-                        onDiscard={discardManagedConnectionDrafts}
-                        onSave={saveManagedConnectionDrafts}
-                        saveLabel="Save connection settings"
-                      />
-                    ) : null}
-                  </>
-                ) : (
-                  <>
-                    <SettingRow
-                      title="Remote service host"
-                      hint="Enter the LAN IP or hostname of the other machine running the speech service."
-                      learnMore
-                    >
-                      <TextInput
-                        value={draftRemoteHost}
-                        disabled={disabled}
-                        placeholder="10.0.0.8"
-                        onChange={(event) => setDraftRemoteHost(event.target.value)}
-                        className="field-input--wide"
-                      />
-                    </SettingRow>
-
-                    <SettingRow
-                      title="Remote service port"
-                      hint="This must match the port exposed by the speech service on the other machine."
-                      learnMore
-                    >
-                      <TextInput
-                        value={draftRemotePort}
-                        disabled={disabled}
-                        placeholder="8765"
-                        inputMode="numeric"
-                        onChange={(event) => setDraftRemotePort(event.target.value)}
-                        className={`field-input--wide ${invalidRemotePort ? 'field-input--invalid' : ''}`}
-                      />
-                      {invalidRemotePort ? (
-                        <div className="field-note field-note--danger">Port must be numeric. The current value cannot be used.</div>
-                      ) : null}
-                    </SettingRow>
-
-                    {remoteConnectionDraftDirty ? (
-                      <DraftActionRow
-                        label="Unsaved connection settings"
-                        description="Host and port save together for the remote service."
-                        disabled={disabled}
-                        saveDisabled={invalidRemotePort}
-                        onDiscard={discardRemoteConnectionDrafts}
-                        onSave={saveRemoteConnectionDrafts}
-                        saveLabel="Save connection settings"
-                      />
-                    ) : null}
-                  </>
-                )}
-
-                <SettingRow title="Diagnostics recording" hint="Only meaningful while troubleshooting. Keep it off otherwise.">
-                  <div className="advanced-actions">
-                    <div className="field-chip field-chip--quiet">
-                      {props.settings.advanced.diagnosticsEnabled ? 'Enabled' : 'Disabled'}
-                    </div>
+              <div className="settings-card">
+                <h2 className="settings-card__title">诊断</h2>
+                <div className="settings-card__body">
+                  <CardRow label="诊断记录">
+                    <span className="settings-card__value">
+                      {props.settings.advanced.diagnosticsEnabled ? '已启用' : '已禁用'}
+                    </span>
+                  </CardRow>
+                  <div className="settings-card__actions-row">
                     <Button
-                      label={props.busyAction === 'diagnostics-export' ? 'Exporting...' : 'Export diagnostic bundle'}
+                      label={props.busyAction === 'diagnostics-export' ? '导出中...' : '导出诊断包'}
                       size="small"
                       variant="secondary"
                       disabled={disabled}
                       onClick={props.onExportDiagnostics}
                     />
-                    {props.diagnosticsMessage ? <div className="field-note">{props.diagnosticsMessage}</div> : null}
                   </div>
-                </SettingRow>
-
-                <div className="advanced-warning">
-                  Advanced stays visible so it can be found quickly, but it should feel lower-confidence than the rest of the page. Use managed locally for the built-in SenseVoice sidecar. For Local Accurate on Windows, use Remote service and point it at your WSL/Docker host.
+                  {props.diagnosticsMessage ? <div className="settings-card__note">{props.diagnosticsMessage}</div> : null}
                 </div>
-
-                <div className="settings-section__footer">
-                  <button
-                    type="button"
-                    className="settings-reset"
-                    disabled={disabled}
-                    onClick={() => {
-                      setDraftManagedHost('127.0.0.1')
-                      setDraftManagedPort('8765')
-                      setDraftRemoteHost('')
-                      setDraftRemotePort('8765')
-                      props.onLocalServiceModeChange('managed-local')
-                      props.onLocalServiceHostChange('127.0.0.1')
-                      props.onLocalServicePortChange(8765)
-                      props.onRemoteServiceHostChange('')
-                      props.onRemoteServicePortChange(8765)
-                    }}
-                  >
-                    Reset to defaults
-                  </button>
-                </div>
-              </SettingsSection>
-            ) : null}
-          </div>
-        </section>
+              </div>
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
   )
 }
 
 const SETTINGS_SECTIONS: Array<{ id: SettingsSectionId; label: string }> = [
-  { id: 'workspace', label: 'Workspace' },
-  { id: 'dictation', label: 'Dictation' },
-  { id: 'meetings', label: 'Meetings' },
-  { id: 'translation', label: 'Translation' },
-  { id: 'recognition', label: 'Recognition' },
-  { id: 'advanced', label: 'Advanced' }
+  { id: 'general', label: '通用' },
+  { id: 'recording', label: '录音' },
+  { id: 'recognition', label: '识别' },
+  { id: 'shortcuts', label: '快捷键' },
+  { id: 'advanced', label: '高级' }
 ]
 
-function describeSettingsSection(section: SettingsSectionId) {
-  switch (section) {
-    case 'workspace':
-      return { title: 'Workspace' }
-    case 'dictation':
-      return { title: 'Dictation' }
-    case 'meetings':
-      return { title: 'Meetings' }
-    case 'translation':
-      return { title: 'Translation' }
-    case 'recognition':
-      return { title: 'Recognition' }
-    case 'advanced':
-    default:
-      return { title: 'Advanced' }
-  }
+function CardRow(props: { label: string; children: ReactNode }) {
+  return (
+    <div className="settings-card__row-item">
+      <span className="settings-card__row-label">{props.label}</span>
+      <span className="settings-card__row-control">{props.children}</span>
+    </div>
+  )
+}
+
+function ToggleSwitch(props: { checked: boolean; disabled?: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      className={`toggle-switch ${props.checked ? 'toggle-switch--on' : ''}`}
+      disabled={props.disabled}
+      onClick={props.onClick}
+      aria-pressed={props.checked}
+    >
+      <span className="toggle-switch__track">
+        <span className="toggle-switch__thumb" />
+      </span>
+    </button>
+  )
 }
 
 export function hasTranslationDraftChanges(
@@ -818,59 +730,6 @@ export function getTranslationTargetSelectValue(targetLanguage: string): Transla
   }
 }
 
-function DraftActionRow(props: {
-  label: string
-  description: string
-  disabled?: boolean
-  saveDisabled?: boolean
-  saveLabel: string
-  onDiscard: () => void
-  onSave: () => void
-}) {
-  return (
-    <div className="settings-draft-bar" role="status" aria-live="polite">
-      <div className="settings-draft-bar__copy">
-        <div className="settings-draft-bar__label">{props.label}</div>
-        <div className="settings-draft-bar__description">{props.description}</div>
-      </div>
-      <div className="settings-draft-bar__actions">
-        <Button
-          label="Discard changes"
-          size="small"
-          variant="ghost"
-          disabled={props.disabled}
-          onClick={props.onDiscard}
-        />
-        <Button
-          label={props.saveLabel}
-          size="small"
-          disabled={props.disabled || props.saveDisabled}
-          onClick={props.onSave}
-        />
-      </div>
-    </div>
-  )
-}
-
-function SettingsSection(props: { children: ReactNode }) {
-  return <section className="settings-section">{props.children}</section>
-}
-
-function SettingRow(props: { title: string; hint: string; learnMore?: boolean; children: ReactNode }) {
-  return (
-    <div className="settings-row">
-      <div className="settings-row__label">
-        <div className="settings-row__title">{props.title}</div>
-        <div className="settings-row__hint">
-          {props.hint}
-          {props.learnMore ? <> <span className="settings-help">Learn more</span></> : null}
-        </div>
-      </div>
-      <div className="settings-row__control">{props.children}</div>
-    </div>
-  )
-}
-
 function Segmented(props: { children: ReactNode }) {
   return <div className="segmented">{props.children}</div>
 }
@@ -884,27 +743,6 @@ function Segment(props: { active: boolean; disabled?: boolean; onClick: () => vo
       onClick={props.onClick}
     >
       {props.children}
-    </button>
-  )
-}
-
-function ToggleButton(props: {
-  checked: boolean
-  disabled?: boolean
-  onClick: () => void
-  onLabel: string
-  offLabel: string
-}) {
-  return (
-    <button
-      type="button"
-      className={`toggle-button ${props.checked ? 'toggle-button--on' : 'toggle-button--off'}`}
-      disabled={props.disabled}
-      onClick={props.onClick}
-      aria-pressed={props.checked}
-    >
-      <span className="toggle-button__track" aria-hidden="true" />
-      <span>{props.checked ? props.onLabel : props.offLabel}</span>
     </button>
   )
 }
