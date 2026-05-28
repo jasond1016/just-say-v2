@@ -10,9 +10,9 @@ import {
 describe('translation target dropdown', () => {
   it('only exposes Chinese, English, and Japanese options', () => {
     expect(TRANSLATION_TARGET_OPTIONS).toEqual([
-      { value: 'zh', label: 'Chinese' },
-      { value: 'en', label: 'English' },
-      { value: 'ja', label: 'Japanese' }
+      { value: 'zh', labelKey: 'settingsTranslationTargetZh' },
+      { value: 'en', labelKey: 'settingsTranslationTargetEn' },
+      { value: 'ja', labelKey: 'settingsTranslationTargetJa' }
     ])
   })
 

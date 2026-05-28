@@ -124,46 +124,46 @@ export function describeLocalServiceStatus(status: LocalServiceStatus, t?: Messa
   }
 }
 
-export function describeProfileLabel(profile: EngineProfile): string {
+export function describeProfileLabel(profile: EngineProfile, t?: Messages): string {
   switch (profile.preset) {
     case 'local-fast':
-      return 'Local Fast'
+      return t?.profileLocalFast ?? 'Local Fast'
     case 'local-accurate':
-      return 'Local Accurate'
+      return t?.profileLocalAccurate ?? 'Local Accurate'
     case 'cloud-low-latency':
-      return 'Cloud Low Latency'
+      return t?.profileCloudLowLatency ?? 'Cloud Low Latency'
     case 'cloud-low-cost':
-      return 'Cloud Low Cost'
+      return t?.profileCloudLowCost ?? 'Cloud Low Cost'
     default:
       return profile.label
   }
 }
 
-export function describeProfileSummary(profile: EngineProfile): string {
+export function describeProfileSummary(profile: EngineProfile, t?: Messages): string {
   switch (profile.preset) {
     case 'local-fast':
-      return 'SenseVoice runtime for the quickest local turnaround.'
+      return t?.profileSummaryLocalFast ?? 'SenseVoice runtime for the quickest local turnaround.'
     case 'local-accurate':
-      return 'Qwen 1.7B runtime for higher accuracy. On Windows, use Remote service via WSL/Docker and then run Check / Load.'
+      return t?.profileSummaryLocalAccurate ?? 'Qwen 1.7B runtime for higher accuracy. On Windows, use Remote service via WSL/Docker and then run Check / Load.'
     case 'cloud-low-latency':
-      return 'Fast cloud preset when low delay matters most.'
+      return t?.profileSummaryCloudLowLatency ?? 'Fast cloud preset when low delay matters most.'
     case 'cloud-low-cost':
-      return 'Lower-cost cloud preset for lighter workloads.'
+      return t?.profileSummaryCloudLowCost ?? 'Lower-cost cloud preset for lighter workloads.'
     default:
       return profile.label
   }
 }
 
-export function describeProfileId(profileId: string): string {
+export function describeProfileId(profileId: string, t?: Messages): string {
   switch (profileId) {
     case 'local-fast':
-      return 'Local Fast'
+      return t?.profileLocalFast ?? 'Local Fast'
     case 'local-accurate':
-      return 'Local Accurate'
+      return t?.profileLocalAccurate ?? 'Local Accurate'
     case 'cloud-low-latency':
-      return 'Cloud Low Latency'
+      return t?.profileCloudLowLatency ?? 'Cloud Low Latency'
     case 'cloud-low-cost':
-      return 'Cloud Low Cost'
+      return t?.profileCloudLowCost ?? 'Cloud Low Cost'
     default:
       return profileId
   }

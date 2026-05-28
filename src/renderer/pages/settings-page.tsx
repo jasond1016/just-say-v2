@@ -12,6 +12,7 @@ import type {
   ThemeSetting,
   TranslationProvider
 } from '../../shared/api-types'
+import type { Messages } from '../../i18n'
 import { Button } from '../ui/controls'
 import {
   describeLocalServiceStatus,
@@ -25,10 +26,10 @@ import { useT } from '../i18n-context'
 type SettingsSectionId = 'general' | 'recording' | 'recognition' | 'shortcuts' | 'advanced'
 export type TranslationTargetOption = 'zh' | 'en' | 'ja'
 
-export const TRANSLATION_TARGET_OPTIONS: Array<{ value: TranslationTargetOption; label: string }> = [
-  { value: 'zh', label: 'Chinese' },
-  { value: 'en', label: 'English' },
-  { value: 'ja', label: 'Japanese' }
+export const TRANSLATION_TARGET_OPTIONS: Array<{ value: TranslationTargetOption; labelKey: 'settingsTranslationTargetZh' | 'settingsTranslationTargetEn' | 'settingsTranslationTargetJa' }> = [
+  { value: 'zh', labelKey: 'settingsTranslationTargetZh' },
+  { value: 'en', labelKey: 'settingsTranslationTargetEn' },
+  { value: 'ja', labelKey: 'settingsTranslationTargetJa' }
 ]
 
 type TextSettingsDraft = {
@@ -391,7 +392,7 @@ export function SettingsPage(props: {
                       onChange={(e) => props.onTranslationTargetLanguageChange(e.target.value as TranslationTargetOption)}
                     >
                       {TRANSLATION_TARGET_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
+                        <option key={option.value} value={option.value}>{t[option.labelKey]}</option>
                       ))}
                     </select>
                   </CardRow>
@@ -426,10 +427,10 @@ export function SettingsPage(props: {
                           <div className="preset-card__row">
                             <div className="preset-card__copy">
                               <div className="preset-card__name">
-                                {describeProfileLabel(profile)}
+                                {describeProfileLabel(profile, t)}
                                 {isSelected ? <span className="preset-card__current">{t.settingsEngineCurrent}</span> : null}
                               </div>
-                              <div className="preset-card__summary">{describeProfileSummary(profile)}</div>
+                              <div className="preset-card__summary">{describeProfileSummary(profile, t)}</div>
                             </div>
                             <div className="preset-card__actions">
                               <Button
@@ -450,7 +451,7 @@ export function SettingsPage(props: {
                           </div>
                           {testResult ? (
                             <div className={`result-line ${testResult.ok ? '' : 'result-line--danger'}`}>
-                              {describeProfileTestResult(testResult)}
+                              {describeProfileTestResult(testResult, t)}
                             </div>
                           ) : null}
                         </div>
@@ -492,9 +493,9 @@ export function SettingsPage(props: {
                       disabled={disabled}
                       onChange={(e) => props.onOutputMethodChange(e.target.value as OutputMethod)}
                     >
-                      <option value="simulate_input">{describeOutputMethod('simulate_input')}</option>
-                      <option value="clipboard">{describeOutputMethod('clipboard')}</option>
-                      <option value="popup">{describeOutputMethod('popup')}</option>
+                      <option value="simulate_input">{describeOutputMethod('simulate_input', t)}</option>
+                      <option value="clipboard">{describeOutputMethod('clipboard', t)}</option>
+                      <option value="popup">{describeOutputMethod('popup', t)}</option>
                     </select>
                   </CardRow>
                 </div>
@@ -508,7 +509,7 @@ export function SettingsPage(props: {
                 <h2 className="settings-card__title">{t.settingsAdvancedSpeechTitle}</h2>
                 <div className="settings-card__body">
                   <div className="settings-card__status">
-                    {describeLocalServiceStatus(props.localServiceStatus)}
+                    {describeLocalServiceStatus(props.localServiceStatus, t)}
                   </div>
                   <CardRow label={t.settingsDeployMode}>
                     <select
@@ -589,7 +590,7 @@ export function SettingsPage(props: {
               <div className="settings-card settings-card--wide">
                 <h2 className="settings-card__title">{t.settingsTranslationConfigTitle}</h2>
                 <div className="settings-card__body">
-                  <CardRow label="Endpoint">
+                  <CardRow label={t.settingsTranslationEndpoint}>
                     <input
                       type="text"
                       className="settings-text-input"
@@ -599,7 +600,7 @@ export function SettingsPage(props: {
                       onChange={(e) => setDraftTranslationEndpoint(e.target.value)}
                     />
                   </CardRow>
-                  <CardRow label="Model">
+                  <CardRow label={t.settingsTranslationModel}>
                     <input
                       type="text"
                       className="settings-text-input"
@@ -609,7 +610,7 @@ export function SettingsPage(props: {
                       onChange={(e) => setDraftTranslationModel(e.target.value)}
                     />
                   </CardRow>
-                  <CardRow label="API Key">
+                  <CardRow label={t.settingsTranslationApiKey}>
                     <input
                       type="password"
                       className="settings-text-input"
@@ -749,28 +750,28 @@ function Segment(props: { active: boolean; disabled?: boolean; onClick: () => vo
   )
 }
 
-function describeProfileTestResult(result: ProfileTestResult): string {
+function describeProfileTestResult(result: ProfileTestResult, t: Messages): string {
   if (!result.ok) {
-    return result.error?.message ?? 'Check failed.'
+    return result.error?.message ?? t.profileTestFailed
   }
 
   if (result.runtimeIdentity?.runtimeFamilyId === 'qwen3-asr') {
     if (result.runtimeReadiness === 'warming') {
-      return 'Speech service is warming in background on the host.'
+      return t.profileTestQwenWarming
     }
 
     if (result.runtimeReadiness === 'ready') {
       return result.prewarmTriggered
-        ? 'Speech service ready. Qwen runtime loaded for this profile.'
-        : 'Speech service ready. Qwen runtime is already loaded on the host.'
+        ? t.profileTestQwenReadyLoaded
+        : t.profileTestQwenReady
     }
 
-    return 'Speech service responded, but Qwen still needs prewarm.'
+    return t.profileTestQwenNeedPrewarm
   }
 
   if (result.localService) {
-    return `${describeLocalServiceStatus(result.localService)}.`
+    return `${describeLocalServiceStatus(result.localService, t)}.`
   }
 
-  return 'Profile ready.'
+  return t.profileTestReady
 }

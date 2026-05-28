@@ -102,6 +102,9 @@ export const enUS: Messages = {
   settingsMeetingTranslation: 'Meeting translation',
   settingsTranslationTarget: 'Target language',
   settingsTranslationService: 'Translation service',
+  settingsTranslationTargetZh: 'Chinese',
+  settingsTranslationTargetEn: 'English',
+  settingsTranslationTargetJa: 'Japanese',
   settingsEngineTitle: 'Recognition Engine',
   settingsEngineCurrent: 'Current',
   settingsEngineUse: 'Use',
@@ -119,6 +122,9 @@ export const enUS: Messages = {
   settingsRemoteHost: 'Remote host',
   settingsRemotePort: 'Remote port',
   settingsTranslationConfigTitle: 'Translation Service Config',
+  settingsTranslationEndpoint: 'Endpoint',
+  settingsTranslationModel: 'Model',
+  settingsTranslationApiKey: 'API Key',
   settingsDiagnosticsTitle: 'Diagnostics',
   settingsDiagnosticsLabel: 'Diagnostics logging',
   settingsDiagnosticsEnabled: 'Enabled',
@@ -172,5 +178,21 @@ export const enUS: Messages = {
   archiveTabNotes: 'AI Notes',
 
   // -- Misc --
-  noMatchingLines: 'No lines match that search.'
+  noMatchingLines: 'No lines match that search.',
+
+  // -- Engine profiles --
+  profileLocalFast: 'Local Fast',
+  profileLocalAccurate: 'Local Accurate',
+  profileCloudLowLatency: 'Cloud Low Latency',
+  profileCloudLowCost: 'Cloud Low Cost',
+  profileSummaryLocalFast: 'SenseVoice runtime for the quickest local turnaround.',
+  profileSummaryLocalAccurate: 'Qwen 1.7B runtime for higher accuracy. On Windows, use Remote service via WSL/Docker and then run Check / Load.',
+  profileSummaryCloudLowLatency: 'Fast cloud preset when low delay matters most.',
+  profileSummaryCloudLowCost: 'Lower-cost cloud preset for lighter workloads.',
+  profileTestFailed: 'Check failed.',
+  profileTestQwenWarming: 'Speech service is warming in background on the host.',
+  profileTestQwenReady: 'Speech service ready. Qwen runtime is already loaded on the host.',
+  profileTestQwenReadyLoaded: 'Speech service ready. Qwen runtime loaded for this profile.',
+  profileTestQwenNeedPrewarm: 'Speech service responded, but Qwen still needs prewarm.',
+  profileTestReady: 'Profile ready.'
 }

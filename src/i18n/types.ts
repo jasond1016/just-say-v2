@@ -100,6 +100,9 @@ export type Messages = {
   settingsMeetingTranslation: string
   settingsTranslationTarget: string
   settingsTranslationService: string
+  settingsTranslationTargetZh: string
+  settingsTranslationTargetEn: string
+  settingsTranslationTargetJa: string
   settingsEngineTitle: string
   settingsEngineCurrent: string
   settingsEngineUse: string
@@ -117,6 +120,9 @@ export type Messages = {
   settingsRemoteHost: string
   settingsRemotePort: string
   settingsTranslationConfigTitle: string
+  settingsTranslationEndpoint: string
+  settingsTranslationModel: string
+  settingsTranslationApiKey: string
   settingsDiagnosticsTitle: string
   settingsDiagnosticsLabel: string
   settingsDiagnosticsEnabled: string
@@ -171,6 +177,22 @@ export type Messages = {
 
   // -- Misc --
   noMatchingLines: string
+
+  // -- Engine profiles --
+  profileLocalFast: string
+  profileLocalAccurate: string
+  profileCloudLowLatency: string
+  profileCloudLowCost: string
+  profileSummaryLocalFast: string
+  profileSummaryLocalAccurate: string
+  profileSummaryCloudLowLatency: string
+  profileSummaryCloudLowCost: string
+  profileTestFailed: string
+  profileTestQwenWarming: string
+  profileTestQwenReady: string
+  profileTestQwenReadyLoaded: string
+  profileTestQwenNeedPrewarm: string
+  profileTestReady: string
 }
 
 export type AppLocale = 'zh-CN' | 'en-US'
