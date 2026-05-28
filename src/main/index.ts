@@ -53,6 +53,9 @@ if (remoteDebuggingPort) {
   app.commandLine.appendSwitch('remote-debugging-port', remoteDebuggingPort)
 }
 
+// Prevent Chromium from killing the app after repeated GPU process crashes
+app.commandLine.appendSwitch('disable-gpu-process-crash-limit')
+
 void wireAppLifecycle(app, {
   onReady: async () => {
     registerElectronDisplayMediaHandler(session.defaultSession, desktopCapturer)
@@ -339,6 +342,42 @@ void wireAppLifecycle(app, {
       }
     })
     captureTransport.attachWindow(appBootstrap.windows.captureWindow)
+
+    // Resilience: recover from GPU/renderer crashes in the capture window
+    const captureWebContents = (appBootstrap.windows.captureWindow as BrowserWindow).webContents
+    captureWebContents.on('render-process-gone', (_event, details) => {
+      console.warn('[capture] Renderer process gone:', details.reason, details.exitCode)
+      // Reset transport readiness so it re-polls after reload
+      captureTransport.resetReady()
+      // Notify the meeting coordinator that capture was lost
+      if (captureWindowService.getState().activeRequest) {
+        meetingCoordinator.handleCaptureProcessGone()
+      }
+      // Reload the capture window so audio capture can resume
+      setTimeout(() => {
+        if (!captureWebContents.isDestroyed()) {
+          captureWebContents.reload()
+        }
+      }, 2000)
+    })
+
+    const mainWebContents = (appBootstrap.windows.mainWindow as BrowserWindow).webContents
+    mainWebContents.on('render-process-gone', (_event, details) => {
+      console.warn('[main] Renderer process gone:', details.reason, details.exitCode)
+      setTimeout(() => {
+        if (!mainWebContents.isDestroyed()) {
+          mainWebContents.reload()
+        }
+      }, 1000)
+    })
+
+    // Resilience: handle GPU process crash without exiting the app
+    app.on('child-process-gone', (_event, details) => {
+      if (details.type === 'GPU') {
+        console.warn('[app] GPU process crashed:', details.reason, '— Chromium will restart it automatically')
+      }
+    })
+
     const pttHudWindowController = new PttHudWindowController(
       appBootstrap.windows.hudWindow as BrowserWindow,
       pttHudService

@@ -178,6 +178,21 @@ export class MeetingCoordinator {
     await session.completion.promise
   }
 
+  handleCaptureProcessGone(): void {
+    if (!this.activeSession) {
+      return
+    }
+    this.notify({
+      level: 'error',
+      message: 'Audio capture process crashed. The session will be saved.'
+    })
+    void this.fail({
+      code: 'E_CAPTURE_PROCESS_GONE',
+      message: 'The capture process crashed unexpectedly',
+      recoverable: false
+    })
+  }
+
   private async handleEngineEvent(event: RecognitionEvent): Promise<void> {
     const session = this.activeSession
 

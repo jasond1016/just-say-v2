@@ -59,6 +59,11 @@ export class ElectronCaptureWindowTransport implements CaptureWindowTransport {
     this.captureWindow = captureWindow
   }
 
+  resetReady(): void {
+    this.ready = false
+    this.readyPromise = null
+  }
+
   dispose(): void {
     this.ipcMain.off(IPC_CHANNELS.captureReady, this.handleReadyBound)
     this.ipcMain.off(IPC_CHANNELS.captureEvent, this.handleEventBound)
