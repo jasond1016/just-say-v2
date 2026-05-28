@@ -5,12 +5,14 @@ import { CaptureRuntime } from '../capture/capture-runtime'
 import { RuntimeStore } from '../features/runtime/runtime-store'
 import { NotificationStore } from '../features/notifications/notification-store'
 import { ToastContainer, BannerContainer } from '../features/notifications/NotificationUI'
+import { I18nProvider, useT } from '../i18n-context'
 import { HistoryPage } from '../pages/history-page'
 import { LiveSessionPage } from '../pages/live-session-page'
 import { QuickDictationPage } from '../pages/quick-dictation-page'
 import { SettingsPage } from '../pages/settings-page'
 import { describeLocalServiceStatus } from '../ui/copy'
 import type { AppRuntimeSnapshot, LocalServiceStatus, PttHudSnapshot, ThemeSetting } from '../../shared/api-types'
+import type { AppLocale } from '../../i18n'
 import { APP_SECTIONS } from './app-model'
 import { AppController } from './app-controller'
 
@@ -37,6 +39,21 @@ function WorkspaceApp() {
     })
   }, [])
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot)
+  const locale = state.settings.general.language as AppLocale
+
+  return (
+    <I18nProvider locale={locale}>
+      <WorkspaceAppContent controller={controller} state={state} notificationStore={notificationStore} />
+    </I18nProvider>
+  )
+}
+
+function WorkspaceAppContent(props: {
+  controller: AppController
+  state: ReturnType<AppController['getSnapshot']>
+  notificationStore: NotificationStore
+}) {
+  const { controller, notificationStore } = props
   const {
     runtime,
     settings,
@@ -59,7 +76,7 @@ function WorkspaceApp() {
     historyTimeFilter,
     error,
     busyAction
-  } = state
+  } = props.state
   const [retainedLiveSession, setRetainedLiveSession] = useState<RetainedLiveSession | null>(null)
 
   useEffect(() => {
@@ -94,6 +111,7 @@ function WorkspaceApp() {
   const meetingStopDisabled = Boolean(busyAction) || !liveSession || liveSession.status !== 'streaming'
   const serviceStatus = runtime.services.localService
   const serviceLabel = describeLocalServiceStatus(serviceStatus)
+  const t = useT()
 
   return (
     <div className="app-shell">
@@ -119,7 +137,7 @@ function WorkspaceApp() {
                 aria-current={isActive ? 'page' : undefined}
               >
                 <NavIcon name={section.icon} />
-                <span>{section.label}</span>
+                <span>{t[section.labelKey]}</span>
               </button>
             )
           })}

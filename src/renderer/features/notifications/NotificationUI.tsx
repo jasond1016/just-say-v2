@@ -1,8 +1,10 @@
 import { useSyncExternalStore } from 'react'
 
 import type { NotificationEntry, NotificationStore } from './notification-store'
+import { useT } from '../../i18n-context'
 
 export function ToastContainer(props: { store: NotificationStore }) {
+  const t = useT()
   const toasts = useSyncExternalStore(
     (cb) => props.store.subscribe(cb),
     () => props.store.getToasts()
@@ -18,7 +20,7 @@ export function ToastContainer(props: { store: NotificationStore }) {
           <button
             type="button"
             className="toast__dismiss"
-            aria-label="Dismiss"
+            aria-label={t.notificationDismiss}
             onClick={() => props.store.dismiss(toast.id)}
           >
             ×
@@ -47,6 +49,7 @@ export function BannerContainer(props: { store: NotificationStore }) {
 }
 
 function BannerItem(props: { entry: NotificationEntry; onDismiss: () => void }) {
+  const t = useT()
   const { entry, onDismiss } = props
   return (
     <div
@@ -55,13 +58,13 @@ function BannerItem(props: { entry: NotificationEntry; onDismiss: () => void }) 
       aria-live={entry.level === 'error' ? 'assertive' : 'polite'}
     >
       <div className="app-note__content">
-        <strong>{entry.level === 'error' ? 'Action needed' : 'Warning'}</strong>
+        <strong>{entry.level === 'error' ? t.notificationActionNeeded : t.notificationWarning}</strong>
         <span>{entry.message}</span>
       </div>
       <button
         type="button"
         className="app-note__dismiss"
-        aria-label="Dismiss"
+        aria-label={t.notificationDismiss}
         onClick={onDismiss}
       >
         ×

@@ -2,6 +2,7 @@ import { useState } from 'react'
 
 import type { AppSettings, AppRuntimeSnapshot, LocalServiceStatus, SavedTranscript } from '../../shared/api-types'
 import { describePttHotkey } from '../ui/copy'
+import { useT } from '../i18n-context'
 
 export function QuickDictationPage(props: {
   runtime: AppRuntimeSnapshot
@@ -11,6 +12,7 @@ export function QuickDictationPage(props: {
   onCopyText: (id: string) => void
   onOpenHistory: () => void
 }) {
+  const t = useT()
   const hotkeyLabel = describePttHotkey(props.settings.input.pttHotkey)
   const shortLabel = props.settings.input.pttHotkey === 'RCtrl' ? 'R Ctrl' : 'R Alt'
 
@@ -18,7 +20,7 @@ export function QuickDictationPage(props: {
     <div className="page page--speak">
       <header className="speak-header">
         <h1 className="page-title">Speak</h1>
-        <p className="speak-header__subtitle">按住快捷键开始说话，松开后自动插入内容</p>
+        <p className="speak-header__subtitle">{t.speakSubtitle}</p>
       </header>
 
       <section className="speak-keycap-area" aria-label={`Press ${hotkeyLabel} to dictate`}>
@@ -27,11 +29,11 @@ export function QuickDictationPage(props: {
             <span className="speak-keycap__label">{shortLabel}</span>
           </div>
         </div>
-        <span className="speak-keycap-area__hint">Hold to Talk</span>
+        <span className="speak-keycap-area__hint">{t.speakHoldToTalk}</span>
       </section>
 
       <section className="speak-recent" aria-label="Recent dictation output">
-        <h2 className="speak-recent__heading">最近输出</h2>
+        <h2 className="speak-recent__heading">{t.speakRecentHeading}</h2>
         {props.recentDictations.length > 0 ? (
           <div className="speak-recent__list">
             {props.recentDictations.map((item) => (
@@ -39,11 +41,11 @@ export function QuickDictationPage(props: {
             ))}
           </div>
         ) : (
-          <div className="speak-recent__empty">尚无输出记录</div>
+          <div className="speak-recent__empty">{t.speakRecentEmpty}</div>
         )}
         <div className="speak-recent__footer">
           <button type="button" className="speak-recent__history-link" onClick={props.onOpenHistory}>
-            查看全部历史
+            {t.speakViewAllHistory}
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
               <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
@@ -55,13 +57,14 @@ export function QuickDictationPage(props: {
 }
 
 function RecentRow(props: { item: SavedTranscript; onCopy: (id: string) => void }) {
+  const t = useT()
   const [menuOpen, setMenuOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const displayText = props.item.plainText.length > 100
     ? props.item.plainText.slice(0, 100) + '…'
     : props.item.plainText
 
-  const timeLabel = formatRelativeTime(props.item.endedAt)
+  const timeLabel = formatRelativeTime(props.item.endedAt, t)
 
   const handleCopy = () => {
     props.onCopy(props.item.id)
@@ -86,7 +89,7 @@ function RecentRow(props: { item: SavedTranscript; onCopy: (id: string) => void 
         {menuOpen && !copied ? (
           <div className="speak-row__menu">
             <button type="button" className="speak-row__menu-item" onClick={handleCopy}>
-              Copy text
+              {t.speakCopyText}
             </button>
           </div>
         ) : null}
@@ -95,9 +98,7 @@ function RecentRow(props: { item: SavedTranscript; onCopy: (id: string) => void 
   )
 }
 
-function formatRelativeTime(timestamp: number): string {
-  const now = Date.now()
-  const diff = now - timestamp
+function formatRelativeTime(timestamp: number, t: { speakYesterday: (time: string) => string }): string {
   const date = new Date(timestamp)
   const today = new Date()
 
@@ -114,7 +115,7 @@ function formatRelativeTime(timestamp: number): string {
     return time
   }
   if (isYesterday) {
-    return `昨天 ${time}`
+    return t.speakYesterday(time)
   }
   return `${date.getMonth() + 1}/${date.getDate()} ${time}`
 }

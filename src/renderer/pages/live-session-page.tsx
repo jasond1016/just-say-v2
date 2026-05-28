@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { AppRuntimeSnapshot, AppSettings, ExportFormat, MeetingStatus } from '../../shared/api-types'
 import { selectVisibleTimeline } from '../../core/transcript/transcript-selectors'
+import { useT } from '../i18n-context'
 
 type LiveSessionSnapshot = NonNullable<AppRuntimeSnapshot['liveSession']>
 type LatestContentViewportMetrics = {
@@ -24,6 +25,7 @@ export function LiveSessionPage(props: {
   onExportLiveSession: (format: ExportFormat) => void
   onOpenHistory: () => void
 }) {
+  const t = useT()
   const session = props.liveSession
   const timeline = session ? selectVisibleTimeline(session.transcript) : []
   const activeStatus = props.activeRuntimeSession?.status ?? session?.status
@@ -63,7 +65,7 @@ export function LiveSessionPage(props: {
                 onClick={props.onStopMeeting}
               >
                 <span className="session-action-btn__icon session-action-btn__icon--stop" aria-hidden="true" />
-                {props.busyAction === 'meeting-stop' ? '停止中...' : '停止转录'}
+                {props.busyAction === 'meeting-stop' ? t.sessionStopBusy : t.sessionStop}
               </button>
             </>
           ) : (
@@ -77,7 +79,7 @@ export function LiveSessionPage(props: {
                 <path d="M10 1a3.5 3.5 0 0 0-3.5 3.5v5a3.5 3.5 0 1 0 7 0v-5A3.5 3.5 0 0 0 10 1Z" fill="currentColor" />
                 <path d="M5 8.5a.75.75 0 0 0-1.5 0v1a6.5 6.5 0 0 0 5.75 6.46v2.29a.75.75 0 0 0 1.5 0v-2.29A6.5 6.5 0 0 0 16.5 9.5v-1a.75.75 0 0 0-1.5 0v1a5 5 0 0 1-10 0v-1Z" fill="currentColor" />
               </svg>
-              {props.busyAction === 'meeting-start' ? '开始中...' : '开始转录'}
+              {props.busyAction === 'meeting-start' ? t.sessionStartBusy : t.sessionStart}
             </button>
           )}
         </div>
@@ -112,6 +114,7 @@ export function LiveSessionPage(props: {
 }
 
 function SessionIdleState() {
+  const t = useT()
   return (
     <section className="session-idle" aria-label="Session idle">
       <div className="session-idle__illustration" aria-hidden="true">
@@ -125,30 +128,30 @@ function SessionIdleState() {
           <rect x="68" y="54" width="14" height="5" rx="2.5" fill="oklch(0.82 0.06 40)" />
         </svg>
       </div>
-      <h2 className="session-idle__heading">点击开始转录，自动生成会议内容</h2>
+      <h2 className="session-idle__heading">{t.sessionIdleHeading}</h2>
       <ul className="session-idle__features">
         <li className="session-idle__feature">
           <span className="session-idle__feature-icon" aria-hidden="true">
             <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M10 2a4 4 0 0 0-4 4v1h-.5A2.5 2.5 0 0 0 3 9.5v5A2.5 2.5 0 0 0 5.5 17h9a2.5 2.5 0 0 0 2.5-2.5v-5A2.5 2.5 0 0 0 14.5 7H14V6a4 4 0 0 0-4-4Zm2 5V6a2 2 0 1 0-4 0v1h4Z" fill="currentColor" /></svg>
           </span>
-          自动识别说话人
+          {t.sessionFeatureSpeaker}
         </li>
         <li className="session-idle__feature">
           <span className="session-idle__feature-icon" aria-hidden="true">
             <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M3 4.5A2.5 2.5 0 0 1 5.5 2h9A2.5 2.5 0 0 1 17 4.5v11a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 3 15.5v-11ZM6 6h8v1.5H6V6Zm0 3.5h5V11H6V9.5Z" fill="currentColor" /></svg>
           </span>
-          实时生成双语转录
+          {t.sessionFeatureBilingual}
         </li>
         <li className="session-idle__feature">
           <span className="session-idle__feature-icon" aria-hidden="true">
             <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path fillRule="evenodd" clipRule="evenodd" d="M4 3a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H4Zm2 4h8v1.5H6V7Zm0 3.5h5V12H6v-1.5Z" fill="currentColor" /></svg>
           </span>
-          转录内容会自动保存在本次 Session 中
+          {t.sessionFeatureAutoSave}
         </li>
       </ul>
       <div className="session-idle__hint">
         <span className="session-idle__hint-icon" aria-hidden="true">✦</span>
-        开始后将自动滚动显示最新转录内容
+        {t.sessionIdleHint}
       </div>
     </section>
   )
@@ -168,6 +171,7 @@ function SessionTranscriptArea(props: {
   onExportLiveSession: (format: ExportFormat) => void
   onOpenHistory: () => void
 }) {
+  const t = useT()
   const canvasRef = useRef<HTMLElement | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const scrollContainerRef = useRef<HTMLElement | null>(null)
@@ -243,7 +247,7 @@ function SessionTranscriptArea(props: {
     <section ref={canvasRef} className="session-transcript" aria-label="Live transcript">
       {props.timeline.length === 0 ? (
         <div className="session-transcript__empty" role="status" aria-live="polite">
-          等待转录内容...
+          {t.sessionWaiting}
         </div>
       ) : (
         <>
@@ -284,7 +288,7 @@ function SessionTranscriptArea(props: {
           {userScrolledAway ? (
             <div className="jump-to-latest">
               <button type="button" className="jump-to-latest__pill" onClick={jumpToLatest}>
-                ↓ 跳到最新
+                {t.sessionJumpToLatest}
               </button>
             </div>
           ) : null}
@@ -303,7 +307,7 @@ function SessionTranscriptArea(props: {
               <path d="M10 1a3.5 3.5 0 0 0-3.5 3.5v5a3.5 3.5 0 1 0 7 0v-5A3.5 3.5 0 0 0 10 1Z" fill="currentColor" />
               <path d="M5 8.5a.75.75 0 0 0-1.5 0v1a6.5 6.5 0 0 0 5.75 6.46v2.29a.75.75 0 0 0 1.5 0v-2.29A6.5 6.5 0 0 0 16.5 9.5v-1a.75.75 0 0 0-1.5 0v1a5 5 0 0 1-10 0v-1Z" fill="currentColor" />
             </svg>
-            {props.busyAction === 'meeting-start' ? '开始中...' : '开始新转录'}
+            {props.busyAction === 'meeting-start' ? t.sessionStartBusy : t.sessionStartNew}
           </button>
           <button
             type="button"
@@ -311,7 +315,7 @@ function SessionTranscriptArea(props: {
             disabled={!props.canUsePostActions}
             onClick={props.onCopyLiveSession}
           >
-            {props.busyAction === 'live-session-copy' ? '复制中...' : '复制文本'}
+            {props.busyAction === 'live-session-copy' ? t.sessionCopyBusy : t.sessionCopyText}
           </button>
           <button
             type="button"
@@ -319,7 +323,7 @@ function SessionTranscriptArea(props: {
             disabled={!props.canUsePostActions}
             onClick={props.onOpenHistory}
           >
-            查看历史
+            {t.sessionViewHistory}
           </button>
         </footer>
       ) : null}

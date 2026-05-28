@@ -8,6 +8,7 @@ import type {
   SavedTranscript
 } from '../../shared/api-types'
 import type { CaptureSource, SessionMode } from '../../shared/primitive-types'
+import type { Messages } from '../../i18n'
 
 export function describeCaptureSource(source: CaptureSource): string {
   return source === 'microphone' ? 'Microphone' : 'System audio'
@@ -17,7 +18,19 @@ export function describeSessionMode(mode: SessionMode): string {
   return mode === 'ptt' ? 'Quick dictation' : 'Live session'
 }
 
-export function describeOutputMethod(method: OutputMethod): string {
+export function describeOutputMethod(method: OutputMethod, t?: Messages): string {
+  if (t) {
+    switch (method) {
+      case 'simulate_input':
+        return t.copyOutputSimulate
+      case 'clipboard':
+        return t.copyOutputClipboard
+      case 'popup':
+        return t.copyOutputPopup
+      default:
+        return method
+    }
+  }
   switch (method) {
     case 'simulate_input':
       return 'Type into the active app'
@@ -80,7 +93,22 @@ export function describeTimelineKind(kind: 'draft' | 'committed'): string {
   return kind === 'draft' ? 'Listening' : 'Saved'
 }
 
-export function describeLocalServiceStatus(status: LocalServiceStatus): string {
+export function describeLocalServiceStatus(status: LocalServiceStatus, t?: Messages): string {
+  if (t) {
+    switch (status) {
+      case 'healthy':
+        return t.copyServiceReady
+      case 'starting':
+        return t.copyServiceStarting
+      case 'degraded':
+        return t.copyServiceNotReady
+      case 'failed':
+        return t.copyServiceUnavailable
+      case 'stopped':
+      default:
+        return t.copyServiceOffline
+    }
+  }
   switch (status) {
     case 'healthy':
       return 'Speech service ready'

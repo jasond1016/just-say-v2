@@ -20,6 +20,7 @@ import {
   describeProfileSummary,
   describePttHotkey
 } from '../ui/copy'
+import { useT } from '../i18n-context'
 
 type SettingsSectionId = 'general' | 'recording' | 'recognition' | 'shortcuts' | 'advanced'
 export type TranslationTargetOption = 'zh' | 'en' | 'ja'
@@ -77,6 +78,7 @@ export function SettingsPage(props: {
   const [draftTranslationEndpoint, setDraftTranslationEndpoint] = useState(props.settings.translation.endpoint ?? '')
   const [draftTranslationModel, setDraftTranslationModel] = useState(props.settings.translation.model ?? '')
   const [draftTranslationApiKey, setDraftTranslationApiKey] = useState('')
+  const t = useT()
   const disabled = Boolean(props.busyAction)
   const translationEnabled = props.settings.translation.enabledForPtt || props.settings.translation.enabledForMeeting
   const translationApiKeyConfigured = Boolean(props.settings.translation.apiKeyConfigured)
@@ -216,7 +218,7 @@ export function SettingsPage(props: {
               className={`settings-tabs__tab ${selectedSection === section.id ? 'settings-tabs__tab--active' : ''}`}
               onClick={() => setSelectedSection(section.id)}
             >
-              {section.label}
+              {t[section.labelKey]}
             </button>
           ))}
         </div>
@@ -226,26 +228,26 @@ export function SettingsPage(props: {
             <div className="settings-grid">
               {/* 应用设置 */}
               <div className="settings-card">
-                <h2 className="settings-card__title">应用设置</h2>
+                <h2 className="settings-card__title">{t.settingsAppTitle}</h2>
                 <div className="settings-card__body">
-                  <CardRow label="开机自动启动">
+                  <CardRow label={t.settingsLaunchAtLogin}>
                     <ToggleSwitch
                       checked={props.settings.general.launchAtLogin}
                       disabled={disabled}
                       onClick={() => {/* launchAtLogin toggle - needs backend wiring */}}
                     />
                   </CardRow>
-                  <CardRow label="最小化到系统托盘">
+                  <CardRow label={t.settingsMinimizeToTray}>
                     <ToggleSwitch
                       checked={props.settings.general.minimizeToTray}
                       disabled={disabled}
                       onClick={() => props.onMinimizeToTrayChange(!props.settings.general.minimizeToTray)}
                     />
                   </CardRow>
-                  <CardRow label="启动后显示">
+                  <CardRow label={t.settingsStartPage}>
                     <select className="settings-select" disabled={disabled}>
-                      <option value="speak">Speak 页面</option>
-                      <option value="session">Session 页面</option>
+                      <option value="speak">{t.settingsStartPageSpeak}</option>
+                      <option value="session">{t.settingsStartPageSession}</option>
                     </select>
                   </CardRow>
                 </div>
@@ -253,36 +255,36 @@ export function SettingsPage(props: {
 
               {/* 主题外观 */}
               <div className="settings-card">
-                <h2 className="settings-card__title">主题外观</h2>
+                <h2 className="settings-card__title">{t.settingsThemeTitle}</h2>
                 <div className="settings-card__body">
-                  <CardRow label="主题模式">
+                  <CardRow label={t.settingsThemeMode}>
                     <select
                       className="settings-select"
                       value={props.settings.general.theme}
                       disabled={disabled}
                       onChange={(e) => props.onThemeChange(e.target.value as ThemeSetting)}
                     >
-                      <option value="system">跟随系统</option>
-                      <option value="light">浅色模式</option>
-                      <option value="dark">深色模式</option>
+                      <option value="system">{t.settingsThemeSystem}</option>
+                      <option value="light">{t.settingsThemeLight}</option>
+                      <option value="dark">{t.settingsThemeDark}</option>
                     </select>
                   </CardRow>
-                  <CardRow label="字体大小">
+                  <CardRow label={t.settingsFontSize}>
                     <select className="settings-select" value="medium" disabled={disabled} onChange={() => {}}>
-                      <option value="small">小</option>
-                      <option value="medium">中（推荐）</option>
-                      <option value="large">大</option>
+                      <option value="small">{t.settingsFontSmall}</option>
+                      <option value="medium">{t.settingsFontMedium}</option>
+                      <option value="large">{t.settingsFontLarge}</option>
                     </select>
                   </CardRow>
-                  <CardRow label="界面语言">
+                  <CardRow label={t.settingsLanguageLabel}>
                     <select
                       className="settings-select"
                       value={props.settings.general.language}
                       disabled={disabled}
                       onChange={(e) => props.onGeneralLanguageChange(e.target.value as AppSettings['general']['language'])}
                     >
-                      <option value="zh-CN">跟随系统</option>
-                      <option value="en-US">English</option>
+                      <option value="zh-CN">{t.settingsLanguageZh}</option>
+                      <option value="en-US">{t.settingsLanguageEn}</option>
                     </select>
                   </CardRow>
                 </div>
@@ -290,9 +292,9 @@ export function SettingsPage(props: {
 
               {/* 数据与存储 */}
               <div className="settings-card">
-                <h2 className="settings-card__title">数据与存储</h2>
+                <h2 className="settings-card__title">{t.settingsDataTitle}</h2>
                 <div className="settings-card__body">
-                  <div className="settings-card__field-label">本地存储位置</div>
+                  <div className="settings-card__field-label">{t.settingsStoragePath}</div>
                   <div className="settings-card__path-row">
                     <input
                       type="text"
@@ -301,17 +303,17 @@ export function SettingsPage(props: {
                       readOnly
                       disabled={disabled}
                     />
-                    <button type="button" className="settings-path-btn" disabled={disabled} aria-label="选择文件夹">
+                    <button type="button" className="settings-path-btn" disabled={disabled} aria-label={t.settingsChooseFolder}>
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
                       </svg>
                     </button>
                   </div>
-                  <CardRow label="自动清理">
+                  <CardRow label={t.settingsAutoClean}>
                     <select className="settings-select" disabled={disabled}>
-                      <option value="never">从不</option>
-                      <option value="30d">30天前</option>
-                      <option value="90d">90天前</option>
+                      <option value="never">{t.settingsAutoCleanNever}</option>
+                      <option value="30d">{t.settingsAutoClean30d}</option>
+                      <option value="90d">{t.settingsAutoClean90d}</option>
                     </select>
                   </CardRow>
                 </div>
@@ -319,16 +321,16 @@ export function SettingsPage(props: {
 
               {/* 关于 JustSay */}
               <div className="settings-card">
-                <h2 className="settings-card__title">关于 JustSay</h2>
+                <h2 className="settings-card__title">{t.settingsAboutTitle}</h2>
                 <div className="settings-card__body">
-                  <CardRow label="版本">
+                  <CardRow label={t.settingsVersion}>
                     <span className="settings-card__value">v1.2.0</span>
                   </CardRow>
-                  <CardRow label="检查更新">
-                    <span className="settings-card__value">已是最新版本</span>
+                  <CardRow label={t.settingsCheckUpdate}>
+                    <span className="settings-card__value">{t.settingsUpToDate}</span>
                   </CardRow>
-                  <CardRow label="用户反馈">
-                    <a href="#" className="settings-card__link" onClick={(e) => e.preventDefault()}>发送反馈</a>
+                  <CardRow label={t.settingsFeedback}>
+                    <a href="#" className="settings-card__link" onClick={(e) => e.preventDefault()}>{t.settingsSendFeedback}</a>
                   </CardRow>
                 </div>
               </div>
@@ -338,23 +340,23 @@ export function SettingsPage(props: {
           {selectedSection === 'recording' ? (
             <div className="settings-grid">
               <div className="settings-card settings-card--wide">
-                <h2 className="settings-card__title">录音设置</h2>
+                <h2 className="settings-card__title">{t.settingsRecordingTitle}</h2>
                 <div className="settings-card__body">
-                  <CardRow label="语音语言">
+                  <CardRow label={t.settingsSpeechLanguage}>
                     <select
                       className="settings-select"
                       value={props.settings.speech.language}
                       disabled={disabled}
                       onChange={(e) => props.onSpeechLanguageChange(e.target.value as SpeechLanguage)}
                     >
-                      <option value="auto">自动检测</option>
-                      <option value="zh">中文</option>
+                      <option value="auto">{t.settingsSpeechAuto}</option>
+                      <option value="zh">{t.settingsSpeechZh}</option>
                       <option value="en">English</option>
                       <option value="ja">日本語</option>
                       <option value="ko">한국어</option>
                     </select>
                   </CardRow>
-                  <CardRow label="会议中捕获麦克风">
+                  <CardRow label={t.settingsMicInMeeting}>
                     <ToggleSwitch
                       checked={props.settings.input.includeMicrophoneInMeeting}
                       disabled={disabled}
@@ -365,23 +367,23 @@ export function SettingsPage(props: {
               </div>
 
               <div className="settings-card settings-card--wide">
-                <h2 className="settings-card__title">翻译</h2>
+                <h2 className="settings-card__title">{t.settingsTranslationTitle}</h2>
                 <div className="settings-card__body">
-                  <CardRow label="PTT 翻译">
+                  <CardRow label={t.settingsPttTranslation}>
                     <ToggleSwitch
                       checked={props.settings.translation.enabledForPtt}
                       disabled={disabled}
                       onClick={() => props.onTranslatePttChange(!props.settings.translation.enabledForPtt)}
                     />
                   </CardRow>
-                  <CardRow label="会议翻译">
+                  <CardRow label={t.settingsMeetingTranslation}>
                     <ToggleSwitch
                       checked={props.settings.translation.enabledForMeeting}
                       disabled={disabled}
                       onClick={() => props.onTranslateMeetingChange(!props.settings.translation.enabledForMeeting)}
                     />
                   </CardRow>
-                  <CardRow label="翻译目标语言">
+                  <CardRow label={t.settingsTranslationTarget}>
                     <select
                       className="settings-select"
                       value={selectedTranslationTarget}
@@ -393,7 +395,7 @@ export function SettingsPage(props: {
                       ))}
                     </select>
                   </CardRow>
-                  <CardRow label="翻译服务">
+                  <CardRow label={t.settingsTranslationService}>
                     <select
                       className="settings-select"
                       value={props.settings.translation.provider}
@@ -411,7 +413,7 @@ export function SettingsPage(props: {
           {selectedSection === 'recognition' ? (
             <div className="settings-grid">
               <div className="settings-card settings-card--full">
-                <h2 className="settings-card__title">识别引擎</h2>
+                <h2 className="settings-card__title">{t.settingsEngineTitle}</h2>
                 <div className="settings-card__body">
                   <div className="preset-list">
                     {props.profiles.map((profile) => {
@@ -425,20 +427,20 @@ export function SettingsPage(props: {
                             <div className="preset-card__copy">
                               <div className="preset-card__name">
                                 {describeProfileLabel(profile)}
-                                {isSelected ? <span className="preset-card__current">当前</span> : null}
+                                {isSelected ? <span className="preset-card__current">{t.settingsEngineCurrent}</span> : null}
                               </div>
                               <div className="preset-card__summary">{describeProfileSummary(profile)}</div>
                             </div>
                             <div className="preset-card__actions">
                               <Button
-                                label={isSelected ? '当前' : '使用'}
+                                label={isSelected ? t.settingsEngineCurrent : t.settingsEngineUse}
                                 disabled={disabled || isSelected}
                                 size="small"
                                 variant={isSelected ? 'secondary' : 'primary'}
                                 onClick={() => props.onSelectProfile(profile.id)}
                               />
                               <Button
-                                label={checking ? '检测中...' : '检测'}
+                                label={checking ? t.settingsEngineTestBusy : t.settingsEngineTest}
                                 disabled={disabled}
                                 size="small"
                                 variant="secondary"
@@ -463,9 +465,9 @@ export function SettingsPage(props: {
           {selectedSection === 'shortcuts' ? (
             <div className="settings-grid">
               <div className="settings-card settings-card--wide">
-                <h2 className="settings-card__title">快捷键设置</h2>
+                <h2 className="settings-card__title">{t.settingsShortcutsTitle}</h2>
                 <div className="settings-card__body">
-                  <CardRow label="PTT 按键">
+                  <CardRow label={t.settingsPttKey}>
                     <Segmented>
                       <Segment
                         active={props.settings.input.pttHotkey === 'RCtrl'}
@@ -483,7 +485,7 @@ export function SettingsPage(props: {
                       </Segment>
                     </Segmented>
                   </CardRow>
-                  <CardRow label="输出方式">
+                  <CardRow label={t.settingsOutputMethod}>
                     <select
                       className="settings-select"
                       value={props.settings.output.method}
@@ -503,26 +505,26 @@ export function SettingsPage(props: {
           {selectedSection === 'advanced' ? (
             <div className="settings-grid">
               <div className="settings-card settings-card--wide">
-                <h2 className="settings-card__title">语音服务</h2>
+                <h2 className="settings-card__title">{t.settingsAdvancedSpeechTitle}</h2>
                 <div className="settings-card__body">
                   <div className="settings-card__status">
                     {describeLocalServiceStatus(props.localServiceStatus)}
                   </div>
-                  <CardRow label="部署模式">
+                  <CardRow label={t.settingsDeployMode}>
                     <select
                       className="settings-select"
                       value={localServiceMode}
                       disabled={disabled}
                       onChange={(e) => props.onLocalServiceModeChange(e.target.value as LocalServiceMode)}
                     >
-                      <option value="managed-local">本地托管</option>
-                      <option value="remote-service">远程服务</option>
+                      <option value="managed-local">{t.settingsDeployLocal}</option>
+                      <option value="remote-service">{t.settingsDeployRemote}</option>
                     </select>
                   </CardRow>
 
                   {localServiceMode === 'managed-local' ? (
                     <>
-                      <CardRow label="本地绑定地址">
+                      <CardRow label={t.settingsLocalHost}>
                         <input
                           type="text"
                           className="settings-text-input"
@@ -532,7 +534,7 @@ export function SettingsPage(props: {
                           onChange={(e) => setDraftManagedHost(e.target.value)}
                         />
                       </CardRow>
-                      <CardRow label="本地绑定端口">
+                      <CardRow label={t.settingsLocalPort}>
                         <input
                           type="text"
                           className={`settings-text-input ${invalidManagedPort ? 'settings-text-input--invalid' : ''}`}
@@ -545,14 +547,14 @@ export function SettingsPage(props: {
                       </CardRow>
                       {managedConnectionDraftDirty ? (
                         <div className="settings-card__actions-row">
-                          <Button label="放弃" size="small" variant="ghost" disabled={disabled} onClick={discardManagedConnectionDrafts} />
-                          <Button label="保存" size="small" disabled={disabled || invalidManagedPort} onClick={saveManagedConnectionDrafts} />
+                          <Button label={t.settingsDiscard} size="small" variant="ghost" disabled={disabled} onClick={discardManagedConnectionDrafts} />
+                          <Button label={t.settingsSave} size="small" disabled={disabled || invalidManagedPort} onClick={saveManagedConnectionDrafts} />
                         </div>
                       ) : null}
                     </>
                   ) : (
                     <>
-                      <CardRow label="远程服务地址">
+                      <CardRow label={t.settingsRemoteHost}>
                         <input
                           type="text"
                           className="settings-text-input"
@@ -562,7 +564,7 @@ export function SettingsPage(props: {
                           onChange={(e) => setDraftRemoteHost(e.target.value)}
                         />
                       </CardRow>
-                      <CardRow label="远程服务端口">
+                      <CardRow label={t.settingsRemotePort}>
                         <input
                           type="text"
                           className={`settings-text-input ${invalidRemotePort ? 'settings-text-input--invalid' : ''}`}
@@ -575,8 +577,8 @@ export function SettingsPage(props: {
                       </CardRow>
                       {remoteConnectionDraftDirty ? (
                         <div className="settings-card__actions-row">
-                          <Button label="放弃" size="small" variant="ghost" disabled={disabled} onClick={discardRemoteConnectionDrafts} />
-                          <Button label="保存" size="small" disabled={disabled || invalidRemotePort} onClick={saveRemoteConnectionDrafts} />
+                          <Button label={t.settingsDiscard} size="small" variant="ghost" disabled={disabled} onClick={discardRemoteConnectionDrafts} />
+                          <Button label={t.settingsSave} size="small" disabled={disabled || invalidRemotePort} onClick={saveRemoteConnectionDrafts} />
                         </div>
                       ) : null}
                     </>
@@ -585,7 +587,7 @@ export function SettingsPage(props: {
               </div>
 
               <div className="settings-card settings-card--wide">
-                <h2 className="settings-card__title">翻译服务配置</h2>
+                <h2 className="settings-card__title">{t.settingsTranslationConfigTitle}</h2>
                 <div className="settings-card__body">
                   <CardRow label="Endpoint">
                     <input
@@ -613,30 +615,30 @@ export function SettingsPage(props: {
                       className="settings-text-input"
                       value={draftTranslationApiKey}
                       disabled={disabled}
-                      placeholder={translationApiKeyConfigured ? '已保存，输入新值替换' : 'sk-...'}
+                      placeholder={translationApiKeyConfigured ? t.settingsApiKeyPlaceholderSaved : 'sk-...'}
                       onChange={(e) => setDraftTranslationApiKey(e.target.value)}
                     />
                   </CardRow>
                   {translationDraftDirty ? (
                     <div className="settings-card__actions-row">
-                      <Button label="放弃" size="small" variant="ghost" disabled={disabled} onClick={discardTranslationDrafts} />
-                      <Button label="保存翻译设置" size="small" disabled={disabled} onClick={() => { void saveTranslationDrafts() }} />
+                      <Button label={t.settingsDiscard} size="small" variant="ghost" disabled={disabled} onClick={discardTranslationDrafts} />
+                      <Button label={t.settingsSaveTranslation} size="small" disabled={disabled} onClick={() => { void saveTranslationDrafts() }} />
                     </div>
                   ) : null}
                 </div>
               </div>
 
               <div className="settings-card">
-                <h2 className="settings-card__title">诊断</h2>
+                <h2 className="settings-card__title">{t.settingsDiagnosticsTitle}</h2>
                 <div className="settings-card__body">
-                  <CardRow label="诊断记录">
+                  <CardRow label={t.settingsDiagnosticsLabel}>
                     <span className="settings-card__value">
-                      {props.settings.advanced.diagnosticsEnabled ? '已启用' : '已禁用'}
+                      {props.settings.advanced.diagnosticsEnabled ? t.settingsDiagnosticsEnabled : t.settingsDiagnosticsDisabled}
                     </span>
                   </CardRow>
                   <div className="settings-card__actions-row">
                     <Button
-                      label={props.busyAction === 'diagnostics-export' ? '导出中...' : '导出诊断包'}
+                      label={props.busyAction === 'diagnostics-export' ? t.settingsExportDiagBusy : t.settingsExportDiag}
                       size="small"
                       variant="secondary"
                       disabled={disabled}
@@ -654,12 +656,12 @@ export function SettingsPage(props: {
   )
 }
 
-const SETTINGS_SECTIONS: Array<{ id: SettingsSectionId; label: string }> = [
-  { id: 'general', label: '通用' },
-  { id: 'recording', label: '录音' },
-  { id: 'recognition', label: '识别' },
-  { id: 'shortcuts', label: '快捷键' },
-  { id: 'advanced', label: '高级' }
+const SETTINGS_SECTIONS: Array<{ id: SettingsSectionId; labelKey: 'settingsTabGeneral' | 'settingsTabRecording' | 'settingsTabRecognition' | 'settingsTabShortcuts' | 'settingsTabAdvanced' }> = [
+  { id: 'general', labelKey: 'settingsTabGeneral' },
+  { id: 'recording', labelKey: 'settingsTabRecording' },
+  { id: 'recognition', labelKey: 'settingsTabRecognition' },
+  { id: 'shortcuts', labelKey: 'settingsTabShortcuts' },
+  { id: 'advanced', labelKey: 'settingsTabAdvanced' }
 ]
 
 function CardRow(props: { label: string; children: ReactNode }) {

@@ -10,6 +10,7 @@ import type {
 } from '../../shared/api-types'
 import type { CaptureSource } from '../../shared/primitive-types'
 import { Button, TextInput } from '../ui/controls'
+import { useT } from '../i18n-context'
 
 type HistoryTimeFilter = 'all' | 'today' | 'last_7_days' | 'last_30_days'
 const ITEMS_PER_PAGE = 15
@@ -73,6 +74,7 @@ export function HistoryPage(props: {
   onExport: (id: string, format: ExportFormat) => void
   onGenerateNotes: (id: string, options?: HistoryNotesGenerateOptions) => void
 }) {
+  const t = useT()
   const headingId = useId()
   const actionMenuId = useId()
   const [detailQuery, setDetailQuery] = useState('')
@@ -241,8 +243,8 @@ export function HistoryPage(props: {
                 ref={searchInputRef}
                 value={props.searchQuery}
                 onChange={(event) => props.onSearchQueryChange(event.target.value)}
-                placeholder="搜索记录内容..."
-                ariaLabel="搜索记录内容"
+                placeholder={t.archiveSearchPlaceholder}
+                ariaLabel={t.archiveSearchPlaceholder}
                 className="field-input--full archive-search-input"
               />
             </div>
@@ -256,7 +258,7 @@ export function HistoryPage(props: {
               aria-selected={modeTab === 'all'}
               onClick={() => setModeTab('all')}
             >
-              全部 <span className="archive-tab__count">{props.items.length}</span>
+              {t.archiveTabAll} <span className="archive-tab__count">{props.items.length}</span>
             </button>
             <button
               type="button"
@@ -274,7 +276,7 @@ export function HistoryPage(props: {
               aria-selected={modeTab === 'meeting'}
               onClick={() => setModeTab('meeting')}
             >
-              会议 <span className="archive-tab__count">{meetingCount}</span>
+              {t.archiveTabMeeting} <span className="archive-tab__count">{meetingCount}</span>
             </button>
           </div>
 
@@ -284,17 +286,17 @@ export function HistoryPage(props: {
             {bulkMode ? (
               <div className="archive-bulk-bar" role="toolbar" aria-label="Bulk actions">
                 <div className="archive-bulk-bar__info">
-                  <div>{formatBulkSelectionSummary(selectedCount)}</div>
+                  <div>{t.archiveBulkSelected(selectedCount)}</div>
                   <div className="archive-bulk-bar__hint">
                     {selectedCount > 0
-                      ? 'Pick an action for the selected records.'
-                      : 'Select records from the list below to delete them together.'}
+                      ? t.archiveBulkActionHint
+                      : t.archiveBulkSelectHint}
                   </div>
                 </div>
                 <div className="archive-bulk-bar__actions">
                   {props.onExportBulk ? (
                     <Button
-                      label={selectedCount > 0 ? `Export ${selectedCount}` : 'Export selected'}
+                      label={t.archiveBulkExport(selectedCount)}
                       size="small"
                       variant="secondary"
                       disabled={Boolean(props.busyAction) || selectedCount === 0}
@@ -307,7 +309,7 @@ export function HistoryPage(props: {
                   ) : null}
                   {props.onDeleteBulk ? (
                     <Button
-                      label={formatBulkDeleteLabel(selectedCount)}
+                      label={t.archiveBulkDelete(selectedCount)}
                       size="small"
                       variant="secondary"
                       danger
@@ -316,7 +318,7 @@ export function HistoryPage(props: {
                     />
                   ) : null}
                   <Button
-                    label="Cancel"
+                    label={t.archiveBulkCancel}
                     size="small"
                     variant="ghost"
                     onClick={() => {
@@ -332,17 +334,17 @@ export function HistoryPage(props: {
             {displayItems.length === 0 ? (
               <div className="empty-state empty-state--archive" role="status" aria-live="polite">
                 <div className="empty-state__title">
-                  {hasActiveFilters || modeTab !== 'all' ? 'No transcripts match these filters.' : 'No transcripts yet.'}
+                  {hasActiveFilters || modeTab !== 'all' ? t.archiveEmptyFilterHint : t.archiveEmptyList}
                 </div>
                 <p className="empty-state__body">
                   {hasActiveFilters || modeTab !== 'all'
-                    ? 'Clear filters or search for a broader phrase to see more of the archive again.'
-                    : 'Finished dictation and live sessions will land here automatically after capture is done.'}
+                    ? t.archiveEmptyFilterBody
+                    : t.archiveEmptyListHint}
                 </p>
                 {!hasActiveFilters && modeTab === 'all' ? (
                   <div className="empty-state__actions">
-                    <Button label="Open quick dictation" size="small" onClick={props.onOpenQuickDictation} />
-                    <Button label="Open live session" size="small" variant="secondary" onClick={props.onOpenLiveSession} />
+                    <Button label={t.archiveOpenQuickDictation} size="small" onClick={props.onOpenQuickDictation} />
+                    <Button label={t.archiveOpenLiveSession} size="small" variant="secondary" onClick={props.onOpenLiveSession} />
                   </div>
                 ) : null}
               </div>
@@ -352,10 +354,10 @@ export function HistoryPage(props: {
                   <thead>
                     <tr>
                       {bulkMode ? <th className="archive-table__th-check"></th> : null}
-                      <th className="archive-table__th-title">标题</th>
-                      <th className="archive-table__th-time">时间</th>
-                      <th className="archive-table__th-duration">时长</th>
-                      <th className="archive-table__th-type">类型</th>
+                      <th className="archive-table__th-title">{t.archiveThTitle}</th>
+                      <th className="archive-table__th-time">{t.archiveThTime}</th>
+                      <th className="archive-table__th-duration">{t.archiveThDuration}</th>
+                      <th className="archive-table__th-type">{t.archiveThType}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -391,7 +393,7 @@ export function HistoryPage(props: {
                           <td className="archive-table__td-duration">{formatDurationMs(item.endedAt - item.startedAt)}</td>
                           <td className="archive-table__td-type">
                             <span className={`archive-badge ${item.mode === 'ptt' ? 'archive-badge--ptt' : 'archive-badge--meeting'}`}>
-                              {item.mode === 'ptt' ? 'PTT' : '会议'}
+                              {item.mode === 'ptt' ? 'PTT' : t.archiveTypeMeeting}
                             </span>
                           </td>
                         </tr>
@@ -451,7 +453,7 @@ export function HistoryPage(props: {
         <header className="archive-detail__header">
           <div className="archive-detail__top-row">
             <button type="button" className="archive-detail__back" onClick={props.onCloseDetail}>
-              <span aria-hidden="true">←</span> 返回归档列表
+              <span aria-hidden="true">←</span> {t.archiveBackToList}
             </button>
             <div className="archive-detail__top-actions">
               <button
@@ -463,7 +465,7 @@ export function HistoryPage(props: {
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                   <path d="M8 1v9m0 0L5 7m3 3 3-3M2 11v2a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                导出
+                {t.archiveExport}
               </button>
               <div
                 ref={actionMenuRef}
@@ -536,7 +538,7 @@ export function HistoryPage(props: {
             </span>
             <span className="archive-detail__meta-sep">·</span>
             <span className={`archive-badge ${selectedTranscript.mode === 'ptt' ? 'archive-badge--ptt' : 'archive-badge--meeting'}`}>
-              {selectedTranscript.mode === 'ptt' ? 'PTT' : '会议'}
+              {selectedTranscript.mode === 'ptt' ? 'PTT' : t.archiveTypeMeeting}
             </span>
             <span className="archive-detail__meta-sep">·</span>
             <span className="archive-detail__meta-item archive-detail__meta-status">
@@ -544,7 +546,7 @@ export function HistoryPage(props: {
                 <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.2"/>
                 <path d="M5.5 8l2 2 3.5-3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-              已归档
+              {t.archiveArchived}
             </span>
           </div>
         </header>
@@ -557,7 +559,7 @@ export function HistoryPage(props: {
             aria-selected={detailView === 'transcript'}
             onClick={() => setDetailView('transcript')}
           >
-            {selectedTranscript.mode === 'meeting' ? '会议转录' : '语音转录'}
+            {selectedTranscript.mode === 'meeting' ? t.archiveTabTranscriptMeeting : t.archiveTabTranscriptPtt}
           </button>
           <button
             type="button"
@@ -566,7 +568,7 @@ export function HistoryPage(props: {
             aria-selected={detailView === 'notes'}
             onClick={() => setDetailView('notes')}
           >
-            AI Notes
+            {t.archiveTabNotes}
           </button>
         </div>
 
@@ -599,7 +601,7 @@ export function HistoryPage(props: {
               ))}
               {filteredBlocks.length === 0 ? (
                 <div className="empty-inline" role="status" aria-live="polite">
-                  No lines match that search.
+                  {t.noMatchingLines}
                 </div>
               ) : null}
             </div>
@@ -608,14 +610,14 @@ export function HistoryPage(props: {
           <section className="notes-canvas">
             {notesState?.status === 'idle' ? (
               <div className="notes-state">
-                <div className="notes-state__eyebrow">Not generated yet</div>
-                <div className="notes-state__title">No notes yet for this transcript.</div>
+                <div className="notes-state__eyebrow">{t.notesNotGenerated}</div>
+                <div className="notes-state__title">{t.notesNotGeneratedTitle}</div>
                 <p className="notes-state__body">
-                  Generate one readable notes view that merges summary, decisions, and follow-up items while leaving the source transcript untouched.
+                  {t.notesNotGeneratedBody}
                 </p>
                 <div className="notes-state__actions">
                   <Button
-                    label="Generate notes"
+                    label={t.notesGenerate}
                     variant="primary"
                     size="small"
                     disabled={Boolean(props.busyAction)}
@@ -628,15 +630,15 @@ export function HistoryPage(props: {
             {notesState?.status === 'loading' || notesState?.status === 'generating' ? (
               <div className="notes-state">
                 <div className="notes-state__eyebrow">
-                  {notesState.status === 'loading' ? 'Loading' : 'Generating'}
+                  {notesState.status === 'loading' ? t.notesLoading : t.notesGenerating}
                 </div>
                 <div className="notes-state__title">
-                  {notesState.status === 'loading' ? 'Loading saved notes for this transcript.' : 'Building notes from the transcript.'}
+                  {notesState.status === 'loading' ? t.notesLoadingTitle : t.notesGeneratingTitle}
                 </div>
                 <p className="notes-state__body">
                   {notesState.status === 'loading'
-                    ? 'If a notes snapshot already exists, it will appear here without changing the underlying transcript.'
-                    : 'The transcript stays available in the other tab while JustSay condenses the conversation into a lighter derived view.'}
+                    ? t.notesLoadingBody
+                    : t.notesGeneratingBody}
                 </p>
                 <div className="notes-dots" aria-hidden="true">
                   <span />
@@ -648,21 +650,21 @@ export function HistoryPage(props: {
 
             {notesState?.status === 'failed' ? (
               <div className="notes-state">
-                <div className="notes-state__eyebrow">Generation failed</div>
-                <div className="notes-state__title">Notes could not be generated this time.</div>
+                <div className="notes-state__eyebrow">{t.notesFailed}</div>
+                <div className="notes-state__title">{t.notesFailedTitle}</div>
                 <p className="notes-state__body">
                   {notesState.message}
                 </p>
                 <div className="notes-state__actions">
                   <Button
-                    label="Try again"
+                    label={t.notesTryAgain}
                     variant="primary"
                     size="small"
                     disabled={Boolean(props.busyAction)}
                     onClick={() => props.onGenerateNotes(selectedTranscript.id, { force: true })}
                   />
                   <Button
-                    label="Back to transcript"
+                    label={t.notesBackToTranscript}
                     variant="ghost"
                     size="small"
                     onClick={() => setDetailView('transcript')}
@@ -677,7 +679,7 @@ export function HistoryPage(props: {
                   Generated {formatRelativeTime(notesState.notes.generatedAt)} · {notesState.notes.model}
                 </div>
                 <section className="notes-card">
-                  <div className="notes-card__eyebrow">Overview</div>
+                  <div className="notes-card__eyebrow">{t.notesOverview}</div>
                   <div className="notes-overview">
                     {formatNotesOverview(notesState.notes.overview).map((paragraph, index) => (
                       <p key={`${paragraph}-${index}`}>{paragraph}</p>
@@ -685,7 +687,7 @@ export function HistoryPage(props: {
                   </div>
                 </section>
                 <section className="notes-card">
-                  <div className="notes-card__eyebrow">Decisions</div>
+                  <div className="notes-card__eyebrow">{t.notesDecisions}</div>
                   <ul className="notes-list">
                     {notesState.notes.decisions.map((decision, index) => (
                       <li key={`${decision.summary}-${index}`}>
@@ -698,7 +700,7 @@ export function HistoryPage(props: {
                   </ul>
                 </section>
                 <section className="notes-card">
-                  <div className="notes-card__eyebrow">Action Items</div>
+                  <div className="notes-card__eyebrow">{t.notesActionItems}</div>
                   <ul className="notes-list">
                     {notesState.notes.actionItems.map((action, index) => (
                       <li key={`${action.task}-${index}`}>
@@ -712,7 +714,7 @@ export function HistoryPage(props: {
                 </section>
                 {notesState.notes.openQuestions.length > 0 ? (
                   <section className="notes-card">
-                    <div className="notes-card__eyebrow">Open Questions</div>
+                    <div className="notes-card__eyebrow">{t.notesOpenQuestions}</div>
                     <ul className="notes-list">
                       {notesState.notes.openQuestions.map((question, index) => (
                         <li key={`${question.question}-${index}`}>
