@@ -245,12 +245,6 @@ export function SettingsPage(props: {
                       onClick={() => props.onMinimizeToTrayChange(!props.settings.general.minimizeToTray)}
                     />
                   </CardRow>
-                  <CardRow label={t.settingsStartPage}>
-                    <select className="settings-select" disabled={disabled}>
-                      <option value="speak">{t.settingsStartPageSpeak}</option>
-                      <option value="session">{t.settingsStartPageSession}</option>
-                    </select>
-                  </CardRow>
                 </div>
               </div>
 
@@ -268,13 +262,6 @@ export function SettingsPage(props: {
                       <option value="system">{t.settingsThemeSystem}</option>
                       <option value="light">{t.settingsThemeLight}</option>
                       <option value="dark">{t.settingsThemeDark}</option>
-                    </select>
-                  </CardRow>
-                  <CardRow label={t.settingsFontSize}>
-                    <select className="settings-select" value="medium" disabled={disabled} onChange={() => {}}>
-                      <option value="small">{t.settingsFontSmall}</option>
-                      <option value="medium">{t.settingsFontMedium}</option>
-                      <option value="large">{t.settingsFontLarge}</option>
                     </select>
                   </CardRow>
                   <CardRow label={t.settingsLanguageLabel}>
@@ -325,13 +312,7 @@ export function SettingsPage(props: {
                 <h2 className="settings-card__title">{t.settingsAboutTitle}</h2>
                 <div className="settings-card__body">
                   <CardRow label={t.settingsVersion}>
-                    <span className="settings-card__value">v1.2.0</span>
-                  </CardRow>
-                  <CardRow label={t.settingsCheckUpdate}>
-                    <span className="settings-card__value">{t.settingsUpToDate}</span>
-                  </CardRow>
-                  <CardRow label={t.settingsFeedback}>
-                    <a href="#" className="settings-card__link" onClick={(e) => e.preventDefault()}>{t.settingsSendFeedback}</a>
+                    <span className="settings-card__value">v1.0.0</span>
                   </CardRow>
                 </div>
               </div>
@@ -408,6 +389,48 @@ export function SettingsPage(props: {
                   </CardRow>
                 </div>
               </div>
+
+              <div className="settings-card settings-card--wide">
+                <h2 className="settings-card__title">{t.settingsTranslationConfigTitle}</h2>
+                <div className="settings-card__body">
+                  <CardRow label={t.settingsTranslationEndpoint}>
+                    <input
+                      type="text"
+                      className="settings-text-input"
+                      value={draftTranslationEndpoint}
+                      disabled={disabled}
+                      placeholder="https://api.openai.com/v1"
+                      onChange={(e) => setDraftTranslationEndpoint(e.target.value)}
+                    />
+                  </CardRow>
+                  <CardRow label={t.settingsTranslationModel}>
+                    <input
+                      type="text"
+                      className="settings-text-input"
+                      value={draftTranslationModel}
+                      disabled={disabled}
+                      placeholder="gpt-4o-mini"
+                      onChange={(e) => setDraftTranslationModel(e.target.value)}
+                    />
+                  </CardRow>
+                  <CardRow label={t.settingsTranslationApiKey}>
+                    <input
+                      type="password"
+                      className="settings-text-input"
+                      value={draftTranslationApiKey}
+                      disabled={disabled}
+                      placeholder={translationApiKeyConfigured ? t.settingsApiKeyPlaceholderSaved : 'sk-...'}
+                      onChange={(e) => setDraftTranslationApiKey(e.target.value)}
+                    />
+                  </CardRow>
+                  {translationDraftDirty ? (
+                    <div className="settings-card__actions-row">
+                      <Button label={t.settingsDiscard} size="small" variant="ghost" disabled={disabled} onClick={discardTranslationDrafts} />
+                      <Button label={t.settingsSaveTranslation} size="small" disabled={disabled} onClick={() => { void saveTranslationDrafts() }} />
+                    </div>
+                  ) : null}
+                </div>
+              </div>
             </div>
           ) : null}
 
@@ -460,51 +483,7 @@ export function SettingsPage(props: {
                   </div>
                 </div>
               </div>
-            </div>
-          ) : null}
 
-          {selectedSection === 'shortcuts' ? (
-            <div className="settings-grid">
-              <div className="settings-card settings-card--wide">
-                <h2 className="settings-card__title">{t.settingsShortcutsTitle}</h2>
-                <div className="settings-card__body">
-                  <CardRow label={t.settingsPttKey}>
-                    <Segmented>
-                      <Segment
-                        active={props.settings.input.pttHotkey === 'RCtrl'}
-                        disabled={disabled}
-                        onClick={() => props.onPttHotkeyChange('RCtrl')}
-                      >
-                        {describePttHotkey('RCtrl')}
-                      </Segment>
-                      <Segment
-                        active={props.settings.input.pttHotkey === 'RAlt'}
-                        disabled={disabled}
-                        onClick={() => props.onPttHotkeyChange('RAlt')}
-                      >
-                        {describePttHotkey('RAlt')}
-                      </Segment>
-                    </Segmented>
-                  </CardRow>
-                  <CardRow label={t.settingsOutputMethod}>
-                    <select
-                      className="settings-select"
-                      value={props.settings.output.method}
-                      disabled={disabled}
-                      onChange={(e) => props.onOutputMethodChange(e.target.value as OutputMethod)}
-                    >
-                      <option value="simulate_input">{describeOutputMethod('simulate_input', t)}</option>
-                      <option value="clipboard">{describeOutputMethod('clipboard', t)}</option>
-                      <option value="popup">{describeOutputMethod('popup', t)}</option>
-                    </select>
-                  </CardRow>
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          {selectedSection === 'advanced' ? (
-            <div className="settings-grid">
               <div className="settings-card settings-card--wide">
                 <h2 className="settings-card__title">{t.settingsAdvancedSpeechTitle}</h2>
                 <div className="settings-card__body">
@@ -586,49 +565,51 @@ export function SettingsPage(props: {
                   )}
                 </div>
               </div>
+            </div>
+          ) : null}
 
+          {selectedSection === 'shortcuts' ? (
+            <div className="settings-grid">
               <div className="settings-card settings-card--wide">
-                <h2 className="settings-card__title">{t.settingsTranslationConfigTitle}</h2>
+                <h2 className="settings-card__title">{t.settingsShortcutsTitle}</h2>
                 <div className="settings-card__body">
-                  <CardRow label={t.settingsTranslationEndpoint}>
-                    <input
-                      type="text"
-                      className="settings-text-input"
-                      value={draftTranslationEndpoint}
-                      disabled={disabled}
-                      placeholder="https://api.openai.com/v1"
-                      onChange={(e) => setDraftTranslationEndpoint(e.target.value)}
-                    />
+                  <CardRow label={t.settingsPttKey}>
+                    <Segmented>
+                      <Segment
+                        active={props.settings.input.pttHotkey === 'RCtrl'}
+                        disabled={disabled}
+                        onClick={() => props.onPttHotkeyChange('RCtrl')}
+                      >
+                        {describePttHotkey('RCtrl')}
+                      </Segment>
+                      <Segment
+                        active={props.settings.input.pttHotkey === 'RAlt'}
+                        disabled={disabled}
+                        onClick={() => props.onPttHotkeyChange('RAlt')}
+                      >
+                        {describePttHotkey('RAlt')}
+                      </Segment>
+                    </Segmented>
                   </CardRow>
-                  <CardRow label={t.settingsTranslationModel}>
-                    <input
-                      type="text"
-                      className="settings-text-input"
-                      value={draftTranslationModel}
+                  <CardRow label={t.settingsOutputMethod}>
+                    <select
+                      className="settings-select"
+                      value={props.settings.output.method}
                       disabled={disabled}
-                      placeholder="gpt-4o-mini"
-                      onChange={(e) => setDraftTranslationModel(e.target.value)}
-                    />
+                      onChange={(e) => props.onOutputMethodChange(e.target.value as OutputMethod)}
+                    >
+                      <option value="simulate_input">{describeOutputMethod('simulate_input', t)}</option>
+                      <option value="clipboard">{describeOutputMethod('clipboard', t)}</option>
+                      <option value="popup">{describeOutputMethod('popup', t)}</option>
+                    </select>
                   </CardRow>
-                  <CardRow label={t.settingsTranslationApiKey}>
-                    <input
-                      type="password"
-                      className="settings-text-input"
-                      value={draftTranslationApiKey}
-                      disabled={disabled}
-                      placeholder={translationApiKeyConfigured ? t.settingsApiKeyPlaceholderSaved : 'sk-...'}
-                      onChange={(e) => setDraftTranslationApiKey(e.target.value)}
-                    />
-                  </CardRow>
-                  {translationDraftDirty ? (
-                    <div className="settings-card__actions-row">
-                      <Button label={t.settingsDiscard} size="small" variant="ghost" disabled={disabled} onClick={discardTranslationDrafts} />
-                      <Button label={t.settingsSaveTranslation} size="small" disabled={disabled} onClick={() => { void saveTranslationDrafts() }} />
-                    </div>
-                  ) : null}
                 </div>
               </div>
+            </div>
+          ) : null}
 
+          {selectedSection === 'advanced' ? (
+            <div className="settings-grid">
               <div className="settings-card">
                 <h2 className="settings-card__title">{t.settingsDiagnosticsTitle}</h2>
                 <div className="settings-card__body">
