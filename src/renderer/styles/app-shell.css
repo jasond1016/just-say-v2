@@ -240,6 +240,8 @@
 
 .app-note {
   display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
   gap: 4px;
   padding: 12px 14px;
   border: 1px solid var(--border);
@@ -247,6 +249,30 @@
   background: color-mix(in oklab, var(--bg-surface) 88%, transparent);
   font-size: 12px;
   line-height: 1.55;
+}
+
+.app-note__content {
+  display: grid;
+  gap: 4px;
+}
+
+.app-note__dismiss {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 16px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
+.app-note__dismiss:hover {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
 }
 
 .app-note strong {
@@ -275,6 +301,71 @@
 
 .app-note--error strong {
   color: var(--danger-text);
+}
+
+.banner-container {
+  display: grid;
+  gap: 8px;
+  padding: 0 48px;
+}
+
+.toast-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: grid;
+  gap: 8px;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 12px oklch(0 0 0 / 0.1);
+  font-size: 13px;
+  color: var(--text-primary);
+  pointer-events: auto;
+  animation: toast-in 0.25s ease-out;
+}
+
+.toast__message {
+  flex: 1;
+}
+
+.toast__dismiss {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  font-size: 14px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
+.toast__dismiss:hover {
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .capture-shell {

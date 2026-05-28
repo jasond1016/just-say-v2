@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { createBrowserCaptureSourceManager } from '../capture/browser-capture-source'
 import { CaptureRuntime } from '../capture/capture-runtime'
 import { RuntimeStore } from '../features/runtime/runtime-store'
+import { NotificationStore } from '../features/notifications/notification-store'
+import { ToastContainer, BannerContainer } from '../features/notifications/NotificationUI'
 import { HistoryPage } from '../pages/history-page'
 import { LiveSessionPage } from '../pages/live-session-page'
 import { QuickDictationPage } from '../pages/quick-dictation-page'
@@ -27,6 +29,7 @@ export function App() {
 }
 
 function WorkspaceApp() {
+  const notificationStore = useMemo(() => new NotificationStore(), [])
   const controller = useMemo(() => {
     return new AppController({
       api: requireApi(),
@@ -54,7 +57,6 @@ function WorkspaceApp() {
     historyMode,
     historySource,
     historyTimeFilter,
-    latestNotification,
     error,
     busyAction
   } = state
@@ -65,8 +67,15 @@ function WorkspaceApp() {
   }, [settings.general.theme])
 
   useEffect(() => {
-    return controller.start()
-  }, [controller])
+    const stopController = controller.start()
+    const unsubNotification = requireApi().onRuntimeNotification((notification) => {
+      notificationStore.push(notification)
+    })
+    return () => {
+      stopController()
+      unsubNotification()
+    }
+  }, [controller, notificationStore])
 
   useEffect(() => {
     if (!runtime.liveSession) {
@@ -152,26 +161,17 @@ function WorkspaceApp() {
       </nav>
 
       <main className="app-main">
-        {error || latestNotification ? (
+        {error ? (
           <div className="app-main__notes">
-            {error ? (
-              <div className="app-note app-note--error" role="alert">
-                <strong>Action needed</strong>
-                <span>{error}</span>
-              </div>
-            ) : null}
-
-            {latestNotification ? (
-              <div
-                className={`app-note app-note--${latestNotification.level}`}
-                role={latestNotification.level === 'error' ? 'alert' : 'status'}
-                aria-live={latestNotification.level === 'error' ? 'assertive' : 'polite'}
-              >
-                <strong>{formatNotificationLevel(latestNotification.level)}</strong>
-                <span>{latestNotification.message}</span>
-              </div>
-            ) : null}
+            <div className="app-note app-note--error" role="alert">
+              <strong>Action needed</strong>
+              <span>{error}</span>
+            </div>
           </div>
+        ) : null}
+
+        {(activeSection === 'quick-dictation' || activeSection === 'live-session') ? (
+          <BannerContainer store={notificationStore} />
         ) : null}
 
         {activeSection === 'quick-dictation' ? (
@@ -273,6 +273,8 @@ function WorkspaceApp() {
             onExportDiagnostics={() => { void controller.exportDiagnostics() }}
           />
         ) : null}
+
+        <ToastContainer store={notificationStore} />
       </main>
     </div>
   )
@@ -468,19 +470,6 @@ function describeDegradedGuidance(status: LocalServiceStatus): string {
       return 'The speech service has stopped. Restart it to resume dictation and meeting capture.'
     default:
       return 'The speech service needs attention.'
-  }
-}
-
-function formatNotificationLevel(level: 'info' | 'warning' | 'error') {
-  switch (level) {
-    case 'info':
-      return 'Note'
-    case 'warning':
-      return 'Warning'
-    case 'error':
-      return 'Action needed'
-    default:
-      return level
   }
 }
 

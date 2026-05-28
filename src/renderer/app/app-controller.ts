@@ -8,7 +8,6 @@ import type {
   PaginatedHistoryResult,
   PttHotkey,
   ProfileTestResult,
-  RuntimeNotification,
   SavedTranscript,
   SpeechLanguage,
   ThemeSetting,
@@ -51,7 +50,6 @@ export type AppControllerState = {
   historyMode: HistoryModeFilter
   historySource: HistorySourceFilter
   historyTimeFilter: HistoryTimeFilter
-  latestNotification: RuntimeNotification | null
   error: string | null
   busyAction: string | null
 }
@@ -85,7 +83,6 @@ export function createInitialAppControllerState(): AppControllerState {
     historyMode: 'all',
     historySource: 'all',
     historyTimeFilter: 'all',
-    latestNotification: null,
     error: null,
     busyAction: null
   }
@@ -140,11 +137,6 @@ export class AppController {
             : {})
         }))
       }, this.deps.api),
-      this.deps.api.onRuntimeNotification((notification) => {
-        this.setState({
-          latestNotification: notification
-        })
-      }),
       this.deps.api.onSettingsChanged((settings) => {
         this.setState({
           settings
