@@ -204,7 +204,7 @@ export function SettingsPage(props: {
   return (
     <div className="page page--settings">
       <div className="settings-page">
-        <h1 className="settings-page__title">Settings</h1>
+        <h1 className="page-title">Settings</h1>
 
         <div className="settings-tabs" role="tablist">
           {SETTINGS_SECTIONS.map((section) => (

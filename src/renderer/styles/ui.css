@@ -13,7 +13,7 @@
 .page {
   display: grid;
   gap: 18px;
-  padding: 20px 30px 40px;
+  padding: 40px 48px 48px;
 }
 
 .page--wide {
@@ -23,6 +23,19 @@
 .page--settings {
   max-width: none;
   min-height: calc(100vh - 60px);
+}
+
+.page-title {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.page-title--compact {
+  font-size: 22px;
 }
 
 .surface-header {
@@ -757,22 +770,13 @@
 .page--speak {
   display: grid;
   gap: 0;
-  padding: 40px 48px 48px;
   align-content: start;
 }
 
 .speak-header {
   display: grid;
   gap: 8px;
-  margin-bottom: 36px;
-}
-
-.speak-header__title {
-  font-size: 36px;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: -0.04em;
-  color: var(--text-primary);
+  margin-bottom: 24px;
 }
 
 .speak-header__subtitle {
@@ -991,7 +995,6 @@
 .page--session {
   display: grid;
   gap: 0;
-  padding: 40px 48px 48px;
   align-content: start;
 }
 
@@ -1006,14 +1009,6 @@
 .session-page-header__left {
   display: grid;
   gap: 6px;
-}
-
-.session-page-header__title {
-  font-size: 36px;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: -0.04em;
-  color: var(--text-primary);
 }
 
 .session-page-header__subtitle {
@@ -1199,8 +1194,8 @@
 .session-entry--draft {
   border-bottom: none;
   padding: 20px 16px;
-  border-radius: 12px;
-  background: color-mix(in oklab, var(--accent-muted) 40%, transparent);
+  border-left: 3px solid var(--accent);
+  background: color-mix(in oklab, var(--accent-muted) 15%, transparent);
 }
 
 .session-entry__time {
@@ -1240,14 +1235,6 @@
   flex-shrink: 0;
   color: var(--text-tertiary);
   font-size: 12px;
-}
-
-.session-entry__live-badge {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--accent-text);
-  white-space: nowrap;
-  padding-top: 2px;
 }
 
 .session-transcript__typing {
@@ -1330,24 +1317,12 @@
 
 /* --- New archive table layout --- */
 
-.archive-page {
-  padding-top: 28px;
-}
-
 .archive-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  padding-bottom: 20px;
-}
-
-.archive-header__title {
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--text-primary);
-  margin: 0;
+  padding-bottom: 24px;
 }
 
 .archive-header__toolbar {
@@ -1578,7 +1553,7 @@
 .archive-detail__header {
   display: grid;
   gap: 12px;
-  padding-bottom: 20px;
+  padding-bottom: 24px;
 }
 
 .archive-detail__top-row {
@@ -1650,15 +1625,6 @@
 
 .archive-detail__more-btn:hover {
   background: color-mix(in oklab, var(--accent-muted) 24%, transparent);
-}
-
-.archive-detail__title {
-  font-size: 26px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--text-primary);
-  margin: 0;
-  line-height: 1.2;
 }
 
 .archive-detail__meta {
@@ -2174,21 +2140,14 @@
 /* ─── Settings page (card-based redesign) ─── */
 
 .settings-page {
-  padding: 28px 36px 40px;
   max-width: 900px;
-}
-
-.settings-page__title {
-  font-size: 28px;
-  font-weight: 600;
-  margin: 0 0 20px;
-  color: var(--text-primary);
 }
 
 .settings-tabs {
   display: flex;
   gap: 28px;
   border-bottom: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+  margin-top: 24px;
   margin-bottom: 28px;
 }
 

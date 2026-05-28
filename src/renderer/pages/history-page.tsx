@@ -235,7 +235,7 @@ export function HistoryPage(props: {
       <>
         <div className="page page--wide archive-page">
           <header className="archive-header">
-            <h1 className="archive-header__title">Archive</h1>
+            <h1 className="page-title">Archive</h1>
             <div className="archive-header__toolbar">
               <TextInput
                 ref={searchInputRef}
@@ -514,7 +514,7 @@ export function HistoryPage(props: {
             </div>
           </div>
 
-          <h1 className="archive-detail__title" id={headingId} ref={detailHeadingRef} tabIndex={-1}>
+          <h1 className="page-title page-title--compact" id={headingId} ref={detailHeadingRef} tabIndex={-1}>
             {selectedTranscript.title}
           </h1>
 

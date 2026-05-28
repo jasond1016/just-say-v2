@@ -40,7 +40,7 @@ export function LiveSessionPage(props: {
     <div className="page page--session">
       <header className="session-page-header">
         <div className="session-page-header__left">
-          <h1 className="session-page-header__title">Session</h1>
+          <h1 className="page-title">Session</h1>
           {!isColdStart && sessionTitle ? (
             <div className="session-page-header__subtitle">
               <span>{sessionTitle}</span>
@@ -270,9 +270,6 @@ function SessionTranscriptArea(props: {
                       </div>
                     ) : null}
                   </div>
-                  {isDraft && isLast && props.isStreaming ? (
-                    <div className="session-entry__live-badge">实时转录中</div>
-                  ) : null}
                 </article>
               )
             })}

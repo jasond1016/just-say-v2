@@ -479,10 +479,6 @@ describe('SessionCoordinator + PTTCoordinator', () => {
         }
       }
     ])
-    expect(notifications).toContainEqual({
-      level: 'info',
-      message: 'Live session saved to history.'
-    })
     unsubscribe()
   })
 

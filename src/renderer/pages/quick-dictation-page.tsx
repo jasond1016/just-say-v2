@@ -17,7 +17,7 @@ export function QuickDictationPage(props: {
   return (
     <div className="page page--speak">
       <header className="speak-header">
-        <h1 className="speak-header__title">Speak</h1>
+        <h1 className="page-title">Speak</h1>
         <p className="speak-header__subtitle">按住快捷键开始说话，松开后自动插入内容</p>
       </header>
 
