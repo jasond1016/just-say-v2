@@ -278,35 +278,6 @@ export function SettingsPage(props: {
                 </div>
               </div>
 
-              {/* 数据与存储 */}
-              <div className="settings-card">
-                <h2 className="settings-card__title">{t.settingsDataTitle}</h2>
-                <div className="settings-card__body">
-                  <div className="settings-card__field-label">{t.settingsStoragePath}</div>
-                  <div className="settings-card__path-row">
-                    <input
-                      type="text"
-                      className="settings-path-input"
-                      value="D:\\JustSay\\Transcripts"
-                      readOnly
-                      disabled={disabled}
-                    />
-                    <button type="button" className="settings-path-btn" disabled={disabled} aria-label={t.settingsChooseFolder}>
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                      </svg>
-                    </button>
-                  </div>
-                  <CardRow label={t.settingsAutoClean}>
-                    <select className="settings-select" disabled={disabled}>
-                      <option value="never">{t.settingsAutoCleanNever}</option>
-                      <option value="30d">{t.settingsAutoClean30d}</option>
-                      <option value="90d">{t.settingsAutoClean90d}</option>
-                    </select>
-                  </CardRow>
-                </div>
-              </div>
-
               {/* 关于 JustSay */}
               <div className="settings-card">
                 <h2 className="settings-card__title">{t.settingsAboutTitle}</h2>
