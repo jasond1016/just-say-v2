@@ -22,6 +22,7 @@ export type TrayLike = {
 export class TrayController {
   private tray: TrayLike | null = null
   private quitting = false
+  private closeListenerBound = false
 
   constructor(
     private readonly dependencies: {
@@ -35,6 +36,31 @@ export class TrayController {
   ) {}
 
   start(): void {
+    this.bindCloseListener()
+
+    if (this.dependencies.getSettings().general.minimizeToTray) {
+      this.ensureTray()
+    }
+  }
+
+  /** Call when the minimizeToTray setting changes at runtime. */
+  syncWithSettings(settings: AppSettings): void {
+    if (settings.general.minimizeToTray) {
+      this.ensureTray()
+    } else {
+      this.destroyTray()
+    }
+  }
+
+  prepareForQuit(): void {
+    this.quitting = true
+  }
+
+  dispose(): void {
+    this.destroyTray()
+  }
+
+  private ensureTray(): void {
     if (this.tray) {
       return
     }
@@ -67,6 +93,19 @@ export class TrayController {
       this.showMainWindow()
     })
 
+    this.tray = tray
+  }
+
+  private destroyTray(): void {
+    this.tray?.destroy()
+    this.tray = null
+  }
+
+  private bindCloseListener(): void {
+    if (this.closeListenerBound) {
+      return
+    }
+
     this.dependencies.mainWindow.on('close', (event) => {
       if (!this.shouldHideToTray()) {
         return
@@ -84,16 +123,7 @@ export class TrayController {
       this.dependencies.mainWindow.hide()
     })
 
-    this.tray = tray
-  }
-
-  prepareForQuit(): void {
-    this.quitting = true
-  }
-
-  dispose(): void {
-    this.tray?.destroy()
-    this.tray = null
+    this.closeListenerBound = true
   }
 
   private shouldHideToTray(): boolean {

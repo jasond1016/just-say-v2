@@ -391,6 +391,9 @@ void wireAppLifecycle(app, {
       quitApp: () => app.quit()
     })
     trayController.start()
+    settingsService.onChanged((settings) => {
+      trayController.syncWithSettings(settings)
+    })
     let shutdownPromise: Promise<void> | null = null
     const shutdown = async (): Promise<void> => {
       trayController.prepareForQuit()

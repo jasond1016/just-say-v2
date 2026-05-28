@@ -61,6 +61,36 @@ describe('TrayController', () => {
 
     expect(event.preventDefault).not.toHaveBeenCalled()
   })
+
+  it('does not create a tray icon when minimize-to-tray is disabled', () => {
+    const harness = createHarness(false)
+
+    harness.controller.start()
+
+    expect(harness.tray.setToolTip).not.toHaveBeenCalled()
+  })
+
+  it('destroys the tray when syncWithSettings is called and setting is now disabled', () => {
+    const harness = createHarness(true)
+
+    harness.controller.start()
+    expect(harness.tray.setToolTip).toHaveBeenCalled()
+
+    harness.controller.syncWithSettings(harness.settingsWithMinimizeToTray(false))
+
+    expect(harness.tray.destroy).toHaveBeenCalled()
+  })
+
+  it('creates the tray when syncWithSettings is called and setting is now enabled', () => {
+    const harness = createHarness(false)
+
+    harness.controller.start()
+    expect(harness.tray.setToolTip).not.toHaveBeenCalled()
+
+    harness.controller.syncWithSettings(harness.settingsWithMinimizeToTray(true))
+
+    expect(harness.tray.setToolTip).toHaveBeenCalled()
+  })
 })
 
 function createHarness(minimizeToTray: boolean) {
@@ -99,7 +129,7 @@ function createHarness(minimizeToTray: boolean) {
         language: 'zh-CN',
         theme: 'system',
         launchAtLogin: false,
-        minimizeToTray
+        minimizeToTray: minimizeToTray
       },
       speech: {
         selectedProfileId: 'local-fast',
@@ -137,6 +167,7 @@ function createHarness(minimizeToTray: boolean) {
   return {
     controller,
     mainWindow,
+    tray,
     quitApp,
     trayListeners,
     windowListeners,
@@ -146,6 +177,39 @@ function createHarness(minimizeToTray: boolean) {
     },
     set visible(value: boolean) {
       visible = value
+    },
+    settingsWithMinimizeToTray(value: boolean) {
+      return {
+        general: {
+          language: 'zh-CN' as const,
+          theme: 'system' as const,
+          launchAtLogin: false,
+          minimizeToTray: value
+        },
+        speech: {
+          selectedProfileId: 'local-fast',
+          language: 'auto' as const
+        },
+        input: {
+          pttHotkey: 'RCtrl' as const,
+          includeMicrophoneInMeeting: false,
+          microphoneDeviceId: 'default'
+        },
+        output: {
+          method: 'simulate_input' as const
+        },
+        translation: {
+          enabledForPtt: false,
+          enabledForMeeting: false,
+          targetLanguage: 'en',
+          provider: 'openai-compatible' as const
+        },
+        advanced: {
+          localServiceMode: 'managed-local' as const,
+          diagnosticsEnabled: true,
+          experimentalFlags: [] as string[]
+        }
+      }
     }
   }
 }
