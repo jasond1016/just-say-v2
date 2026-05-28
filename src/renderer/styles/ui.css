@@ -2194,10 +2194,10 @@
 }
 
 .settings-card {
-  border: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+  border: 1px solid color-mix(in oklab, var(--border-subtle) 70%, transparent);
   border-radius: 14px;
   padding: 22px 24px;
-  background: var(--bg-surface);
+  background: transparent;
 }
 
 .settings-card--wide {
