@@ -51,6 +51,7 @@ export type AppApi = {
   generateHistoryNotes: (id: string, options?: HistoryNotesGenerateOptions) => Promise<TranscriptNotes>
   getHistoryAudioPlayback: (id: string) => Promise<HistoryAudioPlayback | null>
   deleteHistory: (id: string) => Promise<boolean>
+  updateHistoryTitle: (id: string, title: string) => Promise<SavedTranscript>
   copyHistory: (id: string, format: ExportFormat) => Promise<void>
   exportHistory: (id: string, format: ExportFormat) => Promise<ExportResult>
   exportDiagnostics: () => Promise<DiagnosticBundleResult>
@@ -115,6 +116,8 @@ export function createAppApi(invoke: IpcInvoke, events?: IpcEventSource): AppApi
     getHistoryAudioPlayback: async (id) =>
       invoke<HistoryAudioPlayback | null>(IPC_CHANNELS.historyGetAudioPlayback, id),
     deleteHistory: async (id) => invoke<boolean>(IPC_CHANNELS.historyDelete, id),
+    updateHistoryTitle: async (id, title) =>
+      invoke<SavedTranscript>(IPC_CHANNELS.historyUpdateTitle, id, title),
     copyHistory: async (id, format) => invoke<void>(IPC_CHANNELS.historyCopy, id, format),
     exportHistory: async (id, format) =>
       invoke<ExportResult>(IPC_CHANNELS.historyExport, id, format),

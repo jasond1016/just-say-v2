@@ -26,6 +26,7 @@ export const IPC_CHANNELS = {
   historyGenerateNotes: 'history.generateNotes',
   historyGetAudioPlayback: 'history.getAudioPlayback',
   historyDelete: 'history.delete',
+  historyUpdateTitle: 'history.updateTitle',
   historyCopy: 'history.copy',
   historyExport: 'history.export',
   diagnosticsExport: 'diagnostics.export',

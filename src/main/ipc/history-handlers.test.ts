@@ -25,6 +25,23 @@ describe('createHistoryHandlers', () => {
       }),
       getAudioPlayback: vi.fn().mockResolvedValue(null),
       delete: vi.fn().mockResolvedValue(true),
+      updateTitle: vi.fn().mockResolvedValue({
+        id: 'tx-1',
+        mode: 'meeting',
+        title: 'Renamed',
+        startedAt: 1,
+        endedAt: 2,
+        plainText: 'hello',
+        blocks: [],
+        metadata: {
+          engineProfileId: 'local-fast',
+          runtimeFamilyId: 'sensevoice',
+          modelIdentifier: 'iic/SenseVoiceSmall',
+          deploymentMode: 'managed-local',
+          includeMicrophone: true,
+          translationEnabled: false
+        }
+      }),
       copy: vi.fn().mockResolvedValue(undefined),
       export: vi.fn().mockResolvedValue({ ok: false, error: 'not implemented' })
     }
@@ -38,6 +55,7 @@ describe('createHistoryHandlers', () => {
     await handlers[IPC_CHANNELS.historyGenerateNotes]('tx-1', { force: true })
     await handlers[IPC_CHANNELS.historyGetAudioPlayback]('tx-1')
     await handlers[IPC_CHANNELS.historyDelete]('tx-1')
+    await handlers[IPC_CHANNELS.historyUpdateTitle]('tx-1', 'Renamed')
     await handlers[IPC_CHANNELS.historyCopy]('tx-1', 'plain_text')
     await handlers[IPC_CHANNELS.historyExport]('tx-1', 'json')
 
@@ -48,6 +66,7 @@ describe('createHistoryHandlers', () => {
     expect(historyService.generateNotes).toHaveBeenCalledWith('tx-1', { force: true })
     expect(historyService.getAudioPlayback).toHaveBeenCalledWith('tx-1')
     expect(historyService.delete).toHaveBeenCalledWith('tx-1')
+    expect(historyService.updateTitle).toHaveBeenCalledWith('tx-1', 'Renamed')
     expect(historyService.copy).toHaveBeenCalledWith('tx-1', 'plain_text')
     expect(historyService.export).toHaveBeenCalledWith('tx-1', 'json')
   })
@@ -61,6 +80,7 @@ describe('createHistoryHandlers', () => {
       generateNotes: vi.fn(),
       getAudioPlayback: vi.fn(),
       delete: vi.fn(),
+      updateTitle: vi.fn(),
       copy: vi.fn(),
       export: vi.fn()
     }

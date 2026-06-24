@@ -43,6 +43,7 @@ export const enUS: Messages = {
   archiveThType: 'Type',
   archiveTypeMeeting: 'Meeting',
   archiveBackToList: 'Back to archive list',
+  archiveRenameTitle: 'Edit title',
   archiveExport: 'Export',
   archiveArchived: 'Archived',
   archiveTabTranscriptMeeting: 'Meeting transcript',

@@ -41,6 +41,7 @@ export type Messages = {
   archiveThType: string
   archiveTypeMeeting: string
   archiveBackToList: string
+  archiveRenameTitle: string
   archiveExport: string
   archiveArchived: string
   archiveTabTranscriptMeeting: string

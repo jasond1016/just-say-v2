@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type RefObject } from 'react'
 
 import type {
   ExportFormat,
@@ -69,6 +69,7 @@ export function HistoryPage(props: {
   onCloseDetail: () => void
   onDelete: (id: string) => void
   onDeleteBulk?: (ids: string[]) => Promise<void> | void
+  onRenameTitle: (id: string, title: string) => void
   onExportBulk?: (ids: string[], format: ExportFormat) => void
   onCopy: (id: string, format: ExportFormat) => void
   onExport: (id: string, format: ExportFormat) => void
@@ -85,7 +86,7 @@ export function HistoryPage(props: {
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const searchInputRef = useRef<HTMLInputElement | null>(null)
-  const detailHeadingRef = useRef<HTMLDivElement | null>(null)
+  const detailHeadingRef = useRef<HTMLHeadingElement | null>(null)
   const actionMenuRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -516,9 +517,13 @@ export function HistoryPage(props: {
             </div>
           </div>
 
-          <h1 className="page-title page-title--compact" id={headingId} ref={detailHeadingRef} tabIndex={-1}>
-            {selectedTranscript.title}
-          </h1>
+          <ArchiveDetailTitle
+            title={selectedTranscript.title}
+            headingId={headingId}
+            headingRef={detailHeadingRef}
+            disabled={Boolean(props.busyAction)}
+            onRename={(title) => props.onRenameTitle(selectedTranscript.id, title)}
+          />
 
           <div className="archive-detail__meta">
             <span className="archive-detail__meta-item">
@@ -796,6 +801,106 @@ export function getHistoryDetailActionGroups(): HistoryDetailActionGroup[] {
       ]
     }
   ]
+}
+
+function ArchiveDetailTitle(props: {
+  title: string
+  headingId: string
+  headingRef: RefObject<HTMLHeadingElement | null>
+  disabled: boolean
+  onRename: (title: string) => void | Promise<void>
+}) {
+  const t = useT()
+  const inputRef = useRef<HTMLInputElement | null>(null)
+  const [isEditing, setIsEditing] = useState(false)
+  const [draft, setDraft] = useState(props.title)
+
+  useEffect(() => {
+    setDraft(props.title)
+    setIsEditing(false)
+  }, [props.title])
+
+  useEffect(() => {
+    if (!isEditing) {
+      return
+    }
+
+    inputRef.current?.focus()
+    inputRef.current?.select()
+  }, [isEditing])
+
+  const cancelEditing = () => {
+    setDraft(props.title)
+    setIsEditing(false)
+  }
+
+  const commitEditing = () => {
+    const nextTitle = draft.trim()
+
+    if (!nextTitle || nextTitle === props.title) {
+      cancelEditing()
+      return
+    }
+
+    void Promise.resolve(props.onRename(nextTitle)).finally(() => {
+      setIsEditing(false)
+    })
+  }
+
+  const startEditing = () => {
+    if (props.disabled) {
+      return
+    }
+
+    setDraft(props.title)
+    setIsEditing(true)
+  }
+
+  if (isEditing) {
+    return (
+      <div className="archive-detail__title-row">
+        <input
+          ref={inputRef}
+          className="archive-detail__title-input page-title page-title--compact"
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault()
+              commitEditing()
+            }
+
+            if (event.key === 'Escape') {
+              event.preventDefault()
+              cancelEditing()
+            }
+          }}
+          onBlur={commitEditing}
+          maxLength={120}
+          aria-label={t.archiveRenameTitle}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div className="archive-detail__title-row">
+      <h1 className="page-title page-title--compact" id={props.headingId} ref={props.headingRef} tabIndex={-1}>
+        {props.title}
+      </h1>
+      <button
+        type="button"
+        className="archive-detail__title-edit"
+        aria-label={t.archiveRenameTitle}
+        disabled={props.disabled}
+        onClick={startEditing}
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M11.5 2.5l2 2-8 8H3.5v-2l8-8z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+        </svg>
+      </button>
+    </div>
+  )
 }
 
 

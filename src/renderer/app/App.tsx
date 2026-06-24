@@ -254,6 +254,7 @@ function WorkspaceAppContent(props: {
             onOpen={(id) => { void controller.openHistoryItem(id) }}
             onCloseDetail={() => { controller.clearSelectedHistory() }}
             onDelete={(id) => { void controller.deleteHistoryItem(id) }}
+            onRenameTitle={(id, title) => { void controller.updateHistoryTitle(id, title) }}
             onDeleteBulk={(ids) => controller.deleteHistoryItems(ids)}
             onCopy={(id, format) => { void controller.copyHistoryItem(id, format) }}
             onExport={(id, format) => { void controller.exportHistoryItem(id, format) }}

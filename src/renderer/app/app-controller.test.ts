@@ -615,6 +615,25 @@ function createApi(overrides: Partial<AppApi> & {
     generateHistoryNotes: overrides.generateHistoryNotes ?? vi.fn(async () => createTranscriptNotes('tx-1')),
     getHistoryAudioPlayback: overrides.getHistoryAudioPlayback ?? vi.fn(async () => null),
     deleteHistory: overrides.deleteHistory ?? vi.fn(async () => false),
+    updateHistoryTitle:
+      overrides.updateHistoryTitle ??
+      vi.fn(async (_id: string, title: string) => ({
+        id: 'tx-1',
+        mode: 'meeting' as const,
+        title,
+        startedAt: 1,
+        endedAt: 2,
+        plainText: 'hello',
+        blocks: [],
+        metadata: {
+          engineProfileId: 'local-fast',
+          runtimeFamilyId: 'sensevoice',
+          modelIdentifier: 'iic/SenseVoiceSmall',
+          deploymentMode: 'managed-local',
+          includeMicrophone: true,
+          translationEnabled: false
+        }
+      })),
     copyHistory: overrides.copyHistory ?? vi.fn(async () => undefined),
     exportHistory: overrides.exportHistory ?? vi.fn(async () => ({ ok: false, error: 'not implemented' })),
     exportDiagnostics: overrides.exportDiagnostics ?? vi.fn(async () => ({ ok: false, error: 'not implemented' }))

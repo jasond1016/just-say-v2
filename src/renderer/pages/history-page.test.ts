@@ -96,6 +96,7 @@ describe('HistoryPage audio detail', () => {
     )
 
     expect(markup).toContain('More actions')
+    expect(markup).toContain('archive-detail__title-edit')
     expect(markup).not.toContain('Copy, export, delete')
   })
 })
@@ -250,6 +251,7 @@ function createProps(overrides: {
     onOpen: vi.fn(),
     onCloseDetail: vi.fn(),
     onDelete: vi.fn(),
+    onRenameTitle: vi.fn(),
     onCopy: vi.fn(),
     onExport: vi.fn(),
     onGenerateNotes: vi.fn()

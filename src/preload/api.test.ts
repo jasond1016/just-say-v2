@@ -52,6 +52,7 @@ describe('createAppApi', () => {
     await api.generateHistoryNotes('tx-1', { force: true })
     await api.getHistoryAudioPlayback('tx-1')
     await api.deleteHistory('tx-1')
+    await api.updateHistoryTitle('tx-1', 'Renamed')
     await api.copyHistory('tx-1', 'plain_text')
     await api.exportHistory('tx-1', 'json')
     await api.exportDiagnostics()
@@ -104,6 +105,7 @@ describe('createAppApi', () => {
       [IPC_CHANNELS.historyGenerateNotes, 'tx-1', { force: true }],
       [IPC_CHANNELS.historyGetAudioPlayback, 'tx-1'],
       [IPC_CHANNELS.historyDelete, 'tx-1'],
+      [IPC_CHANNELS.historyUpdateTitle, 'tx-1', 'Renamed'],
       [IPC_CHANNELS.historyCopy, 'tx-1', 'plain_text'],
       [IPC_CHANNELS.historyExport, 'tx-1', 'json'],
       [IPC_CHANNELS.diagnosticsExport]

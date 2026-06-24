@@ -357,6 +357,17 @@ export class AppController {
     })
   }
 
+  async updateHistoryTitle(id: string, title: string): Promise<void> {
+    await this.runAction(`rename:${id}`, async () => {
+      const updated = await this.deps.api.updateHistoryTitle(id, title)
+
+      this.setState({
+        history: this.state.history.map((item) => (item.id === id ? updated : item)),
+        selectedHistory: this.state.selectedHistory?.id === id ? updated : this.state.selectedHistory
+      })
+    })
+  }
+
   async deleteHistoryItems(ids: string[]): Promise<void> {
     const uniqueIds = [...new Set(ids)]
 

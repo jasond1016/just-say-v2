@@ -14,6 +14,21 @@ import type { TranscriptExporter, TranscriptNotesRepository, TranscriptRepositor
 import type { NotesGenerationService } from './notes-generation-service'
 
 const LEGACY_INVALID_NOTES_OVERVIEW = 'No concise summary was available.'
+export const MAX_TRANSCRIPT_TITLE_LENGTH = 120
+
+export function normalizeTranscriptTitle(title: string): string {
+  const normalized = title.trim()
+
+  if (!normalized) {
+    throw new Error('Title cannot be empty.')
+  }
+
+  if (normalized.length > MAX_TRANSCRIPT_TITLE_LENGTH) {
+    throw new Error(`Title must be ${MAX_TRANSCRIPT_TITLE_LENGTH} characters or fewer.`)
+  }
+
+  return normalized
+}
 
 export class HistoryService {
   constructor(
@@ -105,6 +120,23 @@ export class HistoryService {
     }
 
     return deleted
+  }
+
+  async updateTitle(id: string, title: string): Promise<SavedTranscript> {
+    const transcript = await this.repository.getById(id)
+
+    if (!transcript) {
+      throw new Error(`Transcript not found: ${id}`)
+    }
+
+    const normalizedTitle = normalizeTranscriptTitle(title)
+    const updatedTranscript = {
+      ...transcript,
+      title: normalizedTitle
+    }
+
+    await this.repository.save(updatedTranscript)
+    return updatedTranscript
   }
 
   async export(id: string, format: ExportFormat): Promise<ExportResult> {

@@ -31,6 +31,26 @@ describe('HistoryService', () => {
     expect(await service.delete('tx-1')).toBe(true)
   })
 
+  it('updates transcript titles through the repository', async () => {
+    const repository = new InMemoryTranscriptRepository()
+    const service = new HistoryService(repository)
+    const transcript = createTranscript({
+      id: 'tx-1',
+      title: 'Weekly Sync',
+      plainText: 'planning notes',
+      startedAt: 1000
+    })
+
+    await repository.save(transcript)
+
+    const updated = await service.updateTitle('tx-1', '  Product review  ')
+
+    expect(updated.title).toBe('Product review')
+    expect(await service.get('tx-1')).toMatchObject({ title: 'Product review' })
+    await expect(service.updateTitle('tx-1', '   ')).rejects.toThrow('Title cannot be empty.')
+    await expect(service.updateTitle('missing', 'New title')).rejects.toThrow('Transcript not found: missing')
+  })
+
   it('returns a clear fallback when export is unavailable', async () => {
     const service = new HistoryService(new InMemoryTranscriptRepository())
 

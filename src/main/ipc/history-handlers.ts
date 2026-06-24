@@ -19,6 +19,7 @@ export type HistoryHandlerService = {
   generateNotes(id: string, options?: HistoryNotesGenerateOptions): Promise<TranscriptNotes>
   getAudioPlayback(id: string): Promise<HistoryAudioPlayback | null>
   delete(id: string): Promise<boolean>
+  updateTitle(id: string, title: string): Promise<SavedTranscript>
   copy(id: string, format: ExportFormat): Promise<void>
   export(id: string, format: ExportFormat): Promise<ExportResult>
 }
@@ -31,6 +32,7 @@ export type HistoryHandlers = {
   [IPC_CHANNELS.historyGenerateNotes]: (id: string, options?: HistoryNotesGenerateOptions) => Promise<TranscriptNotes>
   [IPC_CHANNELS.historyGetAudioPlayback]: (id: string) => Promise<HistoryAudioPlayback | null>
   [IPC_CHANNELS.historyDelete]: (id: string) => Promise<boolean>
+  [IPC_CHANNELS.historyUpdateTitle]: (id: string, title: string) => Promise<SavedTranscript>
   [IPC_CHANNELS.historyCopy]: (id: string, format: ExportFormat) => Promise<void>
   [IPC_CHANNELS.historyExport]: (id: string, format: ExportFormat) => Promise<ExportResult>
 }
@@ -44,6 +46,7 @@ export function createHistoryHandlers(historyService: HistoryHandlerService): Hi
     [IPC_CHANNELS.historyGenerateNotes]: async (id, options) => historyService.generateNotes(id, options),
     [IPC_CHANNELS.historyGetAudioPlayback]: async (id) => historyService.getAudioPlayback(id),
     [IPC_CHANNELS.historyDelete]: async (id) => historyService.delete(id),
+    [IPC_CHANNELS.historyUpdateTitle]: async (id, title) => historyService.updateTitle(id, title),
     [IPC_CHANNELS.historyCopy]: async (id, format) => historyService.copy(id, format),
     [IPC_CHANNELS.historyExport]: async (id, format) => historyService.export(id, format)
   }

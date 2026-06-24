@@ -182,6 +182,7 @@ describe('createApp', () => {
       'history.generateNotes',
       'history.getAudioPlayback',
       'history.delete',
+      'history.updateTitle',
       'history.copy',
       'history.export',
       'settings.get',

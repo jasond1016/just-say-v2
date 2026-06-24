@@ -43,6 +43,7 @@ export const zhCN: Messages = {
   archiveThType: '类型',
   archiveTypeMeeting: '会议',
   archiveBackToList: '返回归档列表',
+  archiveRenameTitle: '编辑标题',
   archiveExport: '导出',
   archiveArchived: '已归档',
   archiveTabTranscriptMeeting: '会议转录',
