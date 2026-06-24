@@ -1081,13 +1081,22 @@
   align-items: center;
   gap: 20px;
   padding: 48px 32px;
-  border: 1.5px dashed color-mix(in oklab, var(--accent) 30%, var(--border));
+  border: 1.5px dashed color-mix(in oklab, var(--border) 75%, transparent);
   border-radius: 16px;
-  background: color-mix(in oklab, var(--accent-muted) 30%, transparent);
+  background: transparent;
 }
 
 .session-idle__illustration {
-  margin-bottom: 8px;
+  width: min(100%, 360px);
+  margin-bottom: 4px;
+}
+
+.session-idle__background {
+  display: block;
+  width: 100%;
+  height: auto;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .session-idle__heading {
@@ -1113,15 +1122,12 @@
 }
 
 .session-idle__feature-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   width: 32px;
   height: 32px;
-  border-radius: 8px;
-  background: color-mix(in oklab, var(--accent-muted) 60%, var(--bg-surface));
-  color: var(--accent-text);
   flex-shrink: 0;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .session-idle__hint {

@@ -113,39 +113,48 @@ export function LiveSessionPage(props: {
   )
 }
 
+const SESSION_IDLE_ASSETS = {
+  hero: './assets/session-idle-hero.png',
+  bilingual: './assets/session-feature-bilingual.png',
+  save: './assets/session-feature-save.png',
+} as const
+
 function SessionIdleState() {
   const t = useT()
   return (
     <section className="session-idle" aria-label="Session idle">
       <div className="session-idle__illustration" aria-hidden="true">
-        <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
-          <circle cx="60" cy="60" r="50" fill="oklch(0.94 0.03 40)" />
-          <rect x="42" y="30" width="18" height="46" rx="9" fill="oklch(0.72 0.1 40)" />
-          <path d="M35 58a25 25 0 0 0 50 0" stroke="oklch(0.72 0.1 40)" strokeWidth="3" strokeLinecap="round" fill="none" />
-          <line x1="60" y1="83" x2="60" y2="96" stroke="oklch(0.72 0.1 40)" strokeWidth="3" strokeLinecap="round" />
-          <rect x="68" y="36" width="22" height="5" rx="2.5" fill="oklch(0.82 0.06 40)" />
-          <rect x="68" y="45" width="18" height="5" rx="2.5" fill="oklch(0.82 0.06 40)" />
-          <rect x="68" y="54" width="14" height="5" rx="2.5" fill="oklch(0.82 0.06 40)" />
-        </svg>
+        <img
+          className="session-idle__background"
+          src={SESSION_IDLE_ASSETS.hero}
+          alt=""
+          width={360}
+          height={220}
+          draggable={false}
+        />
       </div>
       <h2 className="session-idle__heading">{t.sessionIdleHeading}</h2>
       <ul className="session-idle__features">
         <li className="session-idle__feature">
-          <span className="session-idle__feature-icon" aria-hidden="true">
-            <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M10 2a4 4 0 0 0-4 4v1h-.5A2.5 2.5 0 0 0 3 9.5v5A2.5 2.5 0 0 0 5.5 17h9a2.5 2.5 0 0 0 2.5-2.5v-5A2.5 2.5 0 0 0 14.5 7H14V6a4 4 0 0 0-4-4Zm2 5V6a2 2 0 1 0-4 0v1h4Z" fill="currentColor" /></svg>
-          </span>
-          {t.sessionFeatureSpeaker}
-        </li>
-        <li className="session-idle__feature">
-          <span className="session-idle__feature-icon" aria-hidden="true">
-            <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M3 4.5A2.5 2.5 0 0 1 5.5 2h9A2.5 2.5 0 0 1 17 4.5v11a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 3 15.5v-11ZM6 6h8v1.5H6V6Zm0 3.5h5V11H6V9.5Z" fill="currentColor" /></svg>
-          </span>
+          <img
+            className="session-idle__feature-icon"
+            src={SESSION_IDLE_ASSETS.bilingual}
+            alt=""
+            width={32}
+            height={32}
+            draggable={false}
+          />
           {t.sessionFeatureBilingual}
         </li>
         <li className="session-idle__feature">
-          <span className="session-idle__feature-icon" aria-hidden="true">
-            <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path fillRule="evenodd" clipRule="evenodd" d="M4 3a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H4Zm2 4h8v1.5H6V7Zm0 3.5h5V12H6v-1.5Z" fill="currentColor" /></svg>
-          </span>
+          <img
+            className="session-idle__feature-icon"
+            src={SESSION_IDLE_ASSETS.save}
+            alt=""
+            width={32}
+            height={32}
+            draggable={false}
+          />
           {t.sessionFeatureAutoSave}
         </li>
       </ul>

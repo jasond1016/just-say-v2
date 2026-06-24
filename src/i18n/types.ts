@@ -21,7 +21,6 @@ export type Messages = {
   sessionStartBusy: string
   sessionStart: string
   sessionIdleHeading: string
-  sessionFeatureSpeaker: string
   sessionFeatureBilingual: string
   sessionFeatureAutoSave: string
   sessionIdleHint: string
