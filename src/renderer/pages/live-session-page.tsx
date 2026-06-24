@@ -39,76 +39,82 @@ export function LiveSessionPage(props: {
   const canUsePostActions = Boolean(session) && !isSessionActive && hasTranscript && !props.busyAction
 
   return (
-    <div className="page page--session">
-      <header className="session-page-header">
-        <div className="session-page-header__left">
-          <h1 className="page-title">Session</h1>
-          {!isColdStart && sessionTitle ? (
-            <div className="session-page-header__subtitle">
-              <span>{sessionTitle}</span>
-              <button type="button" className="session-page-header__edit" aria-label="Edit title">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <path d="M11.5 2.5l2 2-8 8H3.5v-2l8-8z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
-                </svg>
-              </button>
+    <div className={`page page--session ${isColdStart ? 'page--session-idle' : 'page--session-live'}`}>
+      <div className="session-shell">
+        <div className="session-shell__chrome">
+          <header className="session-page-header">
+            <div className="session-page-header__left">
+              <h1 className="page-title">Session</h1>
+              {!isColdStart && sessionTitle ? (
+                <div className="session-page-header__subtitle">
+                  <span>{sessionTitle}</span>
+                  <button type="button" className="session-page-header__edit" aria-label="Edit title">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                      <path d="M11.5 2.5l2 2-8 8H3.5v-2l8-8z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                </div>
+              ) : null}
+            </div>
+            <div className="session-page-header__right">
+              {isSessionActive && session ? (
+                <>
+                  <span className="session-page-header__timer">{formatSessionDuration(displayedDurationSec)}</span>
+                  <button
+                    type="button"
+                    className="session-action-btn session-action-btn--stop"
+                    disabled={props.meetingStopDisabled}
+                    onClick={props.onStopMeeting}
+                  >
+                    <span className="session-action-btn__icon session-action-btn__icon--stop" aria-hidden="true" />
+                    {props.busyAction === 'meeting-stop' ? t.sessionStopBusy : t.sessionStop}
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="session-action-btn session-action-btn--start"
+                  disabled={props.meetingStartDisabled}
+                  onClick={props.onStartMeeting}
+                >
+                  <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                    <path d="M10 1a3.5 3.5 0 0 0-3.5 3.5v5a3.5 3.5 0 1 0 7 0v-5A3.5 3.5 0 0 0 10 1Z" fill="currentColor" />
+                    <path d="M5 8.5a.75.75 0 0 0-1.5 0v1a6.5 6.5 0 0 0 5.75 6.46v2.29a.75.75 0 0 0 1.5 0v-2.29A6.5 6.5 0 0 0 16.5 9.5v-1a.75.75 0 0 0-1.5 0v1a5 5 0 0 1-10 0v-1Z" fill="currentColor" />
+                  </svg>
+                  {props.busyAction === 'meeting-start' ? t.sessionStartBusy : t.sessionStart}
+                </button>
+              )}
+            </div>
+          </header>
+
+          {props.liveSessionMessage ? (
+            <div className="inline-note inline-note--neutral" role="status" aria-live="polite">
+              {props.liveSessionMessage}
             </div>
           ) : null}
         </div>
-        <div className="session-page-header__right">
-          {isSessionActive && session ? (
-            <>
-              <span className="session-page-header__timer">{formatSessionDuration(displayedDurationSec)}</span>
-              <button
-                type="button"
-                className="session-action-btn session-action-btn--stop"
-                disabled={props.meetingStopDisabled}
-                onClick={props.onStopMeeting}
-              >
-                <span className="session-action-btn__icon session-action-btn__icon--stop" aria-hidden="true" />
-                {props.busyAction === 'meeting-stop' ? t.sessionStopBusy : t.sessionStop}
-              </button>
-            </>
+
+        <div className={`session-shell__body ${isColdStart ? 'session-shell__body--idle' : 'session-shell__body--live'}`}>
+          {isColdStart ? (
+            <SessionIdleState />
           ) : (
-            <button
-              type="button"
-              className="session-action-btn session-action-btn--start"
-              disabled={props.meetingStartDisabled}
-              onClick={props.onStartMeeting}
-            >
-              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                <path d="M10 1a3.5 3.5 0 0 0-3.5 3.5v5a3.5 3.5 0 1 0 7 0v-5A3.5 3.5 0 0 0 10 1Z" fill="currentColor" />
-                <path d="M5 8.5a.75.75 0 0 0-1.5 0v1a6.5 6.5 0 0 0 5.75 6.46v2.29a.75.75 0 0 0 1.5 0v-2.29A6.5 6.5 0 0 0 16.5 9.5v-1a.75.75 0 0 0-1.5 0v1a5 5 0 0 1-10 0v-1Z" fill="currentColor" />
-              </svg>
-              {props.busyAction === 'meeting-start' ? t.sessionStartBusy : t.sessionStart}
-            </button>
+            <SessionTranscriptArea
+              timeline={timeline}
+              transcriptRevision={transcriptRevision}
+              isStreaming={isStreaming}
+              isSessionActive={isSessionActive}
+              hasTranscript={hasTranscript}
+              canUsePostActions={canUsePostActions}
+              busyAction={props.busyAction}
+              meetingStartDisabled={props.meetingStartDisabled}
+              onStartMeeting={props.onStartMeeting}
+              onCopyLiveSession={props.onCopyLiveSession}
+              onExportLiveSession={props.onExportLiveSession}
+              onOpenHistory={props.onOpenHistory}
+            />
           )}
         </div>
-      </header>
-
-      {props.liveSessionMessage ? (
-        <div className="inline-note inline-note--neutral" role="status" aria-live="polite">
-          {props.liveSessionMessage}
-        </div>
-      ) : null}
-
-      {isColdStart ? (
-        <SessionIdleState />
-      ) : (
-        <SessionTranscriptArea
-          timeline={timeline}
-          transcriptRevision={transcriptRevision}
-          isStreaming={isStreaming}
-          isSessionActive={isSessionActive}
-          hasTranscript={hasTranscript}
-          canUsePostActions={canUsePostActions}
-          busyAction={props.busyAction}
-          meetingStartDisabled={props.meetingStartDisabled}
-          onStartMeeting={props.onStartMeeting}
-          onCopyLiveSession={props.onCopyLiveSession}
-          onExportLiveSession={props.onExportLiveSession}
-          onOpenHistory={props.onOpenHistory}
-        />
-      )}
+      </div>
     </div>
   )
 }
@@ -254,55 +260,56 @@ function SessionTranscriptArea(props: {
 
   return (
     <section ref={canvasRef} className="session-transcript" aria-label="Live transcript">
-      {props.timeline.length === 0 ? (
-        <div className="session-transcript__empty" role="status" aria-live="polite">
-          {t.sessionWaiting}
-        </div>
-      ) : (
-        <>
-          <div className="session-transcript__stack">
-            {props.timeline.map((item, index) => {
-              const isLast = index === props.timeline.length - 1
-              const isDraft = item.kind === 'draft'
-              return (
-                <article
-                  key={`${item.kind}:${item.id}`}
-                  className={`session-entry ${isDraft ? 'session-entry--draft' : ''}`}
-                >
-                  <div className={`session-entry__time ${isDraft ? 'session-entry__time--live' : ''}`}>
-                    {formatElapsedTime(item.startedAt)}
-                  </div>
-                  <div className="session-entry__body">
-                    <div className="session-entry__primary">
-                      {item.primaryText || '...'}
+      <div className="session-transcript__viewport">
+        {props.timeline.length === 0 ? (
+          <div className="session-transcript__empty" role="status" aria-live="polite">
+            {t.sessionWaiting}
+          </div>
+        ) : (
+          <>
+            <div className="session-transcript__stack">
+              {props.timeline.map((item, index) => {
+                const isDraft = item.kind === 'draft'
+                return (
+                  <article
+                    key={`${item.kind}:${item.id}`}
+                    className={`session-entry ${isDraft ? 'session-entry--draft' : ''}`}
+                  >
+                    <div className={`session-entry__time ${isDraft ? 'session-entry__time--live' : ''}`}>
+                      {formatElapsedTime(item.startedAt)}
                     </div>
-                    {item.secondaryText ? (
-                      <div className="session-entry__secondary">
-                        <span className="session-entry__translate-icon" aria-hidden="true">↩</span>
-                        {item.secondaryText}
+                    <div className="session-entry__body">
+                      <div className="session-entry__primary">
+                        {item.primaryText || '...'}
                       </div>
-                    ) : null}
-                  </div>
-                </article>
-              )
-            })}
-            {props.isStreaming ? (
-              <div className="session-transcript__typing" aria-hidden="true">
-                <span /><span /><span />
+                      {item.secondaryText ? (
+                        <div className="session-entry__secondary">
+                          <span className="session-entry__translate-icon" aria-hidden="true">↩</span>
+                          {item.secondaryText}
+                        </div>
+                      ) : null}
+                    </div>
+                  </article>
+                )
+              })}
+              {props.isStreaming ? (
+                <div className="session-transcript__typing" aria-hidden="true">
+                  <span /><span /><span />
+                </div>
+              ) : null}
+              <div ref={bottomRef} />
+            </div>
+
+            {userScrolledAway ? (
+              <div className="jump-to-latest">
+                <button type="button" className="jump-to-latest__pill" onClick={jumpToLatest}>
+                  {t.sessionJumpToLatest}
+                </button>
               </div>
             ) : null}
-            <div ref={bottomRef} />
-          </div>
-
-          {userScrolledAway ? (
-            <div className="jump-to-latest">
-              <button type="button" className="jump-to-latest__pill" onClick={jumpToLatest}>
-                {t.sessionJumpToLatest}
-              </button>
-            </div>
-          ) : null}
-        </>
-      )}
+          </>
+        )}
+      </div>
 
       {!props.isSessionActive && props.hasTranscript ? (
         <footer className="session-transcript__footer">
@@ -341,8 +348,16 @@ function SessionTranscriptArea(props: {
 }
 
 function resolveLiveSessionScrollContainer(canvas: HTMLElement): HTMLElement {
+  const viewport = canvas.querySelector('.session-transcript__viewport')
+  if (viewport instanceof HTMLElement) {
+    return viewport
+  }
+
   const appMain = canvas.closest('.app-main')
-  if (appMain instanceof HTMLElement) return appMain
+  if (appMain instanceof HTMLElement) {
+    return appMain
+  }
+
   return canvas
 }
 

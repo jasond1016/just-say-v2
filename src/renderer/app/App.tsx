@@ -179,7 +179,7 @@ function WorkspaceAppContent(props: {
         </div>
       </nav>
 
-      <main className="app-main">
+      <main className={`app-main ${activeSection === 'live-session' ? 'app-main--session' : ''}`}>
         {error ? (
           <div className="app-main__notes">
             <div className="app-note app-note--error" role="alert">

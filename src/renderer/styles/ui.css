@@ -975,9 +975,42 @@
 
 /* Session page */
 .page--session {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 0;
-  align-content: start;
+  min-height: 0;
+}
+
+.page--session-live {
+  flex: 1;
+}
+
+.session-shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 16px;
+}
+
+.session-shell__chrome {
+  flex-shrink: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.session-shell__body--live {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.session-shell__body--idle {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 .session-page-header {
@@ -985,7 +1018,7 @@
   justify-content: space-between;
   align-items: flex-start;
   gap: 24px;
-  margin-bottom: 24px;
+  margin-bottom: 0;
 }
 
 .session-page-header__left {
@@ -1150,8 +1183,18 @@
 
 /* Session transcript area */
 .session-transcript {
-  display: grid;
-  gap: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.session-transcript__viewport {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .session-transcript__empty {
@@ -1251,9 +1294,9 @@
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  flex-shrink: 0;
   padding-top: 20px;
   border-top: 1px solid color-mix(in oklab, var(--border) 50%, transparent);
-  margin-top: 20px;
 }
 
 .result-panel {
