@@ -11,6 +11,7 @@ export type Messages = {
   speakRecentHeading: string
   speakRecentEmpty: string
   speakViewAllHistory: string
+  speakChangeHotkey: string
   speakCopyText: string
   speakDeleteText: string
   speakYesterday: (time: string) => string
@@ -21,9 +22,8 @@ export type Messages = {
   sessionStartBusy: string
   sessionStart: string
   sessionIdleHeading: string
-  sessionFeatureBilingual: string
-  sessionFeatureAutoSave: string
-  sessionIdleHint: string
+  sessionRecentHeading: string
+  sessionRecentEmpty: string
   sessionWaiting: string
   sessionJumpToLatest: string
   sessionStartNew: string

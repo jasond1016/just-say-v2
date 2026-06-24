@@ -2,6 +2,8 @@ import type { AppRuntimeSnapshot, SavedTranscript } from '../../shared/api-types
 
 export type AppSection = 'quick-dictation' | 'live-session' | 'history' | 'settings'
 
+export type SettingsSectionId = 'general' | 'recording' | 'recognition' | 'shortcuts' | 'advanced'
+
 export const APP_SECTIONS: Array<{ id: AppSection; labelKey: 'navSpeak' | 'navSession' | 'navArchive' | 'navSettings'; icon: string }> = [
   { id: 'quick-dictation', labelKey: 'navSpeak', icon: 'mic' },
   { id: 'live-session', labelKey: 'navSession', icon: 'session' },

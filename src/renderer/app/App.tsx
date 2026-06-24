@@ -62,6 +62,7 @@ function WorkspaceAppContent(props: {
     history,
     historyTotal,
     recentPttDictations,
+    recentMeetingSessions,
     selectedHistory,
     selectedHistoryAudio,
     selectedHistoryNotes,
@@ -71,6 +72,7 @@ function WorkspaceAppContent(props: {
     liveSessionMessage,
     diagnosticsMessage,
     activeSection,
+    settingsSection,
     historyQuery,
     historyMode,
     historySource,
@@ -116,6 +118,7 @@ function WorkspaceAppContent(props: {
 
   return (
     <div className="app-shell">
+      <div className="app-titlebar-drag" aria-hidden="true" />
       <nav className="app-sidebar" aria-label="Workspace sections">
         <div className="app-sidebar__brand">
           <svg className="app-sidebar__brand-icon" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
@@ -202,6 +205,7 @@ function WorkspaceAppContent(props: {
             onCopyText={(id) => { void controller.copyHistoryItem(id, 'plain_text') }}
             onDeleteText={(id) => { void controller.deleteHistoryItem(id) }}
             onOpenHistory={() => { controller.openHistorySection() }}
+            onOpenShortcutSettings={() => { controller.openSettingsSection('shortcuts') }}
           />
         ) : null}
 
@@ -214,11 +218,13 @@ function WorkspaceAppContent(props: {
             liveSessionMessage={liveSessionMessage}
             meetingStartDisabled={meetingStartDisabled}
             meetingStopDisabled={meetingStopDisabled}
+            recentSessions={recentMeetingSessions}
             onStartMeeting={() => { void controller.startMeeting() }}
             onStopMeeting={() => { void controller.stopMeeting() }}
             onCopyLiveSession={() => { void controller.copyLiveSession() }}
             onExportLiveSession={(format) => { void controller.exportLiveSession(format) }}
             onOpenHistory={() => { controller.openHistorySection() }}
+            onOpenHistoryItem={(id) => { void controller.openHistoryItemInArchive(id) }}
           />
         ) : null}
 
@@ -264,6 +270,7 @@ function WorkspaceAppContent(props: {
 
         {activeSection === 'settings' ? (
           <SettingsPage
+            initialSection={settingsSection}
             settings={settings}
             profiles={profiles}
             profileTests={profileTests}

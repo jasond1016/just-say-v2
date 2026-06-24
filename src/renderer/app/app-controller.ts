@@ -17,7 +17,7 @@ import type {
 import type { CaptureSource } from '../../shared/primitive-types'
 import { createDefaultSettings } from '../../core/settings/settings-schema'
 import type { AppApi } from '../../preload/api'
-import type { AppSection } from './app-model'
+import type { AppSection, SettingsSectionId } from './app-model'
 import { getPreferredSection } from './app-model'
 
 type RuntimeStoreLike = {
@@ -31,6 +31,7 @@ export type HistorySourceFilter = 'all' | CaptureSource
 export type HistoryTimeFilter = 'all' | 'today' | 'last_7_days' | 'last_30_days'
 
 export const RECENT_PTT_DICTATION_LIMIT = 5
+export const RECENT_MEETING_SESSION_LIMIT = 5
 
 export type AppControllerState = {
   runtime: AppRuntimeSnapshot
@@ -40,6 +41,7 @@ export type AppControllerState = {
   history: SavedTranscript[]
   historyTotal: number
   recentPttDictations: SavedTranscript[]
+  recentMeetingSessions: SavedTranscript[]
   selectedHistory: SavedTranscript | null
   selectedHistoryAudio: HistoryAudioPlayback | null
   selectedHistoryNotes: TranscriptNotes | null
@@ -49,6 +51,7 @@ export type AppControllerState = {
   liveSessionMessage: string | null
   diagnosticsMessage: string | null
   activeSection: AppSection
+  settingsSection: SettingsSectionId
   historyQuery: string
   historyMode: HistoryModeFilter
   historySource: HistorySourceFilter
@@ -74,6 +77,7 @@ export function createInitialAppControllerState(): AppControllerState {
     history: [],
     historyTotal: 0,
     recentPttDictations: [],
+    recentMeetingSessions: [],
     selectedHistory: null,
     selectedHistoryAudio: null,
     selectedHistoryNotes: null,
@@ -83,6 +87,7 @@ export function createInitialAppControllerState(): AppControllerState {
     liveSessionMessage: null,
     diagnosticsMessage: null,
     activeSection: 'quick-dictation',
+    settingsSection: 'general',
     historyQuery: '',
     historyMode: 'all',
     historySource: 'all',
@@ -155,7 +160,15 @@ export class AppController {
 
   setActiveSection(section: AppSection): void {
     this.setState({
-      activeSection: section
+      activeSection: section,
+      ...(section === 'settings' ? { settingsSection: 'general' as const } : {})
+    })
+  }
+
+  openSettingsSection(section: SettingsSectionId = 'general'): void {
+    this.setState({
+      activeSection: 'settings',
+      settingsSection: section
     })
   }
 
@@ -165,6 +178,11 @@ export class AppController {
 
   openHistorySection(): void {
     this.setActiveSection('history')
+  }
+
+  async openHistoryItemInArchive(id: string): Promise<void> {
+    this.openHistorySection()
+    await this.openHistoryItem(id)
   }
 
   clearSelectedHistory(): void {
@@ -702,7 +720,7 @@ export class AppController {
     const selectedHistory = this.state.selectedHistory
 
     try {
-      const [historyPage, recentPttPage] = await Promise.all([
+      const [historyPage, recentPttPage, recentMeetingPage] = await Promise.all([
         loadHistoryPage(
           this.deps.api,
           historyQuery,
@@ -714,6 +732,10 @@ export class AppController {
         this.deps.api.listHistory({
           mode: 'ptt',
           pageSize: RECENT_PTT_DICTATION_LIMIT
+        }),
+        this.deps.api.listHistory({
+          mode: 'meeting',
+          pageSize: RECENT_MEETING_SESSION_LIMIT
         })
       ])
 
@@ -739,6 +761,7 @@ export class AppController {
         history: historyPage.items,
         historyTotal: historyPage.total,
         recentPttDictations: recentPttPage.items,
+        recentMeetingSessions: recentMeetingPage.items,
         selectedHistory: nextSelectedHistory,
         selectedHistoryAudio: nextSelectedHistoryAudio,
         ...(nextSelectedHistory

@@ -765,32 +765,56 @@
   color: var(--text-secondary);
 }
 
-/* Quick Dictation: config panel */
-/* Speak page */
-.page--speak {
+/* Feature home pages (Speak, Session idle) */
+.page--feature-home {
+  --feature-home-hero-min-height: 360px;
   display: grid;
   gap: 0;
   align-content: start;
 }
 
-.speak-header {
-  display: grid;
-  gap: 8px;
-  margin-bottom: 24px;
+.feature-home-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: var(--feature-home-hero-min-height);
+  padding: 40px 0 48px;
+  box-sizing: border-box;
 }
 
-.speak-header__subtitle {
+.page-chrome {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  margin-bottom: 24px;
+  -webkit-app-region: drag;
+}
+
+.page-chrome__main {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.page-chrome__subtitle {
   font-size: 14px;
   line-height: 1.5;
   color: var(--text-secondary);
 }
 
-.speak-keycap-area {
+.page-chrome__actions {
   display: flex;
-  flex-direction: column;
   align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+  -webkit-app-region: no-drag;
+}
+
+.speak-keycap-area {
   gap: 14px;
-  padding: 40px 0 48px;
 }
 
 .speak-keycap {
@@ -818,40 +842,40 @@
   letter-spacing: 0.02em;
 }
 
-/* Recent output section */
-.speak-recent {
+/* Recent history sections */
+.page-recent {
   display: grid;
   gap: 0;
   margin-top: 8px;
 }
 
-.speak-recent__heading {
+.page-recent__heading {
   font-size: 15px;
   font-weight: 600;
   color: var(--text-primary);
   padding-bottom: 12px;
 }
 
-.speak-recent__list {
+.page-recent__list {
   border: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
   border-radius: 12px;
   background: color-mix(in oklab, var(--bg-surface) 94%, transparent);
   overflow: visible;
 }
 
-.speak-recent__empty {
+.page-recent__empty {
   padding: 28px 0;
   font-size: 13px;
   color: var(--text-tertiary);
 }
 
-.speak-recent__footer {
+.page-recent__footer {
   display: flex;
   justify-content: flex-end;
   padding-top: 14px;
 }
 
-.speak-recent__history-link {
+.page-recent__history-link {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -865,8 +889,57 @@
   font-family: inherit;
 }
 
-.speak-recent__history-link:hover {
+.page-recent__history-link:hover {
   text-decoration: underline;
+}
+
+.page-recent__link-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+  width: 100%;
+  padding: 14px 18px;
+  border: none;
+  border-bottom: 1px solid color-mix(in oklab, var(--border) 40%, transparent);
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.page-recent__link-row:first-child {
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+}
+
+.page-recent__link-row:last-child {
+  border-bottom: none;
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+}
+
+.page-recent__link-row:hover {
+  background: var(--bg-hover);
+}
+
+.page-recent__link-row-time {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+  padding-top: 2px;
+}
+
+.page-recent__link-row-text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Recent row */
@@ -1007,25 +1080,6 @@
   overflow: hidden;
 }
 
-.session-shell__body--idle {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-}
-
-.session-page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 24px;
-  margin-bottom: 0;
-}
-
-.session-page-header__left {
-  display: grid;
-  gap: 6px;
-}
-
 .session-page-header__subtitle {
   display: flex;
   align-items: center;
@@ -1051,13 +1105,6 @@
 .session-page-header__edit:hover {
   background: var(--bg-elevated);
   color: var(--text-secondary);
-}
-
-.session-page-header__right {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-shrink: 0;
 }
 
 .session-page-header__timer {
@@ -1107,78 +1154,14 @@
   background: var(--accent-text);
 }
 
-/* Session idle state */
-.session-idle {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 20px;
-  padding: 48px 32px;
-  border: 1.5px dashed color-mix(in oklab, var(--border) 75%, transparent);
-  border-radius: 16px;
-  background: transparent;
-}
-
-.session-idle__illustration {
-  width: min(100%, 360px);
-  margin-bottom: 4px;
-}
-
-.session-idle__background {
+.session-idle-hero__image {
   display: block;
-  width: 100%;
+  width: auto;
   height: auto;
+  max-height: 260px;
+  max-width: min(100%, 220px);
   user-select: none;
   -webkit-user-drag: none;
-}
-
-.session-idle__heading {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-primary);
-  text-align: center;
-}
-
-.session-idle__features {
-  list-style: none;
-  padding: 0;
-  display: grid;
-  gap: 12px;
-}
-
-.session-idle__feature {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 14px;
-  color: var(--text-primary);
-}
-
-.session-idle__feature-icon {
-  display: block;
-  width: 32px;
-  height: 32px;
-  flex-shrink: 0;
-  user-select: none;
-  -webkit-user-drag: none;
-}
-
-.session-idle__hint {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 12px;
-  padding-top: 16px;
-  border-top: 1px solid color-mix(in oklab, var(--border) 50%, transparent);
-  font-size: 13px;
-  color: var(--text-tertiary);
-  width: 100%;
-  max-width: 320px;
-  justify-content: center;
-}
-
-.session-idle__hint-icon {
-  color: var(--accent-text);
 }
 
 /* Session transcript area */

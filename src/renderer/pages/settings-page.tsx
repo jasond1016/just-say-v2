@@ -13,6 +13,7 @@ import type {
   TranslationProvider
 } from '../../shared/api-types'
 import type { Messages } from '../../i18n'
+import type { SettingsSectionId } from '../app/app-model'
 import { Button } from '../ui/controls'
 import {
   describeLocalServiceStatus,
@@ -23,7 +24,6 @@ import {
 } from '../ui/copy'
 import { useT } from '../i18n-context'
 
-type SettingsSectionId = 'general' | 'recording' | 'recognition' | 'shortcuts' | 'advanced'
 export type TranslationTargetOption = 'zh' | 'en' | 'ja'
 
 export const TRANSLATION_TARGET_OPTIONS: Array<{ value: TranslationTargetOption; labelKey: 'settingsTranslationTargetZh' | 'settingsTranslationTargetEn' | 'settingsTranslationTargetJa' }> = [
@@ -39,6 +39,7 @@ type TextSettingsDraft = {
 
 export function SettingsPage(props: {
   settings: AppSettings
+  initialSection?: SettingsSectionId
   profiles: EngineProfile[]
   profileTests: Record<string, ProfileTestResult | undefined>
   diagnosticsMessage: string | null
@@ -67,7 +68,7 @@ export function SettingsPage(props: {
   onRemoteServicePortChange: (port: number | undefined) => void
   onExportDiagnostics: () => void
 }) {
-  const [selectedSection, setSelectedSection] = useState<SettingsSectionId>('general')
+  const [selectedSection, setSelectedSection] = useState<SettingsSectionId>(props.initialSection ?? 'general')
   const [draftManagedHost, setDraftManagedHost] = useState(props.settings.advanced.localServiceHost ?? '')
   const [draftManagedPort, setDraftManagedPort] = useState(
     props.settings.advanced.localServicePort?.toString() ?? ''
@@ -117,6 +118,10 @@ export function SettingsPage(props: {
   const activeConnectionDraftDirty = localServiceMode === 'managed-local'
     ? managedConnectionDraftDirty
     : remoteConnectionDraftDirty
+
+  useEffect(() => {
+    setSelectedSection(props.initialSection ?? 'general')
+  }, [props.initialSection])
 
   useEffect(() => {
     setDraftManagedHost(props.settings.advanced.localServiceHost ?? '')

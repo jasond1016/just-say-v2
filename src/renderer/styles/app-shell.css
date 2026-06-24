@@ -1,8 +1,20 @@
 .app-shell {
   display: grid;
-  grid-template-columns: 196px minmax(0, 1fr);
+  grid-template-columns: var(--app-sidebar-width) minmax(0, 1fr);
   min-height: 100vh;
   background: var(--bg-page);
+  --app-sidebar-width: 196px;
+  --app-titlebar-height: 36px;
+}
+
+.app-titlebar-drag {
+  position: fixed;
+  top: 0;
+  left: var(--app-sidebar-width);
+  right: 0;
+  height: var(--app-titlebar-height);
+  -webkit-app-region: drag;
+  z-index: 2000;
 }
 
 .app-sidebar {
@@ -219,13 +231,11 @@
   overflow: auto;
   background: color-mix(in oklab, var(--bg-surface) 96%, transparent);
   position: relative;
+  padding-top: var(--app-titlebar-height);
 }
 
-.app-main::before {
-  content: '';
-  display: block;
-  height: 36px;
-  -webkit-app-region: drag;
+.app-main :is(button, a, input, textarea, select, [role="button"]) {
+  -webkit-app-region: no-drag;
 }
 
 [data-theme="light"] .app-main {

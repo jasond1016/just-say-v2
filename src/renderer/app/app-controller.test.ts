@@ -127,6 +127,10 @@ describe('AppController', () => {
       mode: 'ptt',
       pageSize: 5
     })
+    expect(listHistory).toHaveBeenCalledWith({
+      mode: 'meeting',
+      pageSize: 5
+    })
 
     dispose()
   })
