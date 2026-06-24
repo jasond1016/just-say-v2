@@ -49,8 +49,10 @@ describe('HistoryPage audio detail', () => {
     )
 
     expect(markup).toContain('archive-audio-bar')
-    expect(markup).toContain('<audio')
+    expect(markup).toContain('archive-audio-bar__play')
+    expect(markup).toContain('archive-audio-bar__media')
     expect(markup).toContain('file:///C:/audio/meeting-1.wav')
+    expect(markup).toContain('archive-audio-bar__volume-slider')
   })
 
   it('shows the audio bar only when playback is available', () => {
@@ -81,7 +83,7 @@ describe('HistoryPage audio detail', () => {
       }))
     )
 
-    expect(markup).not.toContain('<audio')
+    expect(markup).not.toContain('archive-audio-bar__media')
     expect(markup).not.toContain('archive-audio-bar')
   })
 

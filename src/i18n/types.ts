@@ -43,6 +43,15 @@ export type Messages = {
   archiveBackToList: string
   archiveRenameTitle: string
   archiveExport: string
+  archiveAudioPlayer: string
+  archiveAudioPlay: string
+  archiveAudioPause: string
+  archiveAudioSeek: string
+  archiveAudioMute: string
+  archiveAudioUnmute: string
+  archiveAudioVolume: string
+  archiveAudioMore: string
+  archiveAudioSpeed: string
   archiveArchived: string
   archiveTabTranscriptMeeting: string
   archiveTabTranscriptPtt: string

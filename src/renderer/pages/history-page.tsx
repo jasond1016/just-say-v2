@@ -10,6 +10,7 @@ import type {
 } from '../../shared/api-types'
 import type { CaptureSource } from '../../shared/primitive-types'
 import { Button, TextInput } from '../ui/controls'
+import { ArchiveAudioBar } from '../ui/archive-audio-bar'
 import { useT } from '../i18n-context'
 
 type HistoryTimeFilter = 'all' | 'today' | 'last_7_days' | 'last_30_days'
@@ -738,14 +739,7 @@ export function HistoryPage(props: {
         )}
 
         {selectedTranscript.mode === 'meeting' && selectedTranscript.metadata.audio && props.selectedAudio ? (
-          <div className="archive-audio-bar">
-            <audio
-              className="archive-audio-bar__player"
-              controls
-              preload="metadata"
-              src={props.selectedAudio.url}
-            />
-          </div>
+          <ArchiveAudioBar playback={props.selectedAudio} />
         ) : null}
       </div>
       {deleteDialog}
