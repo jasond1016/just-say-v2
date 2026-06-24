@@ -1,8 +1,13 @@
 import { useState } from 'react'
 
-import type { AppSettings, AppRuntimeSnapshot, LocalServiceStatus, SavedTranscript } from '../../shared/api-types'
+import type { AppSettings, AppRuntimeSnapshot, LocalServiceStatus, PttHotkey, SavedTranscript } from '../../shared/api-types'
 import { describePttHotkey } from '../ui/copy'
 import { useT } from '../i18n-context'
+
+const KEYCAP_BY_HOTKEY: Record<PttHotkey, { src: string; label: string }> = {
+  RCtrl: { src: './assets/keycap-rctrl.png', label: 'R Ctrl' },
+  RAlt: { src: './assets/keycap-ralt.png', label: 'R Alt' },
+}
 
 export function QuickDictationPage(props: {
   runtime: AppRuntimeSnapshot
@@ -13,8 +18,10 @@ export function QuickDictationPage(props: {
   onOpenHistory: () => void
 }) {
   const t = useT()
-  const hotkeyLabel = describePttHotkey(props.settings.input.pttHotkey)
-  const shortLabel = props.settings.input.pttHotkey === 'RCtrl' ? 'R Ctrl' : 'R Alt'
+  const hotkey = props.settings.input.pttHotkey
+  const hotkeyLabel = describePttHotkey(hotkey)
+  const keycap = KEYCAP_BY_HOTKEY[hotkey]
+  const isPressed = props.runtime.ptt.status === 'arming' || props.runtime.ptt.status === 'capturing'
 
   return (
     <div className="page page--speak">
@@ -24,10 +31,15 @@ export function QuickDictationPage(props: {
       </header>
 
       <section className="speak-keycap-area" aria-label={`Press ${hotkeyLabel} to dictate`}>
-        <div className="speak-keycap">
-          <div className="speak-keycap__face">
-            <span className="speak-keycap__label">{shortLabel}</span>
-          </div>
+        <div className={`speak-keycap ${isPressed ? 'speak-keycap--pressed' : ''}`}>
+          <img
+            className="speak-keycap__image"
+            src={keycap.src}
+            alt={keycap.label}
+            width={320}
+            height={187}
+            draggable={false}
+          />
         </div>
         <span className="speak-keycap-area__hint">{t.speakHoldToTalk}</span>
       </section>

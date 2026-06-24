@@ -794,56 +794,22 @@
 }
 
 .speak-keycap {
-  position: relative;
-  width: 200px;
-  height: 130px;
-  perspective: 400px;
+  width: 320px;
+  height: auto;
 }
 
-.speak-keycap__face {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 14px;
-  background: linear-gradient(180deg, oklch(0.98 0.003 70) 0%, oklch(0.94 0.006 70) 100%);
-  border: 1.5px solid oklch(0.82 0.012 70);
-  box-shadow:
-    0 10px 0 0 oklch(0.78 0.02 60),
-    0 12px 24px oklch(0.4 0.01 60 / 0.12),
-    inset 0 2px 0 oklch(1 0.002 80 / 0.8);
-  transition: transform 0.08s ease-out, box-shadow 0.08s ease-out;
-}
-
-.speak-keycap__face::before {
-  content: '';
-  position: absolute;
-  inset: 10px;
-  border: 2px dashed oklch(0.82 0.01 70);
-  border-radius: 8px;
-  pointer-events: none;
-}
-
-[data-theme="light"] .speak-keycap__face {
-  background: linear-gradient(180deg, oklch(0.99 0.002 80) 0%, oklch(0.95 0.005 78) 100%);
-  border-color: oklch(0.84 0.01 72);
-  box-shadow:
-    0 10px 0 0 oklch(0.8 0.02 60),
-    0 14px 28px oklch(0.4 0.01 60 / 0.1),
-    inset 0 2px 0 oklch(1 0 0 / 0.7);
-}
-
-[data-theme="light"] .speak-keycap__face::before {
-  border-color: oklch(0.85 0.008 72);
-}
-
-.speak-keycap__label {
-  font-size: 28px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  color: oklch(0.25 0.01 60);
+.speak-keycap__image {
+  display: block;
+  width: 100%;
+  height: auto;
   user-select: none;
+  -webkit-user-drag: none;
+  transition: transform 0.08s ease-out, filter 0.08s ease-out;
+}
+
+.speak-keycap--pressed .speak-keycap__image {
+  transform: translateY(4px) scale(0.985);
+  filter: brightness(0.96);
 }
 
 .speak-keycap-area__hint {

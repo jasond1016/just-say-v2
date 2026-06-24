@@ -62,6 +62,10 @@ await Promise.all([
   cp(path.join(rendererSourceDir, 'styles'), path.join(distDir, 'renderer', 'styles'), {
     recursive: true,
     force: true
+  }),
+  cp(path.join(rendererSourceDir, 'assets'), path.join(distDir, 'renderer', 'assets'), {
+    recursive: true,
+    force: true
   })
 ])
 
