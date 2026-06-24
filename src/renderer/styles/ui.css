@@ -836,7 +836,7 @@
   border: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
   border-radius: 12px;
   background: color-mix(in oklab, var(--bg-surface) 94%, transparent);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .speak-recent__empty {
@@ -879,8 +879,15 @@
   border-bottom: 1px solid color-mix(in oklab, var(--border) 40%, transparent);
 }
 
+.speak-row:first-child {
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+}
+
 .speak-row:last-child {
   border-bottom: none;
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
 }
 
 .speak-row__time {
@@ -928,7 +935,7 @@
 
 .speak-row__menu {
   position: absolute;
-  top: 32px;
+  top: calc(100% + 4px);
   right: 0;
   min-width: 120px;
   padding: 4px;
@@ -936,7 +943,12 @@
   border-radius: 8px;
   background: var(--bg-surface);
   box-shadow: 0 8px 24px oklch(0.2 0 0 / 0.12);
-  z-index: 10;
+  z-index: 20;
+}
+
+.speak-row__menu--above {
+  top: auto;
+  bottom: calc(100% + 4px);
 }
 
 .speak-row__menu-item {
@@ -955,6 +967,10 @@
 
 .speak-row__menu-item:hover {
   background: var(--bg-hover);
+}
+
+.speak-row__menu-item--danger {
+  color: var(--danger-text);
 }
 
 /* Session page */

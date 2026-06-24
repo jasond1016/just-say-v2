@@ -12,6 +12,7 @@ export type Messages = {
   speakRecentEmpty: string
   speakViewAllHistory: string
   speakCopyText: string
+  speakDeleteText: string
   speakYesterday: (time: string) => string
 
   // -- Session page --

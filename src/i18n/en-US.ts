@@ -14,6 +14,7 @@ export const enUS: Messages = {
   speakRecentEmpty: 'No output yet',
   speakViewAllHistory: 'View all history',
   speakCopyText: 'Copy text',
+  speakDeleteText: 'Delete',
   speakYesterday: (time) => `Yesterday ${time}`,
 
   // -- Session page --

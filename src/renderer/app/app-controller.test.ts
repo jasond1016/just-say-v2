@@ -119,9 +119,13 @@ describe('AppController', () => {
     await controller.setHistorySource('system')
     await controller.setHistoryTimeFilter('last_7_days')
 
-    expect(listHistory).toHaveBeenLastCalledWith({
+    expect(listHistory).toHaveBeenCalledWith({
       source: 'system',
       startedAfter: new Date('2026-01-08T12:00:00.000Z').getTime()
+    })
+    expect(listHistory).toHaveBeenCalledWith({
+      mode: 'ptt',
+      pageSize: 5
     })
 
     dispose()
@@ -461,25 +465,32 @@ describe('AppController', () => {
 
   it('deletes multiple history items through the API and refreshes the archive', async () => {
     const deleteHistory = vi.fn(async () => true)
-    const listHistory = vi
-      .fn()
-      .mockResolvedValueOnce({
-        items: [createHistoryItem('tx-1', 'meeting'), createHistoryItem('tx-2', 'meeting')],
-        total: 2,
+    let historyItems = [createHistoryItem('tx-1', 'meeting'), createHistoryItem('tx-2', 'meeting')]
+    const listHistory = vi.fn(async (query?: { mode?: string }) => {
+      if (query?.mode === 'ptt') {
+        return {
+          items: [],
+          total: 0,
+          page: 1,
+          pageSize: 5,
+          totalPages: 0
+        }
+      }
+
+      return {
+        items: historyItems,
+        total: historyItems.length,
         page: 1,
         pageSize: 20,
-        totalPages: 1
-      })
-      .mockResolvedValueOnce({
-        items: [],
-        total: 0,
-        page: 1,
-        pageSize: 20,
-        totalPages: 0
-      })
+        totalPages: historyItems.length === 0 ? 0 : 1
+      }
+    })
     const controller = new AppController({
       api: createApi({
-        deleteHistory,
+        deleteHistory: vi.fn(async (id: string) => {
+          historyItems = historyItems.filter((item) => item.id !== id)
+          return deleteHistory(id)
+        }),
         listHistory
       }),
       runtimeStore: new RuntimeStore()

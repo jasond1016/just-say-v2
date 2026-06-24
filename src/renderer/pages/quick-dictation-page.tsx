@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import type { AppSettings, AppRuntimeSnapshot, LocalServiceStatus, PttHotkey, SavedTranscript } from '../../shared/api-types'
 import { describePttHotkey } from '../ui/copy'
@@ -15,6 +15,7 @@ export function QuickDictationPage(props: {
   localServiceStatus: LocalServiceStatus
   recentDictations: SavedTranscript[]
   onCopyText: (id: string) => void
+  onDeleteText: (id: string) => void
   onOpenHistory: () => void
 }) {
   const t = useT()
@@ -49,7 +50,12 @@ export function QuickDictationPage(props: {
         {props.recentDictations.length > 0 ? (
           <div className="speak-recent__list">
             {props.recentDictations.map((item) => (
-              <RecentRow key={item.id} item={item} onCopy={props.onCopyText} />
+              <RecentRow
+                key={item.id}
+                item={item}
+                onCopy={props.onCopyText}
+                onDelete={props.onDeleteText}
+              />
             ))}
           </div>
         ) : (
@@ -68,15 +74,40 @@ export function QuickDictationPage(props: {
   )
 }
 
-function RecentRow(props: { item: SavedTranscript; onCopy: (id: string) => void }) {
+function RecentRow(props: {
+  item: SavedTranscript
+  onCopy: (id: string) => void
+  onDelete: (id: string) => void
+}) {
   const t = useT()
+  const actionsRef = useRef<HTMLDivElement>(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [menuPlacement, setMenuPlacement] = useState<'above' | 'below'>('below')
   const [copied, setCopied] = useState(false)
   const displayText = props.item.plainText.length > 100
     ? props.item.plainText.slice(0, 100) + '…'
     : props.item.plainText
 
   const timeLabel = formatRelativeTime(props.item.endedAt, t)
+
+  useEffect(() => {
+    if (!menuOpen) {
+      return
+    }
+
+    const onPointerDown = (event: PointerEvent) => {
+      const actions = actionsRef.current
+
+      if (!actions || !(event.target instanceof Node) || actions.contains(event.target)) {
+        return
+      }
+
+      setMenuOpen(false)
+    }
+
+    window.addEventListener('pointerdown', onPointerDown)
+    return () => window.removeEventListener('pointerdown', onPointerDown)
+  }, [menuOpen])
 
   const handleCopy = () => {
     props.onCopy(props.item.id)
@@ -85,23 +116,56 @@ function RecentRow(props: { item: SavedTranscript; onCopy: (id: string) => void 
     window.setTimeout(() => setCopied(false), 1500)
   }
 
+  const handleDelete = () => {
+    props.onDelete(props.item.id)
+    setMenuOpen(false)
+  }
+
+  const toggleMenu = () => {
+    if (menuOpen) {
+      setMenuOpen(false)
+      return
+    }
+
+    const actions = actionsRef.current
+    if (actions) {
+      const rect = actions.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - rect.bottom
+      setMenuPlacement(spaceBelow < 96 ? 'above' : 'below')
+    }
+
+    setMenuOpen(true)
+  }
+
   return (
     <div className="speak-row">
       <span className="speak-row__time">{timeLabel}</span>
       <span className="speak-row__text">{displayText}</span>
-      <div className="speak-row__actions">
+      <div className="speak-row__actions" ref={actionsRef}>
         <button
           type="button"
           className="speak-row__menu-trigger"
           aria-label="Actions"
-          onClick={() => setMenuOpen(!menuOpen)}
+          aria-expanded={menuOpen}
+          onClick={toggleMenu}
         >
           {copied ? '✓' : '⋯'}
         </button>
         {menuOpen && !copied ? (
-          <div className="speak-row__menu">
-            <button type="button" className="speak-row__menu-item" onClick={handleCopy}>
+          <div
+            className={`speak-row__menu ${menuPlacement === 'above' ? 'speak-row__menu--above' : ''}`}
+            role="menu"
+          >
+            <button type="button" className="speak-row__menu-item" role="menuitem" onClick={handleCopy}>
               {t.speakCopyText}
+            </button>
+            <button
+              type="button"
+              className="speak-row__menu-item speak-row__menu-item--danger"
+              role="menuitem"
+              onClick={handleDelete}
+            >
+              {t.speakDeleteText}
             </button>
           </div>
         ) : null}

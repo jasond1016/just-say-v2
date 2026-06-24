@@ -14,6 +14,7 @@ export const zhCN: Messages = {
   speakRecentEmpty: '尚无输出记录',
   speakViewAllHistory: '查看全部历史',
   speakCopyText: '复制文本',
+  speakDeleteText: '删除',
   speakYesterday: (time) => `昨天 ${time}`,
 
   // -- Session page --

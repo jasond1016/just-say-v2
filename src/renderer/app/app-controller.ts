@@ -30,6 +30,8 @@ export type HistoryModeFilter = 'all' | SavedTranscript['mode']
 export type HistorySourceFilter = 'all' | CaptureSource
 export type HistoryTimeFilter = 'all' | 'today' | 'last_7_days' | 'last_30_days'
 
+export const RECENT_PTT_DICTATION_LIMIT = 5
+
 export type AppControllerState = {
   runtime: AppRuntimeSnapshot
   settings: AppSettings
@@ -37,6 +39,7 @@ export type AppControllerState = {
   profileTests: Record<string, ProfileTestResult | undefined>
   history: SavedTranscript[]
   historyTotal: number
+  recentPttDictations: SavedTranscript[]
   selectedHistory: SavedTranscript | null
   selectedHistoryAudio: HistoryAudioPlayback | null
   selectedHistoryNotes: TranscriptNotes | null
@@ -70,6 +73,7 @@ export function createInitialAppControllerState(): AppControllerState {
     profileTests: {},
     history: [],
     historyTotal: 0,
+    recentPttDictations: [],
     selectedHistory: null,
     selectedHistoryAudio: null,
     selectedHistoryNotes: null,
@@ -687,14 +691,20 @@ export class AppController {
     const selectedHistory = this.state.selectedHistory
 
     try {
-      const historyPage = await loadHistoryPage(
-        this.deps.api,
-        historyQuery,
-        historyMode,
-        historySource,
-        historyTimeFilter,
-        this.now()
-      )
+      const [historyPage, recentPttPage] = await Promise.all([
+        loadHistoryPage(
+          this.deps.api,
+          historyQuery,
+          historyMode,
+          historySource,
+          historyTimeFilter,
+          this.now()
+        ),
+        this.deps.api.listHistory({
+          mode: 'ptt',
+          pageSize: RECENT_PTT_DICTATION_LIMIT
+        })
+      ])
 
       if (!this.isLifecycleCurrent(lifecycleToken) || requestId !== this.historyRequestId) {
         return
@@ -717,6 +727,7 @@ export class AppController {
       this.setState({
         history: historyPage.items,
         historyTotal: historyPage.total,
+        recentPttDictations: recentPttPage.items,
         selectedHistory: nextSelectedHistory,
         selectedHistoryAudio: nextSelectedHistoryAudio,
         ...(nextSelectedHistory

@@ -61,6 +61,7 @@ function WorkspaceAppContent(props: {
     profileTests,
     history,
     historyTotal,
+    recentPttDictations,
     selectedHistory,
     selectedHistoryAudio,
     selectedHistoryNotes,
@@ -197,8 +198,9 @@ function WorkspaceAppContent(props: {
             runtime={runtime}
             settings={settings}
             localServiceStatus={serviceStatus}
-            recentDictations={history.filter((item) => item.mode === 'ptt').slice(0, 5)}
+            recentDictations={recentPttDictations}
             onCopyText={(id) => { void controller.copyHistoryItem(id, 'plain_text') }}
+            onDeleteText={(id) => { void controller.deleteHistoryItem(id) }}
             onOpenHistory={() => { controller.openHistorySection() }}
           />
         ) : null}
