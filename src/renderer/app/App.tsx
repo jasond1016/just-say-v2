@@ -151,6 +151,8 @@ function WorkspaceAppContent(props: {
   const serviceLabel = describeLocalServiceStatus(serviceStatus)
   const t = useT()
 
+  const useSessionMainLayout = activeSection === 'live-session' && displayLiveSession !== null
+
   return (
     <div className="app-shell">
       <div className="app-titlebar-drag" aria-hidden="true" />
@@ -214,7 +216,7 @@ function WorkspaceAppContent(props: {
         </div>
       </nav>
 
-      <main className={`app-main ${activeSection === 'live-session' ? 'app-main--session' : ''}`}>
+      <main className={`app-main ${useSessionMainLayout ? 'app-main--session' : ''}`}>
         {error ? (
           <div className="app-main__notes">
             <div className="app-note app-note--error" role="alert">
