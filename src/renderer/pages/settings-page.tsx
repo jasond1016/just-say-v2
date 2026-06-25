@@ -14,7 +14,7 @@ import type {
 } from '../../shared/api-types'
 import type { Messages } from '../../i18n'
 import type { SettingsSectionId } from '../app/app-model'
-import { Button } from '../ui/controls'
+import { Button, SelectField } from '../ui/controls'
 import {
   describeLocalServiceStatus,
   describeOutputMethod,
@@ -258,7 +258,7 @@ export function SettingsPage(props: {
                 <h2 className="settings-card__title">{t.settingsThemeTitle}</h2>
                 <div className="settings-card__body">
                   <CardRow label={t.settingsThemeMode}>
-                    <select
+                    <SelectField
                       className="settings-select"
                       value={props.settings.general.theme}
                       disabled={disabled}
@@ -267,10 +267,10 @@ export function SettingsPage(props: {
                       <option value="system">{t.settingsThemeSystem}</option>
                       <option value="light">{t.settingsThemeLight}</option>
                       <option value="dark">{t.settingsThemeDark}</option>
-                    </select>
+                    </SelectField>
                   </CardRow>
                   <CardRow label={t.settingsLanguageLabel}>
-                    <select
+                    <SelectField
                       className="settings-select"
                       value={props.settings.general.language}
                       disabled={disabled}
@@ -278,7 +278,7 @@ export function SettingsPage(props: {
                     >
                       <option value="zh-CN">{t.settingsLanguageZh}</option>
                       <option value="en-US">{t.settingsLanguageEn}</option>
-                    </select>
+                    </SelectField>
                   </CardRow>
                 </div>
               </div>
@@ -301,7 +301,7 @@ export function SettingsPage(props: {
                 <h2 className="settings-card__title">{t.settingsRecordingTitle}</h2>
                 <div className="settings-card__body">
                   <CardRow label={t.settingsSpeechLanguage}>
-                    <select
+                    <SelectField
                       className="settings-select"
                       value={props.settings.speech.language}
                       disabled={disabled}
@@ -312,7 +312,7 @@ export function SettingsPage(props: {
                       <option value="en">English</option>
                       <option value="ja">日本語</option>
                       <option value="ko">한국어</option>
-                    </select>
+                    </SelectField>
                   </CardRow>
                   <CardRow label={t.settingsMicInMeeting}>
                     <ToggleSwitch
@@ -342,7 +342,7 @@ export function SettingsPage(props: {
                     />
                   </CardRow>
                   <CardRow label={t.settingsTranslationTarget}>
-                    <select
+                    <SelectField
                       className="settings-select"
                       value={selectedTranslationTarget}
                       disabled={disabled || !translationEnabled}
@@ -351,17 +351,17 @@ export function SettingsPage(props: {
                       {TRANSLATION_TARGET_OPTIONS.map((option) => (
                         <option key={option.value} value={option.value}>{t[option.labelKey]}</option>
                       ))}
-                    </select>
+                    </SelectField>
                   </CardRow>
                   <CardRow label={t.settingsTranslationService}>
-                    <select
+                    <SelectField
                       className="settings-select"
                       value={props.settings.translation.provider}
                       disabled={disabled}
                       onChange={(e) => props.onTranslationProviderChange(e.target.value as TranslationProvider)}
                     >
                       <option value="openai-compatible">OpenAI-compatible</option>
-                    </select>
+                    </SelectField>
                   </CardRow>
                 </div>
               </div>
@@ -467,7 +467,7 @@ export function SettingsPage(props: {
                     {describeLocalServiceStatus(props.localServiceStatus, t)}
                   </div>
                   <CardRow label={t.settingsDeployMode}>
-                    <select
+                    <SelectField
                       className="settings-select"
                       value={localServiceMode}
                       disabled={disabled}
@@ -475,7 +475,7 @@ export function SettingsPage(props: {
                     >
                       <option value="managed-local">{t.settingsDeployLocal}</option>
                       <option value="remote-service">{t.settingsDeployRemote}</option>
-                    </select>
+                    </SelectField>
                   </CardRow>
 
                   {localServiceMode === 'managed-local' ? (
@@ -568,7 +568,7 @@ export function SettingsPage(props: {
                     </Segmented>
                   </CardRow>
                   <CardRow label={t.settingsOutputMethod}>
-                    <select
+                    <SelectField
                       className="settings-select"
                       value={props.settings.output.method}
                       disabled={disabled}
@@ -577,7 +577,7 @@ export function SettingsPage(props: {
                       <option value="simulate_input">{describeOutputMethod('simulate_input', t)}</option>
                       <option value="clipboard">{describeOutputMethod('clipboard', t)}</option>
                       <option value="popup">{describeOutputMethod('popup', t)}</option>
-                    </select>
+                    </SelectField>
                   </CardRow>
                 </div>
               </div>

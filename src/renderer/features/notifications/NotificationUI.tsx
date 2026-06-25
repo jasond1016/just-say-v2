@@ -1,7 +1,9 @@
+import { X } from 'lucide-react'
 import { useSyncExternalStore } from 'react'
 
 import type { NotificationEntry, NotificationStore } from './notification-store'
 import { useT } from '../../i18n-context'
+import { appIconProps } from '../../ui/icons'
 
 export function ToastContainer(props: { store: NotificationStore }) {
   const t = useT()
@@ -23,7 +25,7 @@ export function ToastContainer(props: { store: NotificationStore }) {
             aria-label={t.notificationDismiss}
             onClick={() => props.store.dismiss(toast.id)}
           >
-            ×
+            <X {...appIconProps(16)} />
           </button>
         </div>
       ))}
@@ -67,7 +69,7 @@ function BannerItem(props: { entry: NotificationEntry; onDismiss: () => void }) 
         aria-label={t.notificationDismiss}
         onClick={onDismiss}
       >
-        ×
+        <X {...appIconProps(16)} />
       </button>
     </div>
   )

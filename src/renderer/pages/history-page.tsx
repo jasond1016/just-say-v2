@@ -1,3 +1,14 @@
+import {
+  ArrowLeft,
+  Calendar,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Download,
+  Ellipsis,
+  Pencil,
+} from 'lucide-react'
 import { useEffect, useId, useMemo, useRef, useState, type RefObject } from 'react'
 
 import type {
@@ -11,6 +22,7 @@ import type {
 import type { CaptureSource } from '../../shared/primitive-types'
 import { Button, TextInput } from '../ui/controls'
 import { ArchiveAudioBar } from '../ui/archive-audio-bar'
+import { appIconProps } from '../ui/icons'
 import { useT } from '../i18n-context'
 
 type HistoryTimeFilter = 'all' | 'today' | 'last_7_days' | 'last_30_days'
@@ -413,7 +425,7 @@ export function HistoryPage(props: {
                       onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                       aria-label="Previous page"
                     >
-                      ←
+                      <ChevronLeft {...appIconProps(16)} />
                     </button>
                     {buildPageNumbers(currentPage, totalPages).map((page, index) =>
                       page === '...' ? (
@@ -436,7 +448,7 @@ export function HistoryPage(props: {
                       onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                       aria-label="Next page"
                     >
-                      →
+                      <ChevronRight {...appIconProps(16)} />
                     </button>
                   </nav>
                 ) : null}
@@ -455,7 +467,8 @@ export function HistoryPage(props: {
         <header className="archive-detail__header">
           <div className="archive-detail__top-row">
             <button type="button" className="archive-detail__back" onClick={props.onCloseDetail}>
-              <span aria-hidden="true">←</span> {t.archiveBackToList}
+              <ArrowLeft {...appIconProps(16)} />
+              {t.archiveBackToList}
             </button>
             <div className="archive-detail__top-actions">
               <button
@@ -464,9 +477,7 @@ export function HistoryPage(props: {
                 disabled={Boolean(props.busyAction)}
                 onClick={() => props.onExport(selectedTranscript.id, 'plain_text')}
               >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <path d="M8 1v9m0 0L5 7m3 3 3-3M2 11v2a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
+                <Download {...appIconProps(16)} />
                 {t.archiveExport}
               </button>
               <div
@@ -482,7 +493,7 @@ export function HistoryPage(props: {
                   onClick={() => setActionMenuOpen((current) => !current)}
                   aria-label="More actions"
                 >
-                  ···
+                  <Ellipsis {...appIconProps(16)} />
                 </button>
 
                 {actionMenuOpen ? (
@@ -528,18 +539,12 @@ export function HistoryPage(props: {
 
           <div className="archive-detail__meta">
             <span className="archive-detail__meta-item">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <rect x="2" y="3" width="12" height="11" rx="2" stroke="currentColor" strokeWidth="1.2"/>
-                <path d="M5 1v3M11 1v3M2 7h12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-              </svg>
+              <Calendar {...appIconProps(14)} />
               {formatArchiveDate(selectedTranscript.startedAt)}
             </span>
             <span className="archive-detail__meta-sep">·</span>
             <span className="archive-detail__meta-item">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.2"/>
-                <path d="M8 5v3.5l2.5 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+              <Clock {...appIconProps(14)} />
               {formatDurationMs(selectedTranscript.endedAt - selectedTranscript.startedAt)}
             </span>
             <span className="archive-detail__meta-sep">·</span>
@@ -548,10 +553,7 @@ export function HistoryPage(props: {
             </span>
             <span className="archive-detail__meta-sep">·</span>
             <span className="archive-detail__meta-item archive-detail__meta-status">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.2"/>
-                <path d="M5.5 8l2 2 3.5-3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+              <CheckCircle2 {...appIconProps(14)} />
               {t.archiveArchived}
             </span>
           </div>
@@ -889,9 +891,7 @@ function ArchiveDetailTitle(props: {
         disabled={props.disabled}
         onClick={startEditing}
       >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-          <path d="M11.5 2.5l2 2-8 8H3.5v-2l8-8z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
-        </svg>
+        <Pencil {...appIconProps(16)} />
       </button>
     </div>
   )

@@ -1,4 +1,7 @@
+import { ChevronDown } from 'lucide-react'
 import { forwardRef, type ChangeEvent, type ReactNode } from 'react'
+
+import { appIconProps } from './icons'
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost'
 
@@ -80,20 +83,27 @@ export function SelectField(props: {
   value: string
   disabled?: boolean | undefined
   className?: string | undefined
+  wrapClassName?: string | undefined
   onChange: (e: ChangeEvent<HTMLSelectElement>) => void
   children: ReactNode
 }) {
+  const selectClassName = [props.className ?? 'field-select'].filter(Boolean).join(' ')
+  const wrapClassName = ['field-select-wrap', props.wrapClassName ?? ''].filter(Boolean).join(' ')
+
   return (
-    <select
-      id={props.id}
-      aria-label={props.ariaLabel}
-      aria-describedby={props.ariaDescribedBy}
-      value={props.value}
-      disabled={props.disabled}
-      onChange={props.onChange}
-      className={['field-select', props.className ?? ''].filter(Boolean).join(' ')}
-    >
-      {props.children}
-    </select>
+    <div className={wrapClassName}>
+      <select
+        id={props.id}
+        aria-label={props.ariaLabel}
+        aria-describedby={props.ariaDescribedBy}
+        value={props.value}
+        disabled={props.disabled}
+        onChange={props.onChange}
+        className={selectClassName}
+      >
+        {props.children}
+      </select>
+      <ChevronDown {...appIconProps(14, 'field-select-wrap__chevron')} />
+    </div>
   )
 }

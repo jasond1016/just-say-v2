@@ -1,8 +1,10 @@
+import { Check, Ellipsis, Keyboard } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 import type { AppSettings, AppRuntimeSnapshot, LocalServiceStatus, PttHotkey, SavedTranscript } from '../../shared/api-types'
 import { describePttHotkey } from '../ui/copy'
 import { useT } from '../i18n-context'
+import { appIconProps } from '../ui/icons'
 import { PageChrome } from '../ui/page-chrome'
 import { RecentHistorySection, formatRecentTime } from '../ui/page-recent'
 
@@ -34,10 +36,7 @@ export function QuickDictationPage(props: {
         subtitle={t.speakSubtitle}
         actions={
           <button type="button" className="session-action-btn session-action-btn--start" onClick={props.onOpenShortcutSettings}>
-            <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-              <rect x="2.5" y="5.5" width="15" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
-              <path d="M5.5 8.5h1.2M8.2 8.5h1.2M10.9 8.5h1.2M13.6 8.5H15M6.1 11.5h1.2M9.4 11.5h5.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-            </svg>
+            <Keyboard {...appIconProps(16)} />
             {t.speakChangeHotkey}
           </button>
         }
@@ -152,7 +151,7 @@ function RecentRow(props: {
           aria-expanded={menuOpen}
           onClick={toggleMenu}
         >
-          {copied ? '✓' : '⋯'}
+          {copied ? <Check {...appIconProps(16)} /> : <Ellipsis {...appIconProps(16)} />}
         </button>
         {menuOpen && !copied ? (
           <div

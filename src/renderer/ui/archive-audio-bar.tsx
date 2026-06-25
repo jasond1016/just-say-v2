@@ -1,53 +1,26 @@
+import { Ellipsis, Pause, Play, Volume1, Volume2, VolumeX } from 'lucide-react'
 import { useEffect, useId, useRef, useState, type ChangeEvent, type CSSProperties } from 'react'
 
 import type { HistoryAudioPlayback } from '../../shared/api-types'
 import { useT } from '../i18n-context'
+import { appIconProps } from './icons'
 
 const PLAYBACK_RATES = [0.75, 1, 1.25, 1.5, 2] as const
 
+const AUDIO_BAR_ICON_PROPS = appIconProps(18, 'archive-audio-bar__icon')
+
 type VolumeLevel = 'muted' | 'low' | 'high'
 
-export function VolumeIcon(props: { level: VolumeLevel }) {
-  return (
-    <svg className="archive-audio-bar__icon" width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-      <path
-        d="M5.25 8.25h2.2l3.8-2.35v8.2l-3.8-2.35h-2.2v-3.5Z"
-        fill="currentColor"
-      />
-      {props.level === 'low' ? (
-        <path
-          d="M12.75 8.1a2.9 2.9 0 0 1 0 3.8"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-        />
-      ) : null}
-      {props.level === 'high' ? (
-        <>
-          <path
-            d="M12.6 8a3.2 3.2 0 0 1 0 4"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-          <path
-            d="M15.1 5.8a6.2 6.2 0 0 1 0 8.4"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-        </>
-      ) : null}
-      {props.level === 'muted' ? (
-        <path
-          d="M12.8 8.1 16.2 11.5M16.2 8.1 12.8 11.5"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-        />
-      ) : null}
-    </svg>
-  )
+function VolumeLevelIcon(props: { level: VolumeLevel }) {
+  if (props.level === 'muted') {
+    return <VolumeX {...AUDIO_BAR_ICON_PROPS} />
+  }
+
+  if (props.level === 'low') {
+    return <Volume1 {...AUDIO_BAR_ICON_PROPS} />
+  }
+
+  return <Volume2 {...AUDIO_BAR_ICON_PROPS} />
 }
 
 function resolveVolumeLevel(volume: number): VolumeLevel {
@@ -247,16 +220,7 @@ export function ArchiveAudioBar(props: { playback: HistoryAudioPlayback }) {
           aria-label={isPlaying ? t.archiveAudioPause : t.archiveAudioPlay}
           onClick={togglePlay}
         >
-          {isPlaying ? (
-            <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <rect x="3" y="2.5" width="3.5" height="11" rx="0.8" fill="currentColor" />
-              <rect x="9.5" y="2.5" width="3.5" height="11" rx="0.8" fill="currentColor" />
-            </svg>
-          ) : (
-            <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <path d="M4 2.8v10.4l9.2-5.2L4 2.8Z" fill="currentColor" />
-            </svg>
-          )}
+          {isPlaying ? <Pause {...AUDIO_BAR_ICON_PROPS} /> : <Play {...AUDIO_BAR_ICON_PROPS} />}
         </button>
 
         <div className="archive-audio-bar__time" aria-live="off">
@@ -292,7 +256,7 @@ export function ArchiveAudioBar(props: { playback: HistoryAudioPlayback }) {
             aria-pressed={volumeLevel === 'muted'}
             onClick={toggleMute}
           >
-            <VolumeIcon level={volumeLevel} />
+            <VolumeLevelIcon level={volumeLevel} />
           </button>
 
           <div
@@ -322,7 +286,7 @@ export function ArchiveAudioBar(props: { playback: HistoryAudioPlayback }) {
             aria-label={t.archiveAudioMore}
             onClick={() => setMenuOpen((current) => !current)}
           >
-            ···
+            <Ellipsis {...AUDIO_BAR_ICON_PROPS} />
           </button>
 
           {menuOpen ? (

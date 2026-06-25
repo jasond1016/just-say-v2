@@ -1,8 +1,10 @@
+import { Mic, Pencil, Square } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { AppRuntimeSnapshot, AppSettings, ExportFormat, MeetingStatus, SavedTranscript } from '../../shared/api-types'
 import { selectVisibleTimeline } from '../../core/transcript/transcript-selectors'
 import { useT } from '../i18n-context'
+import { appIconProps } from '../ui/icons'
 import { PageChrome } from '../ui/page-chrome'
 import { RecentHistorySection, formatRecentTime } from '../ui/page-recent'
 
@@ -97,9 +99,7 @@ export function LiveSessionPage(props: {
                 <div className="session-page-header__subtitle">
                   <span>{sessionTitle}</span>
                   <button type="button" className="session-page-header__edit" aria-label="Edit title">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                      <path d="M11.5 2.5l2 2-8 8H3.5v-2l8-8z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
-                    </svg>
+                    <Pencil {...appIconProps(16)} />
                   </button>
                 </div>
               ) : null
@@ -181,10 +181,7 @@ function SessionStartButton(props: {
       disabled={props.disabled}
       onClick={props.onStart}
     >
-      <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-        <path d="M10 1a3.5 3.5 0 0 0-3.5 3.5v5a3.5 3.5 0 1 0 7 0v-5A3.5 3.5 0 0 0 10 1Z" fill="currentColor" />
-        <path d="M5 8.5a.75.75 0 0 0-1.5 0v1a6.5 6.5 0 0 0 5.75 6.46v2.29a.75.75 0 0 0 1.5 0v-2.29A6.5 6.5 0 0 0 16.5 9.5v-1a.75.75 0 0 0-1.5 0v1a5 5 0 0 1-10 0v-1Z" fill="currentColor" />
-      </svg>
+      <Mic {...appIconProps(16)} />
       {props.busyAction === 'meeting-start' ? t.sessionStartBusy : t.sessionStart}
     </button>
   )
@@ -204,7 +201,7 @@ function SessionStopButton(props: {
       disabled={props.disabled}
       onClick={props.onStop}
     >
-      <span className="session-action-btn__icon session-action-btn__icon--stop" aria-hidden="true" />
+      <Square {...appIconProps(12, 'session-action-btn__icon')} fill="currentColor" strokeWidth={0} />
       {props.busyAction === 'meeting-stop' ? t.sessionStopBusy : t.sessionStop}
     </button>
   )
@@ -357,10 +354,7 @@ function SessionTranscriptArea(props: {
             disabled={props.meetingStartDisabled}
             onClick={props.onStartMeeting}
           >
-            <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-              <path d="M10 1a3.5 3.5 0 0 0-3.5 3.5v5a3.5 3.5 0 1 0 7 0v-5A3.5 3.5 0 0 0 10 1Z" fill="currentColor" />
-              <path d="M5 8.5a.75.75 0 0 0-1.5 0v1a6.5 6.5 0 0 0 5.75 6.46v2.29a.75.75 0 0 0 1.5 0v-2.29A6.5 6.5 0 0 0 16.5 9.5v-1a.75.75 0 0 0-1.5 0v1a5 5 0 0 1-10 0v-1Z" fill="currentColor" />
-            </svg>
+            <Mic {...appIconProps(16)} />
             {props.busyAction === 'meeting-start' ? t.sessionStartBusy : t.sessionStartNew}
           </button>
           <button

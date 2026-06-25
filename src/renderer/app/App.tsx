@@ -11,6 +11,7 @@ import { LiveSessionPage } from '../pages/live-session-page'
 import { QuickDictationPage } from '../pages/quick-dictation-page'
 import { SettingsPage } from '../pages/settings-page'
 import { describeLocalServiceStatus } from '../ui/copy'
+import { BrandIcon, NavIcon } from '../ui/icons'
 import type { AppRuntimeSnapshot, LocalServiceStatus, PttHudSnapshot, ThemeSetting } from '../../shared/api-types'
 import type { AppLocale } from '../../i18n'
 import { APP_SECTIONS } from './app-model'
@@ -121,10 +122,7 @@ function WorkspaceAppContent(props: {
       <div className="app-titlebar-drag" aria-hidden="true" />
       <nav className="app-sidebar" aria-label="Workspace sections">
         <div className="app-sidebar__brand">
-          <svg className="app-sidebar__brand-icon" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-            <path d="M10 1a3.5 3.5 0 0 0-3.5 3.5v5a3.5 3.5 0 1 0 7 0v-5A3.5 3.5 0 0 0 10 1Z" fill="currentColor" />
-            <path d="M5 8.5a.75.75 0 0 0-1.5 0v1a6.5 6.5 0 0 0 5.75 6.46v2.29a.75.75 0 0 0 1.5 0v-2.29A6.5 6.5 0 0 0 16.5 9.5v-1a.75.75 0 0 0-1.5 0v1a5 5 0 0 1-10 0v-1Z" fill="currentColor" />
-          </svg>
+          <BrandIcon />
           <div className="app-sidebar__brand-mark">JustSay</div>
         </div>
 
@@ -555,37 +553,5 @@ function cloneLiveSession(session: RetainedLiveSession): RetainedLiveSession {
       ),
       revision: session.transcript.revision
     }
-  }
-}
-
-function NavIcon(props: { name: string }) {
-  switch (props.name) {
-    case 'mic':
-      return (
-        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-          <path d="M10 1a3.5 3.5 0 0 0-3.5 3.5v5a3.5 3.5 0 1 0 7 0v-5A3.5 3.5 0 0 0 10 1Z" fill="currentColor" />
-          <path d="M5 8.5a.75.75 0 0 0-1.5 0v1a6.5 6.5 0 0 0 5.75 6.46v2.29a.75.75 0 0 0 1.5 0v-2.29A6.5 6.5 0 0 0 16.5 9.5v-1a.75.75 0 0 0-1.5 0v1a5 5 0 0 1-10 0v-1Z" fill="currentColor" />
-        </svg>
-      )
-    case 'session':
-      return (
-        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-          <path d="M3 4.5A2.5 2.5 0 0 1 5.5 2h9A2.5 2.5 0 0 1 17 4.5v8a2.5 2.5 0 0 1-2.5 2.5H12l-3.5 3v-3H5.5A2.5 2.5 0 0 1 3 12.5v-8Z" fill="currentColor" />
-        </svg>
-      )
-    case 'archive':
-      return (
-        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-          <path fillRule="evenodd" clipRule="evenodd" d="M2 4.75A2.75 2.75 0 0 1 4.75 2h10.5A2.75 2.75 0 0 1 18 4.75v1a.75.75 0 0 1-.75.75H2.75A.75.75 0 0 1 2 5.75v-1ZM3.5 8v7.25c0 .69.56 1.25 1.25 1.25h10.5c.69 0 1.25-.56 1.25-1.25V8h-13Zm4.5 2.75a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 0 1.5h-2.5a.75.75 0 0 1-.75-.75Z" fill="currentColor" />
-        </svg>
-      )
-    case 'settings':
-      return (
-        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-          <path fillRule="evenodd" clipRule="evenodd" d="M8.34 2.08A.75.75 0 0 1 9.07 1.5h1.86a.75.75 0 0 1 .73.58l.38 1.7a6.5 6.5 0 0 1 1.28.74l1.66-.53a.75.75 0 0 1 .86.36l.93 1.6a.75.75 0 0 1-.13.93l-1.28 1.17a6.6 6.6 0 0 1 0 1.5l1.28 1.17a.75.75 0 0 1 .13.93l-.93 1.6a.75.75 0 0 1-.86.36l-1.66-.53a6.5 6.5 0 0 1-1.28.74l-.38 1.7a.75.75 0 0 1-.73.58H9.07a.75.75 0 0 1-.73-.58l-.38-1.7a6.5 6.5 0 0 1-1.28-.74l-1.66.53a.75.75 0 0 1-.86-.36l-.93-1.6a.75.75 0 0 1 .13-.93l1.28-1.17a6.6 6.6 0 0 1 0-1.5L3.36 6.88a.75.75 0 0 1-.13-.93l.93-1.6a.75.75 0 0 1 .86-.36l1.66.53a6.5 6.5 0 0 1 1.28-.74l.38-1.7ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" fill="currentColor" />
-        </svg>
-      )
-    default:
-      return null
   }
 }

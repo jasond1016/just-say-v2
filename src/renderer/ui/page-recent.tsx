@@ -1,4 +1,7 @@
+import { ChevronRight } from 'lucide-react'
 import type { ReactNode } from 'react'
+
+import { appIconProps } from './icons'
 
 export function RecentHistorySection(props: {
   heading: string
@@ -19,9 +22,7 @@ export function RecentHistorySection(props: {
       <div className="page-recent__footer">
         <button type="button" className="page-recent__history-link" onClick={props.onViewAll}>
           {props.viewAllLabel}
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <ChevronRight {...appIconProps(14)} />
         </button>
       </div>
     </section>
