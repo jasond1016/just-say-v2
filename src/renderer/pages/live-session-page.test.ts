@@ -5,8 +5,41 @@ import {
   getDisplayedSessionDurationSec,
   getDistanceFromLatestContent,
   isLatestContentNearViewportBottom,
-  shouldAutoFollowTranscript
+  resolveSessionTitle,
+  shouldAutoFollowTranscript,
 } from './live-session-page'
+
+describe('resolveSessionTitle', () => {
+  it('prefers the saved archive title after a meeting stops', () => {
+    const session = createLiveSession({
+      transcript: {
+        committedBlocks: [{ id: 'b1', source: 'system', text: 'draft preview', startedAt: 1, endedAt: 2 }],
+        activeDrafts: {},
+        revision: 1,
+      },
+    })
+
+    expect(
+      resolveSessionTitle(session, {
+        id: session.sessionId,
+        mode: 'meeting',
+        title: 'Saved meeting title',
+        startedAt: 1,
+        endedAt: 2,
+        plainText: 'draft preview',
+        blocks: [],
+        metadata: {
+          engineProfileId: 'local-fast',
+          runtimeFamilyId: 'sensevoice',
+          modelIdentifier: 'model',
+          deploymentMode: 'managed-local',
+          includeMicrophone: true,
+          translationEnabled: false,
+        },
+      })
+    ).toBe('Saved meeting title')
+  })
+})
 
 describe('getDisplayedSessionDurationSec', () => {
   it('keeps the live-session timer moving from startedAt while streaming', () => {

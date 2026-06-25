@@ -12,7 +12,7 @@ import { QuickDictationPage } from '../pages/quick-dictation-page'
 import { SettingsPage } from '../pages/settings-page'
 import { describeLocalServiceStatus } from '../ui/copy'
 import { BrandIcon, NavIcon } from '../ui/icons'
-import type { AppRuntimeSnapshot, LocalServiceStatus, PttHudSnapshot, ThemeSetting } from '../../shared/api-types'
+import type { AppRuntimeSnapshot, HistoryAudioPlayback, LocalServiceStatus, PttHudSnapshot, ThemeSetting } from '../../shared/api-types'
 import type { AppLocale } from '../../i18n'
 import { APP_SECTIONS } from './app-model'
 import { AppController } from './app-controller'
@@ -82,6 +82,7 @@ function WorkspaceAppContent(props: {
     busyAction
   } = props.state
   const [retainedLiveSession, setRetainedLiveSession] = useState<RetainedLiveSession | null>(null)
+  const [liveSessionAudio, setLiveSessionAudio] = useState<HistoryAudioPlayback | null>(null)
 
   useEffect(() => {
     applyThemeSetting(settings.general.theme)
@@ -108,6 +109,39 @@ function WorkspaceAppContent(props: {
 
   const liveSession = runtime.liveSession
   const displayLiveSession = liveSession ?? retainedLiveSession
+  const savedMeetingRecord = useMemo(() => {
+    if (!displayLiveSession) {
+      return null
+    }
+
+    const { sessionId } = displayLiveSession
+    return (
+      recentMeetingSessions.find((item) => item.id === sessionId)
+      ?? history.find((item) => item.id === sessionId)
+      ?? null
+    )
+  }, [displayLiveSession, recentMeetingSessions, history])
+  useEffect(() => {
+    if (!displayLiveSession || liveSession || !savedMeetingRecord?.metadata.audio) {
+      setLiveSessionAudio(null)
+      return
+    }
+
+    let cancelled = false
+
+    void requireApi()
+      .getHistoryAudioPlayback(displayLiveSession.sessionId)
+      .then((playback) => {
+        if (!cancelled) {
+          setLiveSessionAudio(playback)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [displayLiveSession?.sessionId, liveSession, savedMeetingRecord?.metadata.audio])
+
   const meetingActive = Boolean(liveSession)
   const pttStartDisabled = Boolean(busyAction) || runtime.ptt.status !== 'idle'
   const pttStopDisabled = Boolean(busyAction) || runtime.ptt.status !== 'capturing'
@@ -211,6 +245,8 @@ function WorkspaceAppContent(props: {
           <LiveSessionPage
             liveSession={displayLiveSession}
             activeRuntimeSession={liveSession}
+            savedMeetingRecord={savedMeetingRecord}
+            sessionAudio={liveSessionAudio}
             settings={settings}
             busyAction={busyAction}
             liveSessionMessage={liveSessionMessage}
@@ -219,8 +255,7 @@ function WorkspaceAppContent(props: {
             recentSessions={recentMeetingSessions}
             onStartMeeting={() => { void controller.startMeeting() }}
             onStopMeeting={() => { void controller.stopMeeting() }}
-            onCopyLiveSession={() => { void controller.copyLiveSession() }}
-            onExportLiveSession={(format) => { void controller.exportLiveSession(format) }}
+            onRenameSessionTitle={(id, title) => { void controller.updateHistoryTitle(id, title) }}
             onOpenHistory={() => { controller.openHistorySection() }}
             onOpenHistoryItem={(id) => { void controller.openHistoryItemInArchive(id) }}
           />

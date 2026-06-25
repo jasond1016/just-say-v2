@@ -381,6 +381,9 @@ export class AppController {
 
       this.setState({
         history: this.state.history.map((item) => (item.id === id ? updated : item)),
+        recentMeetingSessions: this.state.recentMeetingSessions.map((item) =>
+          item.id === id ? updated : item
+        ),
         selectedHistory: this.state.selectedHistory?.id === id ? updated : this.state.selectedHistory
       })
     })

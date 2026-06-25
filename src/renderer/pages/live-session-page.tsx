@@ -1,10 +1,18 @@
-import { Mic, Pencil, Square } from 'lucide-react'
+import { Mic, Square } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import type { AppRuntimeSnapshot, AppSettings, ExportFormat, MeetingStatus, SavedTranscript } from '../../shared/api-types'
+import type {
+  AppRuntimeSnapshot,
+  AppSettings,
+  HistoryAudioPlayback,
+  MeetingStatus,
+  SavedTranscript,
+} from '../../shared/api-types'
 import { selectVisibleTimeline } from '../../core/transcript/transcript-selectors'
 import { useT } from '../i18n-context'
 import { appIconProps } from '../ui/icons'
+import { ArchiveAudioBar } from '../ui/archive-audio-bar'
+import { EditableInlineTitle } from '../ui/editable-inline-title'
 import { PageChrome } from '../ui/page-chrome'
 import { RecentHistorySection, formatRecentTime } from '../ui/page-recent'
 
@@ -18,6 +26,8 @@ const AUTO_SCROLL_RESUME_THRESHOLD_PX = 48
 export function LiveSessionPage(props: {
   liveSession: LiveSessionSnapshot | null
   activeRuntimeSession: LiveSessionSnapshot | null
+  savedMeetingRecord: SavedTranscript | null
+  sessionAudio: HistoryAudioPlayback | null
   settings: AppSettings
   busyAction: string | null
   liveSessionMessage: string | null
@@ -25,8 +35,7 @@ export function LiveSessionPage(props: {
   meetingStopDisabled: boolean
   onStartMeeting: () => void
   onStopMeeting: () => void
-  onCopyLiveSession: () => void
-  onExportLiveSession: (format: ExportFormat) => void
+  onRenameSessionTitle: (id: string, title: string) => void
   onOpenHistory: () => void
   onOpenHistoryItem: (id: string) => void
   recentSessions: SavedTranscript[]
@@ -40,9 +49,10 @@ export function LiveSessionPage(props: {
   const hasTranscript = timeline.length > 0
   const transcriptRevision = session?.transcript.revision ?? 0
   const isColdStart = !session && !hasTranscript
-  const sessionTitle = session ? deriveSessionTitle(session) : null
+  const sessionTitle = session ? resolveSessionTitle(session, props.savedMeetingRecord) : null
+  const canEditSessionTitle = Boolean(session && !isSessionActive && props.savedMeetingRecord)
+  const showSessionAudio = !isSessionActive && Boolean(props.sessionAudio)
   const displayedDurationSec = useDisplayedSessionDuration(session, activeStatus)
-  const canUsePostActions = Boolean(session) && !isSessionActive && hasTranscript && !props.busyAction
   const sessionActions = isSessionActive && session ? (
     <>
       <span className="session-page-header__timer">{formatSessionDuration(displayedDurationSec)}</span>
@@ -89,18 +99,32 @@ export function LiveSessionPage(props: {
   }
 
   return (
-    <div className="page page--session page--session-live">
+    <div
+      className={[
+        'page',
+        'page--session',
+        'page--session-live',
+        showSessionAudio ? 'page--session-live-with-audio' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
       <div className="session-shell">
         <div className="session-shell__chrome">
           <PageChrome
             title={t.navSession}
             belowTitle={
-              sessionTitle ? (
+              sessionTitle && session ? (
                 <div className="session-page-header__subtitle">
-                  <span>{sessionTitle}</span>
-                  <button type="button" className="session-page-header__edit" aria-label="Edit title">
-                    <Pencil {...appIconProps(16)} />
-                  </button>
+                  <EditableInlineTitle
+                    title={sessionTitle}
+                    ariaLabel={t.archiveRenameTitle}
+                    disabled={Boolean(props.busyAction)}
+                    canEdit={canEditSessionTitle}
+                    editButtonClassName="session-page-header__edit"
+                    inputClassName="session-page-header__title-input"
+                    onRename={(title) => props.onRenameSessionTitle(session.sessionId, title)}
+                  />
                 </div>
               ) : null
             }
@@ -120,17 +144,13 @@ export function LiveSessionPage(props: {
             transcriptRevision={transcriptRevision}
             isStreaming={isStreaming}
             isSessionActive={isSessionActive}
-            hasTranscript={hasTranscript}
-            canUsePostActions={canUsePostActions}
-            busyAction={props.busyAction}
-            meetingStartDisabled={props.meetingStartDisabled}
-            onStartMeeting={props.onStartMeeting}
-            onCopyLiveSession={props.onCopyLiveSession}
-            onExportLiveSession={props.onExportLiveSession}
-            onOpenHistory={props.onOpenHistory}
           />
         </div>
       </div>
+
+      {showSessionAudio && props.sessionAudio ? (
+        <ArchiveAudioBar playback={props.sessionAudio} />
+      ) : null}
     </div>
   )
 }
@@ -212,14 +232,6 @@ function SessionTranscriptArea(props: {
   transcriptRevision: number
   isStreaming: boolean
   isSessionActive: boolean
-  hasTranscript: boolean
-  canUsePostActions: boolean
-  busyAction: string | null
-  meetingStartDisabled: boolean
-  onStartMeeting: () => void
-  onCopyLiveSession: () => void
-  onExportLiveSession: (format: ExportFormat) => void
-  onOpenHistory: () => void
 }) {
   const t = useT()
   const canvasRef = useRef<HTMLElement | null>(null)
@@ -345,36 +357,6 @@ function SessionTranscriptArea(props: {
           </>
         )}
       </div>
-
-      {!props.isSessionActive && props.hasTranscript ? (
-        <footer className="session-transcript__footer">
-          <button
-            type="button"
-            className="session-action-btn session-action-btn--start"
-            disabled={props.meetingStartDisabled}
-            onClick={props.onStartMeeting}
-          >
-            <Mic {...appIconProps(16)} />
-            {props.busyAction === 'meeting-start' ? t.sessionStartBusy : t.sessionStartNew}
-          </button>
-          <button
-            type="button"
-            className="button button--secondary button--small"
-            disabled={!props.canUsePostActions}
-            onClick={props.onCopyLiveSession}
-          >
-            {props.busyAction === 'live-session-copy' ? t.sessionCopyBusy : t.sessionCopyText}
-          </button>
-          <button
-            type="button"
-            className="button button--ghost button--small"
-            disabled={!props.canUsePostActions}
-            onClick={props.onOpenHistory}
-          >
-            {t.sessionViewHistory}
-          </button>
-        </footer>
-      ) : null}
     </section>
   )
 }
@@ -469,6 +451,17 @@ function formatSessionDuration(durationSec: number): string {
   const minutes = Math.floor((totalSeconds % 3600) / 60)
   const seconds = totalSeconds % 60
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+}
+
+export function resolveSessionTitle(
+  session: LiveSessionSnapshot,
+  savedRecord: SavedTranscript | null
+): string | null {
+  if (savedRecord?.title) {
+    return savedRecord.title
+  }
+
+  return deriveSessionTitle(session)
 }
 
 function deriveSessionTitle(session: LiveSessionSnapshot): string | null {
