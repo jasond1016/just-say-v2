@@ -40,8 +40,6 @@ export type PttSessionEvent =
 export type MeetingSessionEvent =
   | { type: 'START_REQUESTED' }
   | { type: 'SESSION_READY' }
-  | { type: 'DRAFT_UPDATED' }
-  | { type: 'BLOCK_COMMITTED' }
   | { type: 'STOP_REQUESTED' }
   | { type: 'ENGINE_WARNING'; recoverable: boolean }
   | { type: 'FAILED'; error?: AppErrorPayload }

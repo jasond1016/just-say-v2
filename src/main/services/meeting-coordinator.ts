@@ -230,10 +230,6 @@ export class MeetingCoordinator {
         return this.runResolveConfigAndWarmup()
       case 'begin-live-session':
         return {}
-      case 'apply-draft-update':
-        return {}
-      case 'append-committed-block':
-        return {}
       case 'stop-capture-and-close-session':
         return this.runStopCaptureAndCloseSession()
       case 'record-warning':

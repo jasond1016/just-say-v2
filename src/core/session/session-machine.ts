@@ -15,8 +15,6 @@ export type PttTransitionEffect =
 export type MeetingTransitionEffect =
   | 'resolve-config-and-warmup'
   | 'begin-live-session'
-  | 'apply-draft-update'
-  | 'append-committed-block'
   | 'stop-capture-and-close-session'
   | 'record-warning'
   | 'record-warning-and-recover'
@@ -151,12 +149,6 @@ export function transitionMeetingStatus(
       }
       break
     case 'streaming':
-      if (event.type === 'DRAFT_UPDATED') {
-        return buildTransition(current, 'streaming', event, 'apply-draft-update')
-      }
-      if (event.type === 'BLOCK_COMMITTED') {
-        return buildTransition(current, 'streaming', event, 'append-committed-block')
-      }
       if (event.type === 'STOP_REQUESTED') {
         return buildTransition(current, 'finishing', event, 'stop-capture-and-close-session')
       }

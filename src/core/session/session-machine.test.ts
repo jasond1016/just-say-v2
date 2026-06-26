@@ -73,16 +73,6 @@ describe('transitionMeetingStatus', () => {
       to: 'streaming',
       effect: 'begin-live-session'
     })
-    expect(transitionMeetingStatus('streaming', { type: 'DRAFT_UPDATED' })).toMatchObject({
-      to: 'streaming',
-      effect: 'apply-draft-update',
-      changed: false
-    })
-    expect(transitionMeetingStatus('streaming', { type: 'BLOCK_COMMITTED' })).toMatchObject({
-      to: 'streaming',
-      effect: 'append-committed-block',
-      changed: false
-    })
     expect(transitionMeetingStatus('streaming', { type: 'STOP_REQUESTED' })).toMatchObject({
       to: 'finishing',
       effect: 'stop-capture-and-close-session'
