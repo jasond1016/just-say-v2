@@ -40,6 +40,7 @@ import { PttCoordinator } from '../services/ptt-coordinator'
 import { PttHotkeyController } from '../services/ptt-hotkey-controller'
 import { PttHudService } from '../services/ptt-hud-service'
 import { SessionCoordinator } from '../services/session-coordinator'
+import { SessionService } from '../services/session-service'
 import { SettingsService } from '../services/settings-service'
 import { SpeechService } from '../services/speech-service'
 import { TranslationPipeline } from '../services/translation-pipeline'
@@ -287,29 +288,13 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<AppR
     diagnostics: diagnosticsService
   })
   const sessionCoordinator = new SessionCoordinator(pttCoordinator, meetingCoordinator)
-  const pttHudService = new PttHudService(sessionCoordinator)
   const liveSessionActionsService = new LiveSessionActionsService({
     getRuntimeSnapshot: () => sessionCoordinator.getRuntimeSnapshot(),
     clipboard: clipboardService,
     exportDir: path.join(userDataPath, 'exports')
   })
-  const sessionService = {
-    getRuntimeSnapshot: () => sessionCoordinator.getRuntimeSnapshot(),
-    onSnapshot: (listener: Parameters<typeof sessionCoordinator.onSnapshot>[0]) =>
-      sessionCoordinator.onSnapshot(listener),
-    onNotification: (listener: Parameters<NonNullable<typeof sessionCoordinator.onNotification>>[0]) =>
-      sessionCoordinator.onNotification(listener),
-    prewarm: (mode: 'ptt' | 'meeting') => sessionCoordinator.prewarm(mode),
-    startPtt: () => sessionCoordinator.startPtt(),
-    stopPtt: () => sessionCoordinator.stopPtt(),
-    copyLatestPttText: () => sessionCoordinator.copyLatestPttText(),
-    startMeeting: (input?: Parameters<typeof sessionCoordinator.startMeeting>[0]) =>
-      sessionCoordinator.startMeeting(input),
-    stopMeeting: () => sessionCoordinator.stopMeeting(),
-    copyLiveSession: () => liveSessionActionsService.copyPlainText(),
-    exportLiveSession: (format: Parameters<typeof liveSessionActionsService.export>[0]) =>
-      liveSessionActionsService.export(format)
-  }
+  const sessionService = new SessionService(sessionCoordinator, liveSessionActionsService)
+  const pttHudService = new PttHudService(sessionService)
   const pttHotkeyController = new PttHotkeyController(hotkeyService, settingsService, sessionCoordinator)
   sessionCoordinator.setLocalServiceStatus(localServiceSupervisor.getStatus())
   diagnosticsService.setLocalServiceStatus(localServiceSupervisor.getStatus())
@@ -332,7 +317,7 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<AppR
 
   return {
     services: {
-      sessionCoordinator: sessionService,
+      sessionService,
       pttHudService,
       diagnosticsService,
       speechService,

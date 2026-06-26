@@ -49,7 +49,7 @@ describe('createApp', () => {
     const pttHudSnapshot = {
       mode: 'hidden' as const
     }
-    const sessionCoordinator = {
+    const sessionService = {
       getRuntimeSnapshot: vi.fn().mockReturnValue(runtimeSnapshot),
       onSnapshot: vi.fn().mockImplementation((listener) => {
         listener(runtimeSnapshot)
@@ -124,7 +124,7 @@ describe('createApp', () => {
         }
       },
       services: {
-        sessionCoordinator,
+        sessionService,
         pttHudService,
         speechService,
         historyService,
