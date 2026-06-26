@@ -13,6 +13,7 @@ import { SessionDispatchLoop } from '../../core/session/session-dispatch'
 import type { MeetingTransitionEffect } from '../../core/session/session-machine'
 import { transitionMeetingStatus } from '../../core/session/session-machine'
 import type { MeetingSessionEvent } from '../../core/session/session-types'
+import { buildMeetingSavedTranscript } from '../../core/transcript/transcript-provenance'
 import { transcriptReducer, INITIAL_TRANSCRIPT_STATE } from '../../core/transcript/transcript-reducer'
 import { selectPlainText, selectTranslatedPlainText } from '../../core/transcript/transcript-selectors'
 import type { TranscriptEvent } from '../../core/transcript/transcript-types'
@@ -378,7 +379,17 @@ export class MeetingCoordinator {
 
     try {
       await this.dependencies.transcriptRepository.save(
-        buildSavedTranscript(session, endedAt, plainText, translatedPlainText, audioMetadata)
+        buildMeetingSavedTranscript({
+          sessionId: session.sessionId,
+          startedAt: session.startedAt,
+          endedAt,
+          runtimeConfig: session.runtimeConfig,
+          includeMicrophone: session.includeMicrophone,
+          plainText,
+          translatedPlainText,
+          blocks: session.transcript.committedBlocks,
+          audioMetadata
+        })
       )
     } catch (errorLike) {
       if (audioMetadata) {
@@ -848,7 +859,17 @@ export class MeetingCoordinator {
 
     try {
       await this.dependencies.transcriptRepository.save(
-        buildSavedTranscript(session, endedAt, plainText, translatedPlainText, audioMetadata)
+        buildMeetingSavedTranscript({
+          sessionId: session.sessionId,
+          startedAt: session.startedAt,
+          endedAt,
+          runtimeConfig: session.runtimeConfig,
+          includeMicrophone: session.includeMicrophone,
+          plainText,
+          translatedPlainText,
+          blocks: session.transcript.committedBlocks,
+          audioMetadata
+        })
       )
       this.dependencies.diagnostics?.record({
         type: 'session-persisted',
@@ -927,40 +948,6 @@ export class MeetingCoordinator {
 
 function reduceTranscript(state: TranscriptState, event: TranscriptEvent): TranscriptState {
   return transcriptReducer(state, event)
-}
-
-function buildSavedTranscript(
-  session: MeetingSessionContext,
-  endedAt: number,
-  plainText: string,
-  translatedPlainText: string | undefined,
-  audioMetadata: TranscriptAudioMetadata | null
-) {
-  return {
-    id: session.sessionId,
-    mode: 'meeting' as const,
-    title: `Live Session ${new Date(session.startedAt).toISOString()}`,
-    startedAt: session.startedAt,
-    endedAt,
-    language: String(session.runtimeConfig.engineConfig.language),
-    plainText,
-    blocks: session.transcript.committedBlocks.map((block) => ({ ...block })),
-    metadata: {
-      engineProfileId: session.runtimeConfig.engineProfile.id,
-      runtimeFamilyId: session.runtimeConfig.engineProfile.runtimeFamilyId,
-      modelIdentifier: session.runtimeConfig.engineProfile.modelIdentifier,
-      deploymentMode: session.runtimeConfig.engineConfig.localService?.mode ?? 'managed-local',
-      includeMicrophone: session.includeMicrophone,
-      translationEnabled: Boolean(session.runtimeConfig.translationConfig),
-      ...(audioMetadata ? { audio: { ...audioMetadata } } : {})
-    },
-    ...(session.runtimeConfig.translationConfig
-      ? {
-          targetLanguage: String(session.runtimeConfig.translationConfig.targetLanguage),
-          ...(translatedPlainText ? { translatedPlainText } : {})
-        }
-      : {})
-  }
 }
 
 function applyMeetingOverrides(

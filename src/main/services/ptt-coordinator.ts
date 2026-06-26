@@ -13,6 +13,7 @@ import type {
   RecognitionEvent,
   TranslationUpdatedPayload
 } from '../../core/contracts/engine'
+import { buildPttSavedTranscript } from '../../core/transcript/transcript-provenance'
 import { SessionDispatchLoop } from '../../core/session/session-dispatch'
 import type { PttTransitionEffect } from '../../core/session/session-machine'
 import { transitionPttStatus } from '../../core/session/session-machine'
@@ -473,39 +474,16 @@ export class PttCoordinator {
     const deliveredAt = this.now()
 
     try {
-      await this.dependencies.transcriptRepository.save({
-        id: session.sessionId,
-        mode: 'ptt',
-        title: text.slice(0, 48) || 'PTT Transcript',
-        startedAt: session.startedAt,
-        endedAt: deliveredAt,
-        language: String(session.runtimeConfig.engineConfig.language),
-        plainText: session.finalText ?? text,
-        blocks: [
-          {
-            id: `${session.sessionId}-block-1`,
-            source: 'microphone',
-            text: session.finalText ?? text,
-            ...(session.translatedText ? { translatedText: session.translatedText } : {}),
-            startedAt: session.startedAt,
-            endedAt: deliveredAt
-          }
-        ],
-        metadata: {
-          engineProfileId: session.runtimeConfig.engineProfile.id,
-          runtimeFamilyId: session.runtimeConfig.engineProfile.runtimeFamilyId,
-          modelIdentifier: session.runtimeConfig.engineProfile.modelIdentifier,
-          deploymentMode: session.runtimeConfig.engineConfig.localService?.mode ?? 'managed-local',
-          includeMicrophone: true,
-          translationEnabled: Boolean(session.runtimeConfig.translationConfig)
-        },
-        ...(session.runtimeConfig.translationConfig
-          ? {
-              targetLanguage: String(session.runtimeConfig.translationConfig.targetLanguage),
-              ...(session.translatedText ? { translatedPlainText: session.translatedText } : {})
-            }
-          : {})
-      })
+      await this.dependencies.transcriptRepository.save(
+        buildPttSavedTranscript({
+          sessionId: session.sessionId,
+          startedAt: session.startedAt,
+          endedAt: deliveredAt,
+          runtimeConfig: session.runtimeConfig,
+          finalText: session.finalText ?? text,
+          translatedText: session.translatedText
+        })
+      )
     } catch (errorLike) {
       this.error = normalizeStorageErrorPayload(errorLike)
       session.completion.settle()
