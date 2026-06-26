@@ -1,5 +1,4 @@
 import type {
-  AudioChunk,
   AppErrorPayload,
   DiagnosticEvent,
   MeetingStatus,
@@ -10,7 +9,9 @@ import type {
   TranscriptState
 } from '../../shared/api-types'
 import type { RecognitionEngine, RecognitionEvent } from '../../core/contracts/engine'
+import type { MeetingTransitionEffect } from '../../core/session/session-machine'
 import { transitionMeetingStatus } from '../../core/session/session-machine'
+import type { MeetingSessionEvent } from '../../core/session/session-types'
 import { transcriptReducer, INITIAL_TRANSCRIPT_STATE } from '../../core/transcript/transcript-reducer'
 import { selectPlainText, selectTranslatedPlainText } from '../../core/transcript/transcript-selectors'
 import type { TranscriptEvent } from '../../core/transcript/transcript-types'
@@ -55,11 +56,23 @@ type MeetingSessionContext = {
   transcript: TranscriptState
   pendingTranslations: Set<Promise<void>>
   audioRecorder: MeetingAudioRecorderLike | undefined
+  pendingPersist: PendingPersistContext | null
   completion: {
     promise: Promise<void>
     settle: () => void
   }
 }
+
+type PendingPersistContext = {
+  endedAt: number
+  plainText: string
+  translatedPlainText: string | undefined
+  audioMetadata: TranscriptAudioMetadata | null
+}
+
+type MeetingEffectResult =
+  | { followUps?: MeetingSessionEvent | MeetingSessionEvent[] }
+  | { failed: AppErrorPayload }
 
 export class MeetingCoordinator {
   private readonly now: () => number
@@ -69,9 +82,20 @@ export class MeetingCoordinator {
   private activeEngineUnsubscribe: (() => void) | null = null
   private status: MeetingStatus = 'idle'
   private error: AppErrorPayload | undefined
+  private pendingStartInput: StartMeetingCommand = {}
+  private pendingStartupFailure: AppErrorPayload | null = null
   private readonly listeners = new Set<(snapshot: MeetingRuntimeSnapshot | null) => void>()
   private readonly notificationListeners = new Set<(notification: RuntimeNotification) => void>()
   private terminalSnapshot: MeetingRuntimeSnapshot | null = null
+  private cachedTranscriptSnapshot: { revision: number; clone: TranscriptState } | null = null
+  private controlEventSink: ((event: MeetingSessionEvent) => void) | null = null
+  private readonly serialDispatchQueue: Array<{
+    event: MeetingSessionEvent
+    resolve: () => void
+    reject: (error: unknown) => void
+  }> = []
+  private serialDispatchRunning = false
+  private awaitingStopSessionEnd = false
   private recoveryPromise: Promise<void> | null = null
   private recoveryReadySignal: { promise: Promise<void>; settle: () => void } | null = null
 
@@ -94,7 +118,7 @@ export class MeetingCoordinator {
       status: this.status,
       startedAt: this.activeSession.startedAt,
       durationSec: Math.max(0, Math.floor((this.now() - this.activeSession.startedAt) / 1000)),
-      transcript: cloneTranscriptState(this.activeSession.transcript),
+      transcript: this.cloneTranscriptForSnapshot(this.activeSession.transcript),
       engineProfileId: this.activeSession.runtimeConfig.engineProfile.id,
       translationEnabled: Boolean(this.activeSession.runtimeConfig.translationConfig),
       ...(this.error ? { error: { ...this.error } } : {})
@@ -122,9 +146,165 @@ export class MeetingCoordinator {
       throw new Error('Meeting session is already active')
     }
 
-    this.transition({ type: 'START_REQUESTED' })
+    this.pendingStartInput = input
     this.terminalSnapshot = null
+    this.pendingStartupFailure = null
+    await this.dispatch({ type: 'START_REQUESTED' })
 
+    if (this.pendingStartupFailure) {
+      const error = this.pendingStartupFailure
+      this.pendingStartupFailure = null
+      throw Object.assign(new Error(error.message), { payload: error })
+    }
+  }
+
+  async stop(): Promise<void> {
+    const session = this.requireActiveSession()
+
+    if (this.status !== 'streaming') {
+      throw new Error(`Cannot stop meeting session from status "${this.status}"`)
+    }
+
+    this.awaitingStopSessionEnd = true
+
+    try {
+      await this.dispatch({ type: 'STOP_REQUESTED' })
+      await session.completion.promise
+    } finally {
+      this.awaitingStopSessionEnd = false
+    }
+  }
+
+  handleCaptureProcessGone(): void {
+    if (!this.activeSession) {
+      return
+    }
+
+    this.notify({
+      level: 'error',
+      message: 'Audio capture process crashed. The session will be saved.'
+    })
+    void this.dispatch({
+      type: 'FAILED',
+      error: {
+        code: 'E_CAPTURE_PROCESS_GONE',
+        message: 'The capture process crashed unexpectedly',
+        retryable: false
+      }
+    })
+  }
+
+  private dispatch(event: MeetingSessionEvent): Promise<void> {
+    if (this.controlEventSink) {
+      this.controlEventSink(event)
+      return Promise.resolve()
+    }
+
+    return new Promise((resolve, reject) => {
+      this.serialDispatchQueue.push({ event, resolve, reject })
+      this.pumpSerialDispatch()
+    })
+  }
+
+  private pumpSerialDispatch(): void {
+    if (this.serialDispatchRunning || this.serialDispatchQueue.length === 0) {
+      return
+    }
+
+    this.serialDispatchRunning = true
+    const { event, resolve, reject } = this.serialDispatchQueue.shift()!
+
+    void this.runDispatchLoop(event)
+      .then(() => {
+        resolve()
+      })
+      .catch((error) => {
+        reject(error)
+      })
+      .finally(() => {
+        this.serialDispatchRunning = false
+        this.pumpSerialDispatch()
+      })
+  }
+
+  private async runDispatchLoop(event: MeetingSessionEvent): Promise<void> {
+    const queue: MeetingSessionEvent[] = [event]
+    this.controlEventSink = (followUp) => {
+      queue.push(followUp)
+    }
+
+    try {
+      while (queue.length > 0) {
+        const next = queue.shift()!
+        const result = transitionMeetingStatus(this.status, next)
+        this.status = result.to
+        if (next.type === 'FAILED' && next.error) {
+          this.error = next.error
+        }
+        this.emitSnapshot()
+        const effectResult = await this.runEffect(result.effect, next)
+        if (meetingEffectNeedsPostEmit(result.effect)) {
+          this.emitSnapshot()
+        }
+
+        if ('failed' in effectResult) {
+          if (result.effect === 'resolve-config-and-warmup') {
+            this.pendingStartupFailure = effectResult.failed
+          }
+
+          queue.push({ type: 'FAILED', error: effectResult.failed })
+          continue
+        }
+
+        if (effectResult.followUps) {
+          queue.push(...normalizeFollowUps(effectResult.followUps))
+        }
+      }
+    } finally {
+      this.controlEventSink = null
+    }
+  }
+
+  private enqueueControlEvent(event: MeetingSessionEvent): Promise<void> {
+    return this.dispatch(event)
+  }
+
+  private async runEffect(
+    effect: MeetingTransitionEffect,
+    event: MeetingSessionEvent
+  ): Promise<MeetingEffectResult> {
+    switch (effect) {
+      case 'resolve-config-and-warmup':
+        return this.runResolveConfigAndWarmup()
+      case 'begin-live-session':
+        return {}
+      case 'apply-draft-update':
+        return {}
+      case 'append-committed-block':
+        return {}
+      case 'stop-capture-and-close-session':
+        return this.runStopCaptureAndCloseSession()
+      case 'record-warning':
+        return {}
+      case 'record-warning-and-recover':
+        return this.runRecordWarningAndRecover()
+      case 'finalize-transcript':
+        return this.runFinalizeTranscript()
+      case 'persist-transcript':
+        return this.runPersistTranscript()
+      case 'record-unexpected-stop':
+        return this.runRecordUnexpectedStop(event)
+      case 'record-error':
+        return this.runRecordError(event)
+      case 'clear-runtime':
+        return this.runClearRuntime(event)
+      default:
+        return assertNever(effect)
+    }
+  }
+
+  private async runResolveConfigAndWarmup(): Promise<MeetingEffectResult> {
+    const input = this.pendingStartInput
     const settings = this.dependencies.settingsProvider.getSettings()
     const runtimeConfig = applyMeetingOverrides(
       this.dependencies.settingsProvider.resolveRuntimeConfig('meeting'),
@@ -147,6 +327,7 @@ export class MeetingCoordinator {
         sessionId,
         chunkMs: runtimeConfig.captureConfig.chunkMs
       }),
+      pendingPersist: null,
       completion: createCompletionSignal()
     }
     this.dependencies.diagnostics?.record({
@@ -159,38 +340,185 @@ export class MeetingCoordinator {
 
     try {
       await this.startSessionRuntime(this.activeSession, settings.input.microphoneDeviceId)
-    } catch (error) {
-      await this.fail(error)
-      throw error
+    } catch (errorLike) {
+      return { failed: normalizeErrorPayload(errorLike) }
     }
+
+    return {}
   }
 
-  async stop(): Promise<void> {
+  private async runStopCaptureAndCloseSession(): Promise<MeetingEffectResult> {
     const session = this.requireActiveSession()
 
-    if (this.status !== 'streaming') {
-      throw new Error(`Cannot stop meeting session from status "${this.status}"`)
+    try {
+      await this.dependencies.captureWindowService.stopCapture(session.sessionId)
+      await session.engine.stopSession()
+    } catch (errorLike) {
+      return { failed: normalizeErrorPayload(errorLike) }
     }
 
-    this.transition({ type: 'STOP_REQUESTED' })
-    await this.dependencies.captureWindowService.stopCapture(session.sessionId)
-    await session.engine.stopSession()
-    await session.completion.promise
+    return { followUps: { type: 'SESSION_ENDED' } }
   }
 
-  handleCaptureProcessGone(): void {
-    if (!this.activeSession) {
-      return
+  private async runRecordWarningAndRecover(): Promise<MeetingEffectResult> {
+    const session = this.requireActiveSession()
+
+    if (this.recoveryPromise) {
+      await this.recoveryPromise
+      return {}
     }
-    this.notify({
-      level: 'error',
-      message: 'Audio capture process crashed. The session will be saved.'
+
+    const recoveryReadySignal = createCompletionSignal()
+    this.recoveryReadySignal = recoveryReadySignal
+
+    const recoveryPromise = this.performRecovery(session, recoveryReadySignal).finally(() => {
+      if (this.recoveryPromise === recoveryPromise) {
+        this.recoveryPromise = null
+      }
+      if (this.recoveryReadySignal === recoveryReadySignal) {
+        this.recoveryReadySignal = null
+      }
     })
-    void this.fail({
-      code: 'E_CAPTURE_PROCESS_GONE',
-      message: 'The capture process crashed unexpectedly',
-      recoverable: false
+    this.recoveryPromise = recoveryPromise
+
+    try {
+      await recoveryPromise
+    } catch (errorLike) {
+      return { followUps: { type: 'FAILED', error: normalizeErrorPayload(errorLike) } }
+    }
+
+    return {}
+  }
+
+  private async runFinalizeTranscript(): Promise<MeetingEffectResult> {
+    const session = this.requireActiveSession()
+
+    await Promise.allSettled([...session.pendingTranslations])
+    const endedAt = this.now()
+    const plainText = selectPlainText(session.transcript)
+    const translatedPlainText = selectTranslatedPlainText(session.transcript)
+    const audioMetadata = await this.finalizeSessionAudio(session, 'complete')
+
+    session.pendingPersist = {
+      endedAt,
+      plainText,
+      translatedPlainText,
+      audioMetadata
+    }
+
+    return { followUps: { type: 'PERSIST_SUCCEEDED' } }
+  }
+
+  private async runPersistTranscript(): Promise<MeetingEffectResult> {
+    const session = this.requireActiveSession()
+    const pendingPersist = session.pendingPersist
+
+    if (!pendingPersist) {
+      return {
+        failed: {
+          code: 'E_ENGINE_PROTOCOL',
+          message: 'Meeting session finished without persisted transcript context',
+          retryable: true
+        }
+      }
+    }
+
+    const { endedAt, plainText, translatedPlainText, audioMetadata } = pendingPersist
+
+    try {
+      await this.dependencies.transcriptRepository.save(
+        buildSavedTranscript(session, endedAt, plainText, translatedPlainText, audioMetadata)
+      )
+    } catch (errorLike) {
+      if (audioMetadata) {
+        await this.cleanupPersistedAudio(audioMetadata)
+      }
+
+      return { followUps: { type: 'PERSIST_FAILED', error: normalizeStorageErrorPayload(errorLike) } }
+    }
+
+    this.dependencies.diagnostics?.record({
+      type: 'session-persisted',
+      timestamp: endedAt,
+      sessionId: session.sessionId,
+      blockCount: session.transcript.committedBlocks.length
     })
+
+    session.pendingPersist = null
+    session.completion.settle()
+    return { followUps: { type: 'RESET', clearError: true } }
+  }
+
+  private async runRecordError(event: MeetingSessionEvent): Promise<MeetingEffectResult> {
+    const error = readMeetingError(event)
+    const session = this.activeSession
+
+    this.error = error
+    if (session) {
+      this.dependencies.diagnostics?.record({
+        type: 'session-failed',
+        timestamp: this.now(),
+        sessionId: session.sessionId,
+        errorCode: error.code
+      })
+    }
+
+    await this.abortActiveRuntime(session)
+
+    if (session) {
+      await session.audioRecorder?.discard()
+      if (session.audioRecorder) {
+        session.audioRecorder = undefined
+      }
+    }
+
+    this.terminalSnapshot = session ? this.createSnapshotForSession(session, error) : this.terminalSnapshot
+    session?.completion.settle()
+    return { followUps: { type: 'RESET', clearError: false } }
+  }
+
+  private async runRecordUnexpectedStop(event: MeetingSessionEvent): Promise<MeetingEffectResult> {
+    const error = readMeetingError(event)
+    const session = this.activeSession
+    const terminalStatus = this.status
+
+    this.error = error
+    if (session) {
+      this.dependencies.diagnostics?.record({
+        type: 'session-failed',
+        timestamp: this.now(),
+        sessionId: session.sessionId,
+        errorCode: error.code
+      })
+    }
+
+    if (session && terminalStatus === 'stopped_unexpectedly') {
+      await this.persistInterruptedSession(session)
+    }
+
+    await this.abortActiveRuntime(session)
+
+    if (session && terminalStatus !== 'stopped_unexpectedly') {
+      await session.audioRecorder?.discard()
+      session.audioRecorder = undefined
+    }
+
+    this.terminalSnapshot = session ? this.createSnapshotForSession(session, error) : this.terminalSnapshot
+    session?.completion.settle()
+    return { followUps: { type: 'RESET', clearError: false } }
+  }
+
+  private runClearRuntime(event: MeetingSessionEvent): MeetingEffectResult {
+    this.cleanupActiveSession()
+    this.cachedTranscriptSnapshot = null
+
+    if (event.type === 'RESET' && event.clearError === false) {
+      return {}
+    }
+
+    this.error = undefined
+    this.terminalSnapshot = null
+    return {}
   }
 
   private async handleEngineEvent(event: RecognitionEvent): Promise<void> {
@@ -214,11 +542,11 @@ export class MeetingCoordinator {
             return
           }
           if (this.status === 'preparing') {
-            this.transition({ type: 'SESSION_READY' })
+            await this.enqueueControlEvent({ type: 'SESSION_READY' })
           }
           return
         case 'draft-updated':
-          session.transcript = reduceTranscript(session.transcript, {
+          this.applyTranscriptEvent(session, {
             type: 'draft-updated',
             payload: event.payload
           })
@@ -229,14 +557,10 @@ export class MeetingCoordinator {
             source: event.payload.source,
             chars: `${event.payload.stableText}${event.payload.previewText}`.trim().length
           })
-          if (this.status === 'streaming') {
-            this.transition({ type: 'DRAFT_UPDATED' })
-          } else {
-            this.emitSnapshot()
-          }
+          this.emitSnapshot()
           return
         case 'block-committed':
-          session.transcript = reduceTranscript(session.transcript, {
+          this.applyTranscriptEvent(session, {
             type: 'block-committed',
             payload: event.payload
           })
@@ -247,11 +571,7 @@ export class MeetingCoordinator {
             blockId: event.payload.block.id,
             chars: event.payload.block.text.length
           })
-          if (this.status === 'streaming') {
-            this.transition({ type: 'BLOCK_COMMITTED' })
-          } else {
-            this.emitSnapshot()
-          }
+          this.emitSnapshot()
 
           if (
             session.runtimeConfig.translationConfig &&
@@ -262,16 +582,18 @@ export class MeetingCoordinator {
 
           return
         case 'translation-updated':
-          session.transcript = reduceTranscript(session.transcript, {
+          this.applyTranscriptEvent(session, {
             type: 'translation-updated',
             payload: event.payload
           })
           this.emitSnapshot()
           return
         case 'session-ended':
+          if (this.awaitingStopSessionEnd) {
+            return
+          }
           if (this.status === 'finishing') {
-            this.transition({ type: 'SESSION_ENDED' })
-            await this.persistAndComplete()
+            await this.enqueueControlEvent({ type: 'SESSION_ENDED' })
           }
           return
         case 'warning':
@@ -280,20 +602,19 @@ export class MeetingCoordinator {
             message: event.payload.message
           })
           if (this.status === 'streaming' && event.payload.recoverable) {
-            this.transition({
-              type: 'ENGINE_WARNING',
-              recoverable: event.payload.recoverable
-            })
             this.notify({
               level: 'warning',
               message: 'Attempting to recover the live session...'
             })
-            await this.recoverSession(session)
+            await this.enqueueControlEvent({
+              type: 'ENGINE_WARNING',
+              recoverable: event.payload.recoverable
+            })
             return
           }
 
           if (this.status === 'streaming') {
-            this.transition({
+            await this.enqueueControlEvent({
               type: 'ENGINE_WARNING',
               recoverable: event.payload.recoverable
             })
@@ -303,13 +624,13 @@ export class MeetingCoordinator {
           this.emitSnapshot()
           return
         case 'error':
-          await this.fail(event.payload)
+          await this.enqueueControlEvent({ type: 'FAILED', error: event.payload })
           return
         default:
           return assertNever(event)
       }
     } catch (error) {
-      await this.fail(error)
+      await this.enqueueControlEvent({ type: 'FAILED', error: normalizeErrorPayload(error) })
     }
   }
 
@@ -328,7 +649,7 @@ export class MeetingCoordinator {
         session.audioRecorder?.appendChunk(event.chunk)
         return
       case 'capture-error':
-        await this.fail(event.error)
+        await this.enqueueControlEvent({ type: 'FAILED', error: event.error })
         return
       case 'capture-started':
         this.dependencies.diagnostics?.record({
@@ -345,101 +666,6 @@ export class MeetingCoordinator {
     }
   }
 
-  private async persistAndComplete(): Promise<void> {
-    const session = this.requireActiveSession()
-    await Promise.allSettled([...session.pendingTranslations])
-    const endedAt = this.now()
-    const plainText = selectPlainText(session.transcript)
-    const translatedPlainText = selectTranslatedPlainText(session.transcript)
-    const audioMetadata = await this.finalizeSessionAudio(session, 'complete')
-
-    try {
-      await this.dependencies.transcriptRepository.save(
-        buildSavedTranscript(session, endedAt, plainText, translatedPlainText, audioMetadata)
-      )
-    } catch (error) {
-      if (audioMetadata) {
-        await this.cleanupPersistedAudio(audioMetadata)
-      }
-      throw normalizeStorageErrorPayload(error)
-    }
-
-    this.dependencies.diagnostics?.record({
-      type: 'session-persisted',
-      timestamp: endedAt,
-      sessionId: session.sessionId,
-      blockCount: session.transcript.committedBlocks.length
-    })
-
-    this.transition({ type: 'PERSIST_SUCCEEDED' })
-    session.completion.settle()
-    this.resetAfterTerminalState()
-  }
-
-  private async fail(errorLike: unknown): Promise<void> {
-    const error = normalizeErrorPayload(errorLike)
-    const session = this.activeSession
-
-    if (
-      this.status !== 'idle' &&
-      this.status !== 'completed' &&
-      this.status !== 'stopped_unexpectedly' &&
-      this.status !== 'error'
-    ) {
-      this.transition({ type: 'FAILED', error })
-    }
-
-    this.error = error
-    if (session) {
-      this.dependencies.diagnostics?.record({
-        type: 'session-failed',
-        timestamp: this.now(),
-        sessionId: session.sessionId,
-        errorCode: error.code
-      })
-    }
-
-    try {
-      await session?.engine.abortSession()
-    } catch {
-      // best effort cleanup
-    }
-
-    try {
-      await this.dependencies.captureWindowService.abortCapture(session?.sessionId)
-    } catch {
-      // best effort cleanup
-    }
-
-    if (session && this.status === 'stopped_unexpectedly') {
-      await this.persistInterruptedSession(session)
-    } else {
-      await session?.audioRecorder?.discard()
-      if (session) {
-        session.audioRecorder = undefined
-      }
-    }
-
-    this.terminalSnapshot = session ? this.createSnapshotForSession(session) : this.terminalSnapshot
-    session?.completion.settle()
-    this.resetAfterTerminalState(false)
-  }
-
-  private resetAfterTerminalState(clearError = true): void {
-    if (this.status === 'completed' || this.status === 'stopped_unexpectedly' || this.status === 'error') {
-      this.transition({ type: 'RESET' })
-    }
-
-    this.cleanupActiveSession()
-
-    if (clearError) {
-      this.error = undefined
-      this.terminalSnapshot = null
-    }
-
-    this.emitSnapshot()
-  }
-
   private cleanupActiveSession(): void {
     this.activeEngineUnsubscribe?.()
     this.activeEngineUnsubscribe = null
@@ -448,10 +674,19 @@ export class MeetingCoordinator {
     this.activeSession = null
   }
 
-  private transition(event: Parameters<typeof transitionMeetingStatus>[1]): void {
-    const result = transitionMeetingStatus(this.status, event)
-    this.status = result.to
-    this.emitSnapshot()
+  private applyTranscriptEvent(session: MeetingSessionContext, event: TranscriptEvent): void {
+    session.transcript = reduceTranscript(session.transcript, event)
+    this.cachedTranscriptSnapshot = null
+  }
+
+  private cloneTranscriptForSnapshot(transcript: TranscriptState): TranscriptState {
+    if (this.cachedTranscriptSnapshot?.revision === transcript.revision) {
+      return this.cachedTranscriptSnapshot.clone
+    }
+
+    const clone = cloneTranscriptState(transcript)
+    this.cachedTranscriptSnapshot = { revision: transcript.revision, clone }
+    return clone
   }
 
   private emitSnapshot(): void {
@@ -517,69 +752,46 @@ export class MeetingCoordinator {
     }
   }
 
-  private async recoverSession(session: MeetingSessionContext): Promise<void> {
-    if (this.recoveryPromise) {
-      await this.recoveryPromise
-      return
-    }
-
-    const recoveryReadySignal = createCompletionSignal()
-    this.recoveryReadySignal = recoveryReadySignal
-    const recoveryPromise = this.performRecovery(session, recoveryReadySignal).finally(() => {
-      if (this.recoveryPromise === recoveryPromise) {
-        this.recoveryPromise = null
-      }
-      if (this.recoveryReadySignal === recoveryReadySignal) {
-        this.recoveryReadySignal = null
-      }
-    })
-    this.recoveryPromise = recoveryPromise
-    await recoveryPromise
-  }
-
   private async performRecovery(
     session: MeetingSessionContext,
     recoveryReadySignal: { promise: Promise<void>; settle: () => void }
   ): Promise<void> {
     try {
-      try {
-        await session.engine.abortSession()
-      } catch {
-        // best effort cleanup before replacement
-      }
-
-      const settings = this.dependencies.settingsProvider.getSettings()
-      const nextEngine = this.dependencies.engineFactory(session.runtimeConfig)
-      session.engine = nextEngine
-      this.attachEngine(nextEngine)
-
-      await this.startSessionRuntime(session, settings.input.microphoneDeviceId, false)
-      await waitForRecoveryReady(
-        recoveryReadySignal.promise,
-        this.recoveryTimeoutMs,
-        'Meeting recovery timed out before the engine became ready'
-      )
-
-      if (this.activeSession?.sessionId !== session.sessionId || this.status !== 'recovering') {
-        return
-      }
-
-      this.error = undefined
-      this.transition({ type: 'RECOVERY_SUCCEEDED' })
-      this.notify({
-        level: 'info',
-        message: 'Live session recovered.'
-      })
-    } catch (error) {
-      if (this.activeSession?.sessionId !== session.sessionId) {
-        return
-      }
-
-      await this.fail(error)
+      await session.engine.abortSession()
+    } catch {
+      // best effort cleanup before replacement
     }
+
+    const settings = this.dependencies.settingsProvider.getSettings()
+    const nextEngine = this.dependencies.engineFactory(session.runtimeConfig)
+    session.engine = nextEngine
+    this.attachEngine(nextEngine)
+
+    await this.startSessionRuntime(session, settings.input.microphoneDeviceId, false)
+    await waitForRecoveryReady(
+      recoveryReadySignal.promise,
+      this.recoveryTimeoutMs,
+      'Meeting recovery timed out before the engine became ready'
+    )
+
+    if (this.activeSession?.sessionId !== session.sessionId || this.status !== 'recovering') {
+      return
+    }
+
+    const result = transitionMeetingStatus(this.status, { type: 'RECOVERY_SUCCEEDED' })
+    this.status = result.to
+    this.error = undefined
+    this.emitSnapshot()
+    this.notify({
+      level: 'info',
+      message: 'Live session recovered.'
+    })
   }
 
-  private createSnapshotForSession(session: MeetingSessionContext): MeetingRuntimeSnapshot {
+  private createSnapshotForSession(
+    session: MeetingSessionContext,
+    error: AppErrorPayload | undefined = this.error
+  ): MeetingRuntimeSnapshot {
     return {
       sessionId: session.sessionId,
       status: this.status,
@@ -588,7 +800,7 @@ export class MeetingCoordinator {
       transcript: cloneTranscriptState(session.transcript),
       engineProfileId: session.runtimeConfig.engineProfile.id,
       translationEnabled: Boolean(session.runtimeConfig.translationConfig),
-      ...(this.error ? { error: { ...this.error } } : {})
+      ...(error ? { error: { ...error } } : {})
     }
   }
 
@@ -598,6 +810,20 @@ export class MeetingCoordinator {
     }
 
     return this.activeSession
+  }
+
+  private async abortActiveRuntime(session: MeetingSessionContext | null): Promise<void> {
+    try {
+      await session?.engine.abortSession()
+    } catch {
+      // best effort cleanup
+    }
+
+    try {
+      await this.dependencies.captureWindowService.abortCapture(session?.sessionId)
+    } catch {
+      // best effort cleanup
+    }
   }
 
   private startTranslationTask(
@@ -633,7 +859,7 @@ export class MeetingCoordinator {
         return
       }
 
-      session.transcript = reduceTranscript(session.transcript, {
+      this.applyTranscriptEvent(session, {
         type: 'translation-updated',
         payload: translation
       })
@@ -812,6 +1038,39 @@ function applyMeetingOverrides(
       ...(input.targetLanguage ? { targetLanguage: input.targetLanguage } : {})
     }
   }
+}
+
+function meetingEffectNeedsPostEmit(effect: MeetingTransitionEffect): boolean {
+  switch (effect) {
+    case 'resolve-config-and-warmup':
+    case 'clear-runtime':
+    case 'record-error':
+    case 'record-unexpected-stop':
+      return true
+    default:
+      return false
+  }
+}
+
+function readMeetingError(event: MeetingSessionEvent): AppErrorPayload {
+  if (
+    (event.type === 'FAILED' || event.type === 'PERSIST_FAILED' || event.type === 'RECOVERY_FAILED') &&
+    event.error
+  ) {
+    return event.error
+  }
+
+  return {
+    code: 'E_ENGINE_PROTOCOL',
+    message: 'Unknown meeting error',
+    retryable: true
+  }
+}
+
+function normalizeFollowUps(
+  followUps: MeetingSessionEvent | MeetingSessionEvent[]
+): MeetingSessionEvent[] {
+  return Array.isArray(followUps) ? followUps : [followUps]
 }
 
 function cloneTranscriptState(transcript: TranscriptState): TranscriptState {

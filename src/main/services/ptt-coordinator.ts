@@ -13,7 +13,9 @@ import type {
   RecognitionEvent,
   TranslationUpdatedPayload
 } from '../../core/contracts/engine'
+import type { PttTransitionEffect } from '../../core/session/session-machine'
 import { transitionPttStatus } from '../../core/session/session-machine'
+import type { PttSessionEvent } from '../../core/session/session-types'
 import type { CaptureWindowService } from '../platform/capture-window-service'
 import type { TranslationPipeline } from './translation-pipeline'
 
@@ -76,11 +78,16 @@ type PttSessionContext = {
   stopCapturePromise: Promise<boolean> | null
   finalText: string | null
   translatedText: string | null
+  committedBlock: SavedTranscript['blocks'][number] | null
   completion: {
     promise: Promise<void>
     settle: () => void
   }
 }
+
+type PttEffectResult =
+  | { followUps?: PttSessionEvent | PttSessionEvent[] }
+  | { failed: AppErrorPayload }
 
 export class PttCoordinator {
   private readonly completionTimeoutMs: number
@@ -92,6 +99,7 @@ export class PttCoordinator {
   private lastFailedText: string | null = null
   private activeSession: PttSessionContext | null = null
   private activeEngineUnsubscribe: (() => void) | null = null
+  private pendingStartupFailure: AppErrorPayload | null = null
   private readonly listeners = new Set<(snapshot: PttRuntimeSnapshot) => void>()
   private readonly notificationListeners = new Set<(notification: RuntimeNotification) => void>()
 
@@ -142,82 +150,26 @@ export class PttCoordinator {
       throw new Error('PTT session is already active')
     }
 
-    this.transition({ type: 'PTT_HOTKEY_DOWN' })
+    this.pendingStartupFailure = null
+    await this.dispatch({ type: 'PTT_HOTKEY_DOWN' })
 
-    const settings = this.dependencies.settingsProvider.getSettings()
-    const runtimeConfig = this.dependencies.settingsProvider.resolveRuntimeConfig('ptt')
-    const engine = this.dependencies.engineFactory(runtimeConfig)
-    const sessionId = this.createSessionId()
-    const startedAt = this.now()
-
-    this.activeSession = {
-      sessionId,
-      startedAt,
-      settings,
-      runtimeConfig,
-      engine,
-      stopCapturePromise: null,
-      finalText: null,
-      translatedText: null,
-      completion: createCompletionSignal()
-    }
-    this.dependencies.diagnostics?.record({
-      type: 'session-started',
-      timestamp: startedAt,
-      sessionId,
-      mode: 'ptt'
-    })
-
-    this.activeEngineUnsubscribe = engine.onEvent((event) => {
-      void this.handleEngineEvent(event)
-    })
-
-    try {
-      await engine.startSession({
-        sessionId,
-        mode: 'ptt',
-        sources: ['microphone'],
-        language: String(runtimeConfig.engineConfig.language),
-        translation: {
-          enabled: Boolean(runtimeConfig.translationConfig) && runtimeConfig.engineProfile.capabilities.translation,
-          ...(runtimeConfig.translationConfig
-            ? {
-                targetLanguage: String(runtimeConfig.translationConfig.targetLanguage)
-              }
-            : {})
-        }
-      })
-
-      await this.dependencies.captureWindowService.startCapture({
-        requestId: sessionId,
-        sources: ['microphone'],
-        microphoneDeviceId: settings.input.microphoneDeviceId,
-        sampleRate: runtimeConfig.captureConfig.sampleRate,
-        chunkMs: runtimeConfig.captureConfig.chunkMs
-      })
-
-      this.transition({ type: 'CAPTURE_STARTED' })
-    } catch (error) {
-      await this.fail(error)
-      throw error
+    if (this.pendingStartupFailure) {
+      const error = this.pendingStartupFailure
+      this.pendingStartupFailure = null
+      throw Object.assign(new Error(error.message), { payload: error })
     }
   }
 
   async stop(): Promise<void> {
-    const session = this.requireActiveSession()
+    if (!this.activeSession) {
+      throw new Error('No active PTT session')
+    }
 
     if (this.status !== 'capturing') {
       throw new Error(`Cannot stop PTT session from status "${this.status}"`)
     }
 
-    this.transition({ type: 'PTT_HOTKEY_UP' })
-    session.stopCapturePromise = this.dependencies.captureWindowService.stopCapture(session.sessionId)
-    await session.stopCapturePromise
-    try {
-      await waitForPttCompletion(session.completion.promise, this.completionTimeoutMs)
-    } catch (error) {
-      await this.fail(error)
-    }
+    await this.dispatch({ type: 'PTT_HOTKEY_UP' })
   }
 
   async copyLatestText(): Promise<void> {
@@ -246,177 +198,198 @@ export class PttCoordinator {
     this.emitSnapshot()
   }
 
-  private async handleEngineEvent(event: RecognitionEvent): Promise<void> {
+  private async dispatch(event: PttSessionEvent): Promise<void> {
+    const queue: PttSessionEvent[] = [event]
+
+    while (queue.length > 0) {
+      const next = queue.shift()!
+      const result = transitionPttStatus(this.status, next)
+      this.status = result.to
+      this.emitSnapshot()
+      const effectResult = await this.runEffect(result.effect, next)
+      if (pttEffectNeedsPostEmit(result.effect)) {
+        this.emitSnapshot()
+      }
+
+      if ('failed' in effectResult) {
+        if (result.effect === 'prepare-capture-request') {
+          this.pendingStartupFailure = effectResult.failed
+        }
+
+        queue.push({ type: 'FAILED', error: effectResult.failed })
+        continue
+      }
+
+      if (effectResult.followUps) {
+        queue.push(...normalizeFollowUps(effectResult.followUps))
+      }
+    }
+  }
+
+  private async runEffect(effect: PttTransitionEffect, event: PttSessionEvent): Promise<PttEffectResult> {
+    switch (effect) {
+      case 'prepare-capture-request':
+        return this.runPrepareCaptureRequest()
+      case 'begin-audio-capture':
+        return {}
+      case 'stop-capture-and-flush':
+        return this.runStopCaptureAndFlush()
+      case 'discard-transcript':
+        return this.runDiscardTranscript()
+      case 'finalize-transcript':
+        return this.runFinalizeTranscript()
+      case 'dispatch-output':
+        return this.runDispatchOutput()
+      case 'persist-result':
+        return this.runPersistResult()
+      case 'record-error':
+        return this.runRecordError(event)
+      case 'clear-runtime':
+        return this.runClearRuntime(event)
+      default:
+        return assertNever(effect)
+    }
+  }
+
+  private async runPrepareCaptureRequest(): Promise<PttEffectResult> {
+    const settings = this.dependencies.settingsProvider.getSettings()
+    const runtimeConfig = this.dependencies.settingsProvider.resolveRuntimeConfig('ptt')
+    const engine = this.dependencies.engineFactory(runtimeConfig)
+    const sessionId = this.createSessionId()
+    const startedAt = this.now()
+
+    this.activeSession = {
+      sessionId,
+      startedAt,
+      settings,
+      runtimeConfig,
+      engine,
+      stopCapturePromise: null,
+      finalText: null,
+      translatedText: null,
+      committedBlock: null,
+      completion: createCompletionSignal()
+    }
+    this.dependencies.diagnostics?.record({
+      type: 'session-started',
+      timestamp: startedAt,
+      sessionId,
+      mode: 'ptt'
+    })
+
+    this.activeEngineUnsubscribe = engine.onEvent((engineEvent) => {
+      void this.handleEngineEvent(engineEvent)
+    })
+
+    try {
+      await engine.startSession({
+        sessionId,
+        mode: 'ptt',
+        sources: ['microphone'],
+        language: String(runtimeConfig.engineConfig.language),
+        translation: {
+          enabled: Boolean(runtimeConfig.translationConfig) && runtimeConfig.engineProfile.capabilities.translation,
+          ...(runtimeConfig.translationConfig
+            ? {
+                targetLanguage: String(runtimeConfig.translationConfig.targetLanguage)
+              }
+            : {})
+        }
+      })
+
+      await this.dependencies.captureWindowService.startCapture({
+        requestId: sessionId,
+        sources: ['microphone'],
+        microphoneDeviceId: settings.input.microphoneDeviceId,
+        sampleRate: runtimeConfig.captureConfig.sampleRate,
+        chunkMs: runtimeConfig.captureConfig.chunkMs
+      })
+    } catch (errorLike) {
+      return { failed: normalizeErrorPayload(errorLike) }
+    }
+
+    return { followUps: { type: 'CAPTURE_STARTED' } }
+  }
+
+  private async runStopCaptureAndFlush(): Promise<PttEffectResult> {
+    const session = this.requireActiveSession()
+    session.stopCapturePromise = this.dependencies.captureWindowService.stopCapture(session.sessionId)
+
+    try {
+      await session.stopCapturePromise
+      await waitForPttCompletion(session.completion.promise, this.completionTimeoutMs)
+    } catch (errorLike) {
+      return { failed: normalizeErrorPayload(errorLike) }
+    }
+
+    return {}
+  }
+
+  private async runDiscardTranscript(): Promise<PttEffectResult> {
     const session = this.activeSession
 
-    if (!session) {
-      return
+    try {
+      await session?.engine.abortSession()
+    } catch {
+      // best effort cleanup
     }
 
     try {
-      switch (event.type) {
-        case 'session-ready':
-        case 'draft-updated':
-        case 'warning':
-          return
-        case 'session-ended':
-          if (this.status === 'recognizing' && !session.finalText) {
-            this.notify({
-              level: 'warning',
-              message: 'No speech was captured. Check the microphone level and try again.'
-            })
-            await this.fail({
-              code: 'E_NO_SPEECH_DETECTED',
-              message: 'PTT session ended without a transcript.',
-              retryable: true
-            })
-            return
-          }
-
-          if (
-            this.status === 'post_processing' &&
-            session.finalText &&
-            session.runtimeConfig.translationConfig &&
-            session.runtimeConfig.engineProfile.capabilities.translation
-          ) {
-            this.dependencies.diagnostics?.record({
-              type: 'translation-failed',
-              timestamp: this.now(),
-              sessionId: session.sessionId,
-              reason: 'Translation did not complete before the session ended'
-            })
-            this.notify({
-              level: 'warning',
-              message: 'Translation did not complete. Delivered the original transcript instead.'
-            })
-            this.transition({ type: 'SKIP_TRANSLATION' })
-            await this.finalizeAndDeliver()
-          }
-          return
-        case 'error':
-          await this.fail(event.payload)
-          return
-        case 'block-committed':
-          session.finalText = event.payload.block.text
-          this.dependencies.diagnostics?.record({
-            type: 'block-committed',
-            timestamp: this.now(),
-            sessionId: session.sessionId,
-            blockId: event.payload.block.id,
-            chars: event.payload.block.text.length
-          })
-          if (this.status === 'recognizing') {
-            this.transition({ type: 'BLOCK_COMMITTED' })
-          }
-
-          if (session.runtimeConfig.translationConfig) {
-            if (session.runtimeConfig.engineProfile.capabilities.translation) {
-              return
-            }
-
-            await this.translateCommittedBlock(session, event.payload.block)
-            return
-          }
-
-          this.transition({ type: 'SKIP_TRANSLATION' })
-          await this.finalizeAndDeliver()
-          return
-        case 'translation-updated':
-          this.applyTranslationUpdate(session, event.payload)
-          if (this.status === 'post_processing' && session.translatedText) {
-            this.transition({ type: 'TRANSLATION_DONE' })
-            await this.finalizeAndDeliver()
-          }
-          return
-        default:
-          return assertNever(event)
-      }
-    } catch (error) {
-      await this.fail(error)
+      await this.dependencies.captureWindowService.abortCapture(session?.sessionId)
+    } catch {
+      // best effort cleanup
     }
+
+    session?.completion.settle()
+    return { followUps: { type: 'RESET', clearError: true } }
   }
 
-  private async handleCaptureEvent(
-    event: Parameters<CaptureWindowService['onEvent']>[0] extends (payload: infer Event) => void ? Event : never
-  ): Promise<void> {
-    const session = this.activeSession
+  private async runFinalizeTranscript(): Promise<PttEffectResult> {
+    const session = this.requireActiveSession()
 
-    if (!session || event.requestId !== session.sessionId) {
-      return
+    if (!session.runtimeConfig.translationConfig) {
+      return { followUps: { type: 'SKIP_TRANSLATION' } }
     }
 
-    try {
-      switch (event.type) {
-        case 'audio-chunk':
-          session.engine.pushAudio(event.chunk)
-          return
-        case 'capture-error':
-          await this.fail(event.error)
-          return
-        case 'capture-started':
-          this.dependencies.diagnostics?.record({
-            type: 'capture-started',
-            timestamp: this.now(),
-            sessionId: session.sessionId,
-            sources: [...event.sources]
-          })
-          return
-        case 'capture-stopped':
-          if (this.status === 'recognizing') {
-            await session.engine.stopSession()
-          }
-          return
-        default:
-          return assertNever(event)
-      }
-    } catch (error) {
-      await this.fail(error)
-    }
-  }
-
-  private applyTranslationUpdate(
-    session: PttSessionContext,
-    payload: TranslationUpdatedPayload
-  ): void {
-    if (!session.finalText) {
-      return
+    if (session.runtimeConfig.engineProfile.capabilities.translation) {
+      return {}
     }
 
-    session.translatedText = payload.translatedText
-  }
+    if (!session.committedBlock) {
+      return { failed: {
+        code: 'E_ENGINE_PROTOCOL',
+        message: 'PTT session finished without final text',
+        retryable: true
+      } }
+    }
 
-  private async translateCommittedBlock(
-    session: PttSessionContext,
-    block: SavedTranscript['blocks'][number]
-  ): Promise<void> {
-    if (!session.runtimeConfig.translationConfig || !this.dependencies.translationPipeline) {
+    if (!this.dependencies.translationPipeline) {
       this.notify({
         level: 'warning',
         message: 'Translation is enabled but no translation pipeline is configured. Delivered the original transcript instead.'
       })
-      this.transition({ type: 'SKIP_TRANSLATION' })
-      await this.finalizeAndDeliver()
-      return
+      return { followUps: { type: 'SKIP_TRANSLATION' } }
     }
 
     try {
       const translation = await this.dependencies.translationPipeline.translateBlock({
         runtimeConfig: session.runtimeConfig,
-        block
+        block: session.committedBlock
       })
 
       if (this.activeSession?.sessionId !== session.sessionId) {
-        return
+        return {}
       }
 
       this.applyTranslationUpdate(session, translation)
-      if (this.status === 'post_processing' && session.translatedText) {
-        this.transition({ type: 'TRANSLATION_DONE' })
-        await this.finalizeAndDeliver()
+      if (session.translatedText) {
+        return { followUps: { type: 'TRANSLATION_DONE' } }
       }
+
+      return { followUps: { type: 'SKIP_TRANSLATION' } }
     } catch (errorLike) {
       if (this.activeSession?.sessionId !== session.sessionId) {
-        return
+        return {}
       }
 
       this.dependencies.diagnostics?.record({
@@ -429,51 +402,76 @@ export class PttCoordinator {
         level: 'warning',
         message: 'Translation failed. Delivered the original transcript instead.'
       })
-      this.transition({ type: 'SKIP_TRANSLATION' })
-      await this.finalizeAndDeliver()
+      return { followUps: { type: 'SKIP_TRANSLATION' } }
     }
   }
 
-  private async finalizeAndDeliver(): Promise<void> {
+  private async runDispatchOutput(): Promise<PttEffectResult> {
     const session = this.requireActiveSession()
     const text = session.translatedText ?? session.finalText
 
     if (!text) {
-      throw new Error('PTT session finished without final text')
+      return { failed: {
+        code: 'E_ENGINE_PROTOCOL',
+        message: 'PTT session finished without final text',
+        retryable: true
+      } }
     }
 
-    const delivery = await this.dependencies.outputDispatcher.deliver({
-      text,
-      method: session.runtimeConfig.outputConfig.method
-    })
+    try {
+      const delivery = await this.dependencies.outputDispatcher.deliver({
+        text,
+        method: session.runtimeConfig.outputConfig.method
+      })
+
+      const deliveredAt = this.now()
+      this.lastResult = {
+        text,
+        deliveredAt,
+        deliveryMethod: delivery.methodUsed
+      }
+      this.lastFailedText = null
+      this.error = undefined
+
+      this.dependencies.diagnostics?.record({
+        type: 'output-delivered',
+        timestamp: deliveredAt,
+        sessionId: session.sessionId,
+        requestedMethod: delivery.requestedMethod,
+        methodUsed: delivery.methodUsed,
+        fallback: delivery.requestedMethod !== delivery.methodUsed
+      })
+
+      if (delivery.requestedMethod !== delivery.methodUsed) {
+        this.notify({
+          level: 'warning',
+          message:
+            delivery.fallbackReason
+              ? `${delivery.fallbackReason} Copied the transcript to the clipboard instead.`
+              : 'Preferred output failed. Copied the transcript to the clipboard instead.'
+        })
+      }
+
+      return { followUps: { type: 'DELIVERY_SUCCEEDED' } }
+    } catch (errorLike) {
+      const error = normalizeErrorPayload(errorLike)
+      return { followUps: { type: 'DELIVERY_FAILED', error } }
+    }
+  }
+
+  private async runPersistResult(): Promise<PttEffectResult> {
+    const session = this.requireActiveSession()
+    const text = session.translatedText ?? session.finalText
+
+    if (!text) {
+      return { failed: {
+        code: 'E_ENGINE_PROTOCOL',
+        message: 'PTT session finished without final text',
+        retryable: true
+      } }
+    }
 
     const deliveredAt = this.now()
-    this.lastResult = {
-      text,
-      deliveredAt,
-      deliveryMethod: delivery.methodUsed
-    }
-    this.lastFailedText = null
-    this.error = undefined
-
-    this.dependencies.diagnostics?.record({
-      type: 'output-delivered',
-      timestamp: deliveredAt,
-      sessionId: session.sessionId,
-      requestedMethod: delivery.requestedMethod,
-      methodUsed: delivery.methodUsed,
-      fallback: delivery.requestedMethod !== delivery.methodUsed
-    })
-
-    if (delivery.requestedMethod !== delivery.methodUsed) {
-      this.notify({
-        level: 'warning',
-        message:
-          delivery.fallbackReason
-            ? `${delivery.fallbackReason} Copied the transcript to the clipboard instead.`
-            : 'Preferred output failed. Copied the transcript to the clipboard instead.'
-      })
-    }
 
     try {
       await this.dependencies.transcriptRepository.save({
@@ -509,8 +507,10 @@ export class PttCoordinator {
             }
           : {})
       })
-    } catch (error) {
-      throw normalizeStorageErrorPayload(error)
+    } catch (errorLike) {
+      this.error = normalizeStorageErrorPayload(errorLike)
+      session.completion.settle()
+      return { followUps: { type: 'RESET', clearError: false } }
     }
 
     this.dependencies.diagnostics?.record({
@@ -520,25 +520,27 @@ export class PttCoordinator {
       blockCount: 1
     })
 
-    this.transition({ type: 'DELIVERY_SUCCEEDED' })
-
     session.completion.settle()
-    this.resetAfterTerminalState()
+    return { followUps: { type: 'RESET', clearError: true } }
   }
 
-  private async fail(errorLike: unknown): Promise<void> {
-    const error = normalizeErrorPayload(errorLike)
+  private async runRecordError(event: PttSessionEvent): Promise<PttEffectResult> {
+    const error =
+      (event.type === 'FAILED' || event.type === 'DELIVERY_FAILED') && event.error
+        ? event.error
+        : {
+            code: 'E_ENGINE_PROTOCOL',
+            message: 'Unknown PTT error',
+            retryable: true
+          }
     const session = this.activeSession
-
-    if (this.status !== 'error' && this.status !== 'idle') {
-      this.transition({ type: 'FAILED', error })
-    }
 
     this.error = error
     this.lastFailedText =
       error.code === 'E_OUTPUT_DELIVERY' && typeof error.detail?.transcriptText === 'string'
         ? error.detail.transcriptText
         : this.lastFailedText
+
     if (session) {
       this.dependencies.diagnostics?.record({
         type: 'session-failed',
@@ -568,34 +570,154 @@ export class PttCoordinator {
     }
 
     session?.completion.settle()
-    this.resetAfterTerminalState(false)
+    return { followUps: { type: 'RESET', clearError: false } }
   }
 
-  private resetAfterTerminalState(clearError = true): void {
-    if (this.status === 'completed' || this.status === 'cancelled' || this.status === 'error') {
-      this.transition({ type: 'RESET' })
-    }
-
+  private runClearRuntime(event: PttSessionEvent): PttEffectResult {
     this.cleanupActiveSession()
 
-    if (clearError) {
-      this.error = undefined
-      this.lastFailedText = null
+    if (event.type === 'RESET' && event.clearError === false) {
+      return {}
     }
 
-    this.emitSnapshot()
+    this.error = undefined
+    this.lastFailedText = null
+    return {}
+  }
+
+  private async handleEngineEvent(event: RecognitionEvent): Promise<void> {
+    const session = this.activeSession
+
+    if (!session) {
+      return
+    }
+
+    try {
+      switch (event.type) {
+        case 'session-ready':
+        case 'draft-updated':
+        case 'warning':
+          return
+        case 'session-ended':
+          if (this.status === 'recognizing' && !session.finalText) {
+            this.notify({
+              level: 'warning',
+              message: 'No speech was captured. Check the microphone level and try again.'
+            })
+            await this.dispatch({
+              type: 'FAILED',
+              error: {
+                code: 'E_NO_SPEECH_DETECTED',
+                message: 'PTT session ended without a transcript.',
+                retryable: true
+              }
+            })
+            return
+          }
+
+          if (
+            this.status === 'post_processing' &&
+            session.finalText &&
+            session.runtimeConfig.translationConfig &&
+            session.runtimeConfig.engineProfile.capabilities.translation
+          ) {
+            this.dependencies.diagnostics?.record({
+              type: 'translation-failed',
+              timestamp: this.now(),
+              sessionId: session.sessionId,
+              reason: 'Translation did not complete before the session ended'
+            })
+            this.notify({
+              level: 'warning',
+              message: 'Translation did not complete. Delivered the original transcript instead.'
+            })
+            await this.dispatch({ type: 'SKIP_TRANSLATION' })
+          }
+          return
+        case 'error':
+          await this.dispatch({ type: 'FAILED', error: event.payload })
+          return
+        case 'block-committed':
+          session.finalText = event.payload.block.text
+          session.committedBlock = event.payload.block
+          this.dependencies.diagnostics?.record({
+            type: 'block-committed',
+            timestamp: this.now(),
+            sessionId: session.sessionId,
+            blockId: event.payload.block.id,
+            chars: event.payload.block.text.length
+          })
+          if (this.status === 'recognizing') {
+            await this.dispatch({ type: 'BLOCK_COMMITTED' })
+          }
+          return
+        case 'translation-updated':
+          this.applyTranslationUpdate(session, event.payload)
+          if (this.status === 'post_processing' && session.translatedText) {
+            await this.dispatch({ type: 'TRANSLATION_DONE' })
+          }
+          return
+        default:
+          return assertNever(event)
+      }
+    } catch (error) {
+      await this.dispatch({ type: 'FAILED', error: normalizeErrorPayload(error) })
+    }
+  }
+
+  private async handleCaptureEvent(
+    event: Parameters<CaptureWindowService['onEvent']>[0] extends (payload: infer Event) => void ? Event : never
+  ): Promise<void> {
+    const session = this.activeSession
+
+    if (!session || event.requestId !== session.sessionId) {
+      return
+    }
+
+    try {
+      switch (event.type) {
+        case 'audio-chunk':
+          session.engine.pushAudio(event.chunk)
+          return
+        case 'capture-error':
+          await this.dispatch({ type: 'FAILED', error: event.error })
+          return
+        case 'capture-started':
+          this.dependencies.diagnostics?.record({
+            type: 'capture-started',
+            timestamp: this.now(),
+            sessionId: session.sessionId,
+            sources: [...event.sources]
+          })
+          return
+        case 'capture-stopped':
+          if (this.status === 'recognizing') {
+            await session.engine.stopSession()
+          }
+          return
+        default:
+          return assertNever(event)
+      }
+    } catch (error) {
+      await this.dispatch({ type: 'FAILED', error: normalizeErrorPayload(error) })
+    }
+  }
+
+  private applyTranslationUpdate(
+    session: PttSessionContext,
+    payload: TranslationUpdatedPayload
+  ): void {
+    if (!session.finalText) {
+      return
+    }
+
+    session.translatedText = payload.translatedText
   }
 
   private cleanupActiveSession(): void {
     this.activeEngineUnsubscribe?.()
     this.activeEngineUnsubscribe = null
     this.activeSession = null
-  }
-
-  private transition(event: Parameters<typeof transitionPttStatus>[1]): void {
-    const result = transitionPttStatus(this.status, event)
-    this.status = result.to
-    this.emitSnapshot()
   }
 
   private emitSnapshot(): void {
@@ -621,6 +743,23 @@ export class PttCoordinator {
   }
 }
 
+function pttEffectNeedsPostEmit(effect: PttTransitionEffect): boolean {
+  switch (effect) {
+    case 'prepare-capture-request':
+    case 'dispatch-output':
+    case 'persist-result':
+    case 'record-error':
+    case 'clear-runtime':
+      return true
+    default:
+      return false
+  }
+}
+
+function normalizeFollowUps(followUps: PttSessionEvent | PttSessionEvent[]): PttSessionEvent[] {
+  return Array.isArray(followUps) ? followUps : [followUps]
+}
+
 function normalizeErrorPayload(errorLike: unknown): AppErrorPayload {
   if (isAppErrorPayload(errorLike)) {
     return errorLike
@@ -637,6 +776,17 @@ function normalizeErrorPayload(errorLike: unknown): AppErrorPayload {
       code: 'E_ENGINE_PROTOCOL',
       message: errorLike.message,
       retryable: true
+    }
+  }
+
+  if (errorLike && typeof errorLike === 'object') {
+    const candidate = errorLike as Partial<AppErrorPayload>
+    if (
+      typeof candidate.code === 'string' &&
+      typeof candidate.message === 'string' &&
+      typeof candidate.retryable === 'boolean'
+    ) {
+      return candidate as AppErrorPayload
     }
   }
 
@@ -712,5 +862,5 @@ async function waitForPttCompletion(promise: Promise<void>, timeoutMs: number): 
 }
 
 function assertNever(value: never): never {
-  throw new Error(`Unhandled recognition event: ${String(value)}`)
+  throw new Error(`Unhandled PTT value: ${String(value)}`)
 }

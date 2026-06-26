@@ -35,7 +35,7 @@ export type PttSessionEvent =
   | { type: 'DELIVERY_FAILED'; error?: AppErrorPayload }
   | { type: 'FAILED'; error?: AppErrorPayload }
   | { type: 'CANCELLED' }
-  | { type: 'RESET' }
+  | { type: 'RESET'; clearError?: boolean }
 
 export type MeetingSessionEvent =
   | { type: 'START_REQUESTED' }
@@ -50,4 +50,4 @@ export type MeetingSessionEvent =
   | { type: 'PERSIST_FAILED'; error?: AppErrorPayload }
   | { type: 'RECOVERY_SUCCEEDED' }
   | { type: 'RECOVERY_FAILED'; error?: AppErrorPayload }
-  | { type: 'RESET' }
+  | { type: 'RESET'; clearError?: boolean }
