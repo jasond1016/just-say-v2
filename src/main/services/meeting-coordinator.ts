@@ -14,6 +14,7 @@ import type { MeetingTransitionEffect } from '../../core/session/session-machine
 import { transitionMeetingStatus } from '../../core/session/session-machine'
 import type { MeetingSessionEvent } from '../../core/session/session-types'
 import { buildMeetingSavedTranscript } from '../../core/transcript/transcript-provenance'
+import { cloneTranscriptState } from '../../core/transcript/clone-transcript-state'
 import { transcriptReducer, INITIAL_TRANSCRIPT_STATE } from '../../core/transcript/transcript-reducer'
 import { selectPlainText, selectTranslatedPlainText } from '../../core/transcript/transcript-selectors'
 import type { TranscriptEvent } from '../../core/transcript/transcript-types'
@@ -89,7 +90,6 @@ export class MeetingCoordinator {
   private readonly listeners = new Set<(snapshot: MeetingRuntimeSnapshot | null) => void>()
   private readonly notificationListeners = new Set<(notification: RuntimeNotification) => void>()
   private terminalSnapshot: MeetingRuntimeSnapshot | null = null
-  private cachedTranscriptSnapshot: { revision: number; clone: TranscriptState } | null = null
   private readonly sessionDispatch: SessionDispatchLoop<MeetingStatus, MeetingSessionEvent, MeetingTransitionEffect>
   private awaitingStopSessionEnd = false
   private recoveryPromise: Promise<void> | null = null
@@ -129,7 +129,7 @@ export class MeetingCoordinator {
 
   getSnapshot(): MeetingRuntimeSnapshot | null {
     if (!this.activeSession) {
-      return this.terminalSnapshot ? cloneMeetingSnapshot(this.terminalSnapshot) : null
+      return this.terminalSnapshot
     }
 
     return {
@@ -137,7 +137,7 @@ export class MeetingCoordinator {
       status: this.status,
       startedAt: this.activeSession.startedAt,
       durationSec: Math.max(0, Math.floor((this.now() - this.activeSession.startedAt) / 1000)),
-      transcript: this.cloneTranscriptForSnapshot(this.activeSession.transcript),
+      transcript: this.activeSession.transcript,
       engineProfileId: this.activeSession.runtimeConfig.engineProfile.id,
       translationEnabled: Boolean(this.activeSession.runtimeConfig.translationConfig),
       ...(this.error ? { error: { ...this.error } } : {})
@@ -634,17 +634,6 @@ export class MeetingCoordinator {
 
   private applyTranscriptEvent(session: MeetingSessionContext, event: TranscriptEvent): void {
     session.transcript = reduceTranscript(session.transcript, event)
-    this.cachedTranscriptSnapshot = null
-  }
-
-  private cloneTranscriptForSnapshot(transcript: TranscriptState): TranscriptState {
-    if (this.cachedTranscriptSnapshot?.revision === transcript.revision) {
-      return this.cachedTranscriptSnapshot.clone
-    }
-
-    const clone = cloneTranscriptState(transcript)
-    this.cachedTranscriptSnapshot = { revision: transcript.revision, clone }
-    return clone
   }
 
   private emitSnapshot(): void {
@@ -998,35 +987,6 @@ function readMeetingError(event: MeetingSessionEvent): AppErrorPayload {
     code: 'E_ENGINE_PROTOCOL',
     message: 'Unknown meeting error',
     retryable: true
-  }
-}
-
-function cloneTranscriptState(transcript: TranscriptState): TranscriptState {
-  return {
-    committedBlocks: transcript.committedBlocks.map((block) => ({
-      ...block,
-      ...(block.words ? { words: [...block.words] } : {})
-    })),
-    activeDrafts: Object.fromEntries(
-      Object.entries(transcript.activeDrafts).map(([source, draft]) => [
-        source,
-        draft
-          ? {
-              ...draft,
-              ...(draft.words ? { words: [...draft.words] } : {})
-            }
-          : draft
-      ])
-    ),
-    revision: transcript.revision
-  }
-}
-
-function cloneMeetingSnapshot(snapshot: MeetingRuntimeSnapshot): MeetingRuntimeSnapshot {
-  return {
-    ...snapshot,
-    transcript: cloneTranscriptState(snapshot.transcript),
-    ...(snapshot.error ? { error: { ...snapshot.error } } : {})
   }
 }
 

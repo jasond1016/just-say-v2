@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { cloneTranscriptState } from '../../core/transcript/clone-transcript-state'
 import type {
   AppRuntimeSnapshot,
   DiagnosticBundle,
@@ -95,24 +96,7 @@ function cloneRuntimeSnapshot(snapshot: AppRuntimeSnapshot): AppRuntimeSnapshot 
     liveSession: snapshot.liveSession
       ? {
           ...snapshot.liveSession,
-          transcript: {
-            committedBlocks: snapshot.liveSession.transcript.committedBlocks.map((block) => ({
-              ...block,
-              ...(block.words ? { words: [...block.words] } : {})
-            })),
-            activeDrafts: Object.fromEntries(
-              Object.entries(snapshot.liveSession.transcript.activeDrafts).map(([source, draft]) => [
-                source,
-                draft
-                  ? {
-                      ...draft,
-                      ...(draft.words ? { words: [...draft.words] } : {})
-                    }
-                  : draft
-              ])
-            ),
-            revision: snapshot.liveSession.transcript.revision
-          }
+          transcript: cloneTranscriptState(snapshot.liveSession.transcript)
         }
       : null,
     services: {

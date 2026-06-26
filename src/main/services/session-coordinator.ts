@@ -5,6 +5,7 @@ import type {
   StartMeetingCommand
 } from '../../shared/api-types'
 import type { SessionMode } from '../../shared/primitive-types'
+import { cloneTranscriptState } from '../../core/transcript/clone-transcript-state'
 import { INITIAL_RUNTIME_SNAPSHOT } from '../../shared/runtime-snapshot'
 import type { MeetingCoordinator } from './meeting-coordinator'
 import type { PttCoordinator } from './ptt-coordinator'
@@ -48,6 +49,7 @@ export class SessionCoordinator {
   }
 
   getRuntimeSnapshot(): AppRuntimeSnapshot {
+    // Clone live meeting transcripts here so coordinators can share mutable state internally.
     return {
       ...this.snapshot,
       ptt: {
@@ -57,26 +59,7 @@ export class SessionCoordinator {
       liveSession: this.snapshot.liveSession
         ? {
             ...this.snapshot.liveSession,
-            transcript: {
-              committedBlocks: this.snapshot.liveSession.transcript.committedBlocks.map((block) => ({
-                ...block,
-                ...(block.words ? { words: [...block.words] } : {})
-              })),
-              activeDrafts: Object.fromEntries(
-                Object.entries(this.snapshot.liveSession.transcript.activeDrafts).map(
-                  ([source, draft]) => [
-                    source,
-                    draft
-                      ? {
-                          ...draft,
-                          ...(draft.words ? { words: [...draft.words] } : {})
-                        }
-                      : draft
-                  ]
-                )
-              ),
-              revision: this.snapshot.liveSession.transcript.revision
-            }
+            transcript: cloneTranscriptState(this.snapshot.liveSession.transcript)
           }
         : null,
       services: {
