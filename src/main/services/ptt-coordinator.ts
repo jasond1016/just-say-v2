@@ -13,6 +13,7 @@ import type {
   RecognitionEvent,
   TranslationUpdatedPayload
 } from '../../core/contracts/engine'
+import { SessionDispatchLoop } from '../../core/session/session-dispatch'
 import type { PttTransitionEffect } from '../../core/session/session-machine'
 import { transitionPttStatus } from '../../core/session/session-machine'
 import type { PttSessionEvent } from '../../core/session/session-types'
@@ -102,11 +103,33 @@ export class PttCoordinator {
   private pendingStartupFailure: AppErrorPayload | null = null
   private readonly listeners = new Set<(snapshot: PttRuntimeSnapshot) => void>()
   private readonly notificationListeners = new Set<(notification: RuntimeNotification) => void>()
+  private readonly sessionDispatch: SessionDispatchLoop<
+    PttRuntimeSnapshot['status'],
+    PttSessionEvent,
+    PttTransitionEffect
+  >
 
   constructor(private readonly dependencies: PttCoordinatorDependencies) {
     this.completionTimeoutMs = dependencies.completionTimeoutMs ?? 15_000
     this.now = dependencies.now ?? Date.now
     this.createSessionId = dependencies.createSessionId ?? (() => `ptt-${this.now()}`)
+    this.sessionDispatch = new SessionDispatchLoop({
+      getStatus: () => this.status,
+      setStatus: (status) => {
+        this.status = status
+      },
+      transition: transitionPttStatus,
+      runEffect: (effect, event) => this.runEffect(effect, event),
+      emitSnapshot: () => this.emitSnapshot(),
+      createFailedEvent: (error) => ({ type: 'FAILED', error }),
+      effectNeedsPostEmit: pttEffectNeedsPostEmit,
+      onEffectFailed: ({ effect, failed }) => {
+        if (effect === 'prepare-capture-request') {
+          this.pendingStartupFailure = failed
+        }
+      },
+      enableReentrantEnqueue: false
+    })
     this.dependencies.captureWindowService.onEvent((event) => {
       void this.handleCaptureEvent(event)
     })
@@ -198,32 +221,8 @@ export class PttCoordinator {
     this.emitSnapshot()
   }
 
-  private async dispatch(event: PttSessionEvent): Promise<void> {
-    const queue: PttSessionEvent[] = [event]
-
-    while (queue.length > 0) {
-      const next = queue.shift()!
-      const result = transitionPttStatus(this.status, next)
-      this.status = result.to
-      this.emitSnapshot()
-      const effectResult = await this.runEffect(result.effect, next)
-      if (pttEffectNeedsPostEmit(result.effect)) {
-        this.emitSnapshot()
-      }
-
-      if ('failed' in effectResult) {
-        if (result.effect === 'prepare-capture-request') {
-          this.pendingStartupFailure = effectResult.failed
-        }
-
-        queue.push({ type: 'FAILED', error: effectResult.failed })
-        continue
-      }
-
-      if (effectResult.followUps) {
-        queue.push(...normalizeFollowUps(effectResult.followUps))
-      }
-    }
+  private dispatch(event: PttSessionEvent): Promise<void> {
+    return this.sessionDispatch.dispatch(event)
   }
 
   private async runEffect(effect: PttTransitionEffect, event: PttSessionEvent): Promise<PttEffectResult> {
@@ -754,10 +753,6 @@ function pttEffectNeedsPostEmit(effect: PttTransitionEffect): boolean {
     default:
       return false
   }
-}
-
-function normalizeFollowUps(followUps: PttSessionEvent | PttSessionEvent[]): PttSessionEvent[] {
-  return Array.isArray(followUps) ? followUps : [followUps]
 }
 
 function normalizeErrorPayload(errorLike: unknown): AppErrorPayload {

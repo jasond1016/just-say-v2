@@ -9,6 +9,7 @@ import type {
   TranscriptState
 } from '../../shared/api-types'
 import type { RecognitionEngine, RecognitionEvent } from '../../core/contracts/engine'
+import { SessionDispatchLoop } from '../../core/session/session-dispatch'
 import type { MeetingTransitionEffect } from '../../core/session/session-machine'
 import { transitionMeetingStatus } from '../../core/session/session-machine'
 import type { MeetingSessionEvent } from '../../core/session/session-types'
@@ -88,13 +89,7 @@ export class MeetingCoordinator {
   private readonly notificationListeners = new Set<(notification: RuntimeNotification) => void>()
   private terminalSnapshot: MeetingRuntimeSnapshot | null = null
   private cachedTranscriptSnapshot: { revision: number; clone: TranscriptState } | null = null
-  private controlEventSink: ((event: MeetingSessionEvent) => void) | null = null
-  private readonly serialDispatchQueue: Array<{
-    event: MeetingSessionEvent
-    resolve: () => void
-    reject: (error: unknown) => void
-  }> = []
-  private serialDispatchRunning = false
+  private readonly sessionDispatch: SessionDispatchLoop<MeetingStatus, MeetingSessionEvent, MeetingTransitionEffect>
   private awaitingStopSessionEnd = false
   private recoveryPromise: Promise<void> | null = null
   private recoveryReadySignal: { promise: Promise<void>; settle: () => void } | null = null
@@ -103,6 +98,29 @@ export class MeetingCoordinator {
     this.now = dependencies.now ?? Date.now
     this.createSessionId = dependencies.createSessionId ?? (() => `meeting-${this.now()}`)
     this.recoveryTimeoutMs = dependencies.recoveryTimeoutMs ?? 5_000
+    this.sessionDispatch = new SessionDispatchLoop({
+      getStatus: () => this.status,
+      setStatus: (status) => {
+        this.status = status
+      },
+      transition: transitionMeetingStatus,
+      runEffect: (effect, event) => this.runEffect(effect, event),
+      emitSnapshot: () => this.emitSnapshot(),
+      createFailedEvent: (error) => ({ type: 'FAILED', error }),
+      effectNeedsPostEmit: meetingEffectNeedsPostEmit,
+      onTransition: ({ event }) => {
+        if (event.type === 'FAILED' && event.error) {
+          this.error = event.error
+        }
+      },
+      onEffectFailed: ({ effect, failed }) => {
+        if (effect === 'resolve-config-and-warmup') {
+          this.pendingStartupFailure = failed
+        }
+      },
+      serializeTopLevel: true,
+      enableReentrantEnqueue: true
+    })
     this.dependencies.captureWindowService.onEvent((event) => {
       void this.handleCaptureEvent(event)
     })
@@ -195,78 +213,11 @@ export class MeetingCoordinator {
   }
 
   private dispatch(event: MeetingSessionEvent): Promise<void> {
-    if (this.controlEventSink) {
-      this.controlEventSink(event)
-      return Promise.resolve()
-    }
-
-    return new Promise((resolve, reject) => {
-      this.serialDispatchQueue.push({ event, resolve, reject })
-      this.pumpSerialDispatch()
-    })
-  }
-
-  private pumpSerialDispatch(): void {
-    if (this.serialDispatchRunning || this.serialDispatchQueue.length === 0) {
-      return
-    }
-
-    this.serialDispatchRunning = true
-    const { event, resolve, reject } = this.serialDispatchQueue.shift()!
-
-    void this.runDispatchLoop(event)
-      .then(() => {
-        resolve()
-      })
-      .catch((error) => {
-        reject(error)
-      })
-      .finally(() => {
-        this.serialDispatchRunning = false
-        this.pumpSerialDispatch()
-      })
-  }
-
-  private async runDispatchLoop(event: MeetingSessionEvent): Promise<void> {
-    const queue: MeetingSessionEvent[] = [event]
-    this.controlEventSink = (followUp) => {
-      queue.push(followUp)
-    }
-
-    try {
-      while (queue.length > 0) {
-        const next = queue.shift()!
-        const result = transitionMeetingStatus(this.status, next)
-        this.status = result.to
-        if (next.type === 'FAILED' && next.error) {
-          this.error = next.error
-        }
-        this.emitSnapshot()
-        const effectResult = await this.runEffect(result.effect, next)
-        if (meetingEffectNeedsPostEmit(result.effect)) {
-          this.emitSnapshot()
-        }
-
-        if ('failed' in effectResult) {
-          if (result.effect === 'resolve-config-and-warmup') {
-            this.pendingStartupFailure = effectResult.failed
-          }
-
-          queue.push({ type: 'FAILED', error: effectResult.failed })
-          continue
-        }
-
-        if (effectResult.followUps) {
-          queue.push(...normalizeFollowUps(effectResult.followUps))
-        }
-      }
-    } finally {
-      this.controlEventSink = null
-    }
+    return this.sessionDispatch.dispatch(event)
   }
 
   private enqueueControlEvent(event: MeetingSessionEvent): Promise<void> {
-    return this.dispatch(event)
+    return this.sessionDispatch.dispatch(event)
   }
 
   private async runEffect(
@@ -1065,12 +1016,6 @@ function readMeetingError(event: MeetingSessionEvent): AppErrorPayload {
     message: 'Unknown meeting error',
     retryable: true
   }
-}
-
-function normalizeFollowUps(
-  followUps: MeetingSessionEvent | MeetingSessionEvent[]
-): MeetingSessionEvent[] {
-  return Array.isArray(followUps) ? followUps : [followUps]
 }
 
 function cloneTranscriptState(transcript: TranscriptState): TranscriptState {
