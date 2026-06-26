@@ -3,28 +3,34 @@ import { describe, expect, it, vi } from 'vitest'
 import { exposedProfileCatalog, profileCatalog } from '../../core/settings/profile-catalog'
 import type { RecognitionEngine } from '../../core/contracts/engine'
 import type { ResolvedRuntimeConfig, RuntimeReadiness } from '../../shared/api-types'
-import { EngineRegistry } from './engine-registry'
 import type { LocalServiceController } from './local-service-supervisor'
 import { LocalServiceSupervisor } from './local-service-supervisor'
-import { SpeechService } from './speech-service'
+import { SpeechRuntime } from './speech-runtime'
 
-describe('SpeechService', () => {
+describe('SpeechRuntime', () => {
   it('lists profiles from the registry', async () => {
-    const service = createSpeechService()
+    const runtime = createSpeechRuntime()
 
-    await expect(service.listProfiles()).resolves.toEqual(
+    await expect(runtime.listProfiles()).resolves.toEqual(
       expect.arrayContaining(exposedProfileCatalog.map((profile) => expect.objectContaining({ id: profile.id })))
     )
-    await expect(service.listProfiles()).resolves.toHaveLength(exposedProfileCatalog.length)
-    await expect(service.listProfiles()).resolves.not.toEqual(
+    await expect(runtime.listProfiles()).resolves.toHaveLength(exposedProfileCatalog.length)
+    await expect(runtime.listProfiles()).resolves.not.toEqual(
       expect.arrayContaining([expect.objectContaining({ id: 'cloud-low-cost' })])
     )
   })
 
-  it('tests a local profile and reports capabilities plus local service status', async () => {
-    const service = createSpeechService()
+  it('creates engines through the internal registry', () => {
+    const runtime = createSpeechRuntime()
+    const config = createResolvedRuntimeConfig('local-fast')
 
-    await expect(service.testProfile('local-fast')).resolves.toMatchObject({
+    expect(runtime.createEngine(config)).toBeInstanceOf(FakeRecognitionEngine)
+  })
+
+  it('tests a local profile and reports capabilities plus local service status', async () => {
+    const runtime = createSpeechRuntime()
+
+    await expect(runtime.testProfile('local-fast')).resolves.toMatchObject({
       ok: true,
       profileId: 'local-fast',
       localService: 'healthy',
@@ -41,14 +47,14 @@ describe('SpeechService', () => {
       modelIdentifier: target.modelIdentifier,
       readiness: 'ready' as const
     }))
-    const service = createSpeechService({
+    const runtime = createSpeechRuntime({
       controller: createLocalServiceController({
         healthReadiness: 'warming',
         prewarm
       })
     })
 
-    await expect(service.testProfile('local-accurate')).resolves.toMatchObject({
+    await expect(runtime.testProfile('local-accurate')).resolves.toMatchObject({
       ok: true,
       profileId: 'local-accurate',
       runtimeReadiness: 'warming',
@@ -66,14 +72,14 @@ describe('SpeechService', () => {
       modelIdentifier: target.modelIdentifier,
       readiness: 'ready' as const
     }))
-    const service = createSpeechService({
+    const runtime = createSpeechRuntime({
       controller: createLocalServiceController({
         healthReadiness: 'prewarm-required',
         prewarm
       })
     })
 
-    await expect(service.testProfile('local-accurate')).resolves.toMatchObject({
+    await expect(runtime.testProfile('local-accurate')).resolves.toMatchObject({
       ok: true,
       profileId: 'local-accurate',
       runtimeReadiness: 'ready',
@@ -85,9 +91,9 @@ describe('SpeechService', () => {
   })
 
   it('returns a structured error for an unknown profile', async () => {
-    const service = createSpeechService()
+    const runtime = createSpeechRuntime()
 
-    await expect(service.testProfile('missing')).resolves.toMatchObject({
+    await expect(runtime.testProfile('missing')).resolves.toMatchObject({
       ok: false,
       profileId: 'missing',
       error: {
@@ -98,87 +104,93 @@ describe('SpeechService', () => {
 
   it('restarts the local service through the supervisor', async () => {
     const restart = vi.fn(async () => 'healthy' as const)
-    const service = createSpeechService({
+    const runtime = createSpeechRuntime({
       restart
     })
 
-    await service.restartLocalService()
+    await runtime.restartLocalService()
 
     expect(restart).toHaveBeenCalled()
   })
 
   it('probes the local service through the supervisor without starting it', async () => {
     const probe = vi.fn(async () => 'healthy' as const)
-    const service = createSpeechService({
+    const runtime = createSpeechRuntime({
       probe
     })
 
-    await expect(service.probeLocalService()).resolves.toBe('healthy')
+    await expect(runtime.probeLocalService()).resolves.toBe('healthy')
 
     expect(probe).toHaveBeenCalled()
   })
 })
 
-function createSpeechService(overrides: {
+function createSpeechRuntime(overrides: {
   restart?: () => Promise<'healthy' | 'degraded' | 'starting' | 'stopped' | 'failed'>
   probe?: () => Promise<'healthy' | 'degraded' | 'starting' | 'stopped' | 'failed'>
   controller?: LocalServiceController
-} = {}): SpeechService {
-  const registry = new EngineRegistry(profileCatalog, (config) => new FakeRecognitionEngine(config))
-  const localServiceSupervisor = new LocalServiceSupervisor(overrides.controller ?? createLocalServiceController())
+} = {}): SpeechRuntime {
+  const controller = overrides.controller ?? createLocalServiceController()
+  const supervisor = new LocalServiceSupervisor(controller)
   if (overrides.restart) {
-    localServiceSupervisor.restart = overrides.restart as LocalServiceSupervisor['restart']
+    supervisor.restart = overrides.restart as LocalServiceSupervisor['restart']
   }
   if (overrides.probe) {
-    localServiceSupervisor.probe = overrides.probe as LocalServiceSupervisor['probe']
+    supervisor.probe = overrides.probe as LocalServiceSupervisor['probe']
   }
 
-  const resolveProfileRuntimeConfig = async (profileId: string) => {
-      const profile = profileCatalog.find((item) => item.id === profileId)
-
-      if (!profile) {
-        throw new Error(`Unknown engine profile: ${profileId}`)
+  return SpeechRuntime.create({
+    profiles: profileCatalog,
+    localServiceController: controller,
+    supervisor,
+    engineFactory: (config) => new FakeRecognitionEngine(config),
+    runtimeConfigResolver: {
+      async resolveRuntimeConfig() {
+        return createResolvedRuntimeConfig('local-fast')
+      },
+      async resolveProfileRuntimeConfig(profileId) {
+        return createResolvedRuntimeConfig(profileId)
       }
-
-      return {
-        engineProfile: profile,
-        engineConfig: {
-          mode: 'meeting',
-          profileId: profile.id,
-          preset: profile.preset,
-          language: 'auto',
-          diagnosticsEnabled: true,
-          experimentalFlags: [],
-          ...(profile.capabilities.requiresLocalService
-            ? {
-                localService: {
-                  mode: 'managed-local',
-                  host: '127.0.0.1',
-                  port: 8765,
-                  runtimeFamilyId: profile.runtimeFamilyId,
-                  modelIdentifier: profile.modelIdentifier
-                }
-              }
-            : {})
-        },
-        captureConfig: {
-          sampleRate: 16000,
-          chunkMs: 100
-        },
-        outputConfig: {
-          method: 'simulate_input'
-        }
-      } satisfies ResolvedRuntimeConfig
-  }
-
-  return new SpeechService(registry, localServiceSupervisor, {
-    async resolveRuntimeConfig() {
-      return resolveProfileRuntimeConfig('local-fast')
-    },
-    async resolveProfileRuntimeConfig(profileId) {
-      return resolveProfileRuntimeConfig(profileId)
     }
   })
+}
+
+function createResolvedRuntimeConfig(profileId: string): ResolvedRuntimeConfig {
+  const profile = profileCatalog.find((item) => item.id === profileId)
+
+  if (!profile) {
+    throw new Error(`Unknown engine profile: ${profileId}`)
+  }
+
+  return {
+    engineProfile: profile,
+    engineConfig: {
+      mode: 'meeting',
+      profileId: profile.id,
+      preset: profile.preset,
+      language: 'auto',
+      diagnosticsEnabled: true,
+      experimentalFlags: [],
+      ...(profile.capabilities.requiresLocalService
+        ? {
+            localService: {
+              mode: 'managed-local',
+              host: '127.0.0.1',
+              port: 8765,
+              runtimeFamilyId: profile.runtimeFamilyId,
+              modelIdentifier: profile.modelIdentifier
+            }
+          }
+        : {})
+    },
+    captureConfig: {
+      sampleRate: 16000,
+      chunkMs: 100
+    },
+    outputConfig: {
+      method: 'simulate_input'
+    }
+  }
 }
 
 function createLocalServiceController(overrides: {

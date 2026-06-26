@@ -11,7 +11,6 @@ import type {
   TranslationCredentialsInput
 } from '../../shared/api-types'
 import type { AppPaths } from '../app-paths'
-import { createRecognitionEngine } from '../engines/create-recognition-engine'
 import { FileTranscriptExporter } from '../persistence/file-transcript-exporter'
 import { FileCredentialsRepository } from '../persistence/credentials-repository'
 import { FileSettingsRepository } from '../persistence/settings-repository'
@@ -26,11 +25,9 @@ import { OutputWindowService } from '../platform/output-window-service'
 import { WindowsInputService } from '../platform/windows-input-service'
 import type { CreateAppServices } from './create-app'
 import { DiagnosticsService } from '../services/diagnostics-service'
-import { EngineRegistry } from '../services/engine-registry'
 import { getEnvironmentCredentials } from '../services/environment-credentials-provider'
 import { HistoryService } from '../services/history-service'
 import { ConfigurableLocalServiceController } from '../services/configurable-local-service-controller'
-import { LocalServiceSupervisor } from '../services/local-service-supervisor'
 import { LiveSessionActionsService } from '../services/live-session-actions-service'
 import { MeetingAudioStorage } from '../services/meeting-audio-storage'
 import { MeetingCoordinator } from '../services/meeting-coordinator'
@@ -42,7 +39,7 @@ import { PttHudService } from '../services/ptt-hud-service'
 import { SessionCoordinator } from '../services/session-coordinator'
 import { SessionService } from '../services/session-service'
 import { SettingsService } from '../services/settings-service'
-import { SpeechService } from '../services/speech-service'
+import { SpeechRuntime } from '../services/speech-runtime'
 import { TranslationPipeline } from '../services/translation-pipeline'
 
 export type SafeStorageAdapter = {
@@ -67,7 +64,7 @@ export type AppRuntime = {
   meetingCoordinator: MeetingCoordinator
   pttHudService: PttHudService
   pttHotkeyController: PttHotkeyController
-  localServiceSupervisor: LocalServiceSupervisor
+  speechRuntime: SpeechRuntime
   transcriptDatabase: DatabaseSync
   getSettings: () => AppSettings
   shutdown: () => Promise<void>
@@ -171,8 +168,9 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<AppR
       remoteHost: settings.advanced.remoteServiceHost ?? null,
       remotePort: settings.advanced.remoteServicePort ?? null
     })
-  const localServiceSupervisor = new LocalServiceSupervisor(
-    new ConfigurableLocalServiceController({
+  const speechRuntime = SpeechRuntime.create({
+    profiles: profileCatalog,
+    localServiceController: new ConfigurableLocalServiceController({
       managedRuntimePaths: {
         sensevoice: localServicePath,
         ...(platform === 'win32'
@@ -182,8 +180,13 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<AppR
             })
       },
       healthTimeoutMs: 60_000
-    })
-  )
+    }),
+    runtimeConfigResolver: {
+      resolveRuntimeConfig: (mode) => baseSettingsService.resolveRuntimeConfig(mode),
+      resolveProfileRuntimeConfig: (profileId, mode) =>
+        baseSettingsService.resolveProfileRuntimeConfig(profileId, mode)
+    }
+  })
   const settingsService = {
     getSettings: async () => baseSettingsService.getSettings(),
     updateSettings: async (patch: SettingsPatch) => {
@@ -191,7 +194,7 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<AppR
       const updated = await baseSettingsService.updateSettings(patch)
       await refreshSettingsCache()
       if (getLocalServiceSettingsSignature(cachedSettings) !== previousLocalServiceSettingsSignature) {
-        await localServiceSupervisor.stop()
+        await speechRuntime.stop()
         void scheduleSelectedLocalServiceProbe()
       }
       return updated
@@ -219,9 +222,6 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<AppR
       }
     }
   }
-  const engineRegistry = new EngineRegistry(profileCatalog, (config) =>
-    createRecognitionEngine(config, { localServiceSupervisor })
-  )
   const captureTransport = new ElectronCaptureWindowTransport(ipcMain)
   const captureWindowService = new CaptureWindowService(captureTransport)
   const clipboardService = new ElectronClipboardService()
@@ -252,11 +252,6 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<AppR
     appVersion,
     selectedProfileProvider: () => cachedSettings.speech.selectedProfileId
   })
-  const speechService = new SpeechService(engineRegistry, localServiceSupervisor, {
-    resolveRuntimeConfig: (mode) => baseSettingsService.resolveRuntimeConfig(mode),
-    resolveProfileRuntimeConfig: (profileId, mode) =>
-      baseSettingsService.resolveProfileRuntimeConfig(profileId, mode)
-  })
   const scheduleSelectedLocalServiceProbe = async (): Promise<void> => {
     const selectedProfile = getProfileById(cachedSettings.speech.selectedProfileId)
 
@@ -264,12 +259,12 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<AppR
       return
     }
 
-    await speechService.probeLocalService()
+    await speechRuntime.probeLocalService()
   }
   const translationPipeline = new TranslationPipeline()
   const pttCoordinator = new PttCoordinator({
     settingsProvider,
-    engineFactory: (config) => engineRegistry.createForRuntimeConfig(config),
+    engineFactory: (config) => speechRuntime.createEngine(config),
     captureWindowService,
     transcriptRepository,
     outputDispatcher,
@@ -278,7 +273,7 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<AppR
   })
   const meetingCoordinator = new MeetingCoordinator({
     settingsProvider,
-    engineFactory: (config) => engineRegistry.createForRuntimeConfig(config),
+    engineFactory: (config) => speechRuntime.createEngine(config),
     captureWindowService,
     transcriptRepository,
     translationPipeline,
@@ -296,9 +291,9 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<AppR
   const sessionService = new SessionService(sessionCoordinator, liveSessionActionsService)
   const pttHudService = new PttHudService(sessionService)
   const pttHotkeyController = new PttHotkeyController(hotkeyService, settingsService, sessionCoordinator)
-  sessionCoordinator.setLocalServiceStatus(localServiceSupervisor.getStatus())
-  diagnosticsService.setLocalServiceStatus(localServiceSupervisor.getStatus())
-  localServiceSupervisor.onStatusChange((status) => {
+  sessionCoordinator.setLocalServiceStatus(speechRuntime.getStatus())
+  diagnosticsService.setLocalServiceStatus(speechRuntime.getStatus())
+  speechRuntime.onStatusChange((status) => {
     sessionCoordinator.setLocalServiceStatus(status)
     diagnosticsService.setLocalServiceStatus(status)
   })
@@ -320,7 +315,7 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<AppR
       sessionService,
       pttHudService,
       diagnosticsService,
-      speechService,
+      speechService: speechRuntime,
       historyService,
       settingsService
     },
@@ -329,13 +324,13 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<AppR
     meetingCoordinator,
     pttHudService,
     pttHotkeyController,
-    localServiceSupervisor,
+    speechRuntime,
     transcriptDatabase,
     getSettings: () => cachedSettings,
     shutdown: async () => {
       pttHotkeyController.dispose()
       pttHudService.dispose()
-      await localServiceSupervisor.stop()
+      await speechRuntime.stop()
       transcriptDatabase.close()
     }
   }

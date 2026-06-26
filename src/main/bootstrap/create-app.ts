@@ -8,16 +8,16 @@ import { createSessionHandlers } from '../ipc/session-handlers'
 import { createSettingsHandlers } from '../ipc/settings-handlers'
 import { createSpeechHandlers } from '../ipc/speech-handlers'
 import type { SessionService } from '../services/session-service'
+import type { SpeechRuntime } from '../services/speech-runtime'
 import { createWindows, type AppWindows, type CreateWindowsOptions } from './create-windows'
 import type { DiagnosticsHandlerService } from '../ipc/diagnostics-handlers'
 import type { HistoryHandlerService } from '../ipc/history-handlers'
 import type { PttHudHandlerService } from '../ipc/ptt-hud-handlers'
 import type { SettingsHandlerService } from '../ipc/settings-handlers'
-import type { SpeechHandlerService } from '../ipc/speech-handlers'
 
 export type CreateAppServices = {
   sessionService: SessionService
-  speechService: SpeechHandlerService
+  speechService: SpeechRuntime
   historyService: HistoryHandlerService
   pttHudService: PttHudHandlerService & {
     onSnapshot(listener: (snapshot: ReturnType<PttHudHandlerService['getSnapshot']>) => void): () => void

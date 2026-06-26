@@ -1,19 +1,64 @@
-import type { AppErrorPayload, EngineProfile, ProfileTestResult, ResolvedRuntimeConfig } from '../../shared/api-types'
+import type { RecognitionEngine } from '../../core/contracts/engine'
+import type {
+  AppErrorPayload,
+  EngineProfile,
+  LocalServiceStatus,
+  ProfileTestResult,
+  ResolvedRuntimeConfig
+} from '../../shared/api-types'
 import type { SessionMode } from '../../shared/primitive-types'
-import type { EngineRegistry } from './engine-registry'
-import type { LocalServiceSupervisor } from './local-service-supervisor'
+import { createRecognitionEngine } from '../engines/create-recognition-engine'
+import type { SpeechHandlerService } from '../ipc/speech-handlers'
+import type { EngineFactory } from './engine-registry'
+import { EngineRegistry } from './engine-registry'
+import type { LocalServiceController } from './local-service-supervisor'
+import { LocalServiceSupervisor } from './local-service-supervisor'
 
 export interface RuntimeConfigResolver {
   resolveRuntimeConfig(mode: SessionMode): Promise<ResolvedRuntimeConfig>
   resolveProfileRuntimeConfig(profileId: string, mode: SessionMode): Promise<ResolvedRuntimeConfig>
 }
 
-export class SpeechService {
-  constructor(
+export type CreateSpeechRuntimeInput = {
+  profiles: readonly EngineProfile[]
+  localServiceController: LocalServiceController
+  runtimeConfigResolver: RuntimeConfigResolver
+  engineFactory?: EngineFactory
+  supervisor?: LocalServiceSupervisor
+}
+
+export class SpeechRuntime implements SpeechHandlerService {
+  private constructor(
     private readonly registry: EngineRegistry,
     private readonly localServiceSupervisor: LocalServiceSupervisor,
     private readonly runtimeConfigResolver: RuntimeConfigResolver
   ) {}
+
+  static create(input: CreateSpeechRuntimeInput): SpeechRuntime {
+    const supervisor = input.supervisor ?? new LocalServiceSupervisor(input.localServiceController)
+    const engineFactory =
+      input.engineFactory ??
+      ((config) => createRecognitionEngine(config, { localServiceSupervisor: supervisor }))
+    const registry = new EngineRegistry(input.profiles, engineFactory)
+
+    return new SpeechRuntime(registry, supervisor, input.runtimeConfigResolver)
+  }
+
+  createEngine(config: ResolvedRuntimeConfig): RecognitionEngine {
+    return this.registry.createForRuntimeConfig(config)
+  }
+
+  getStatus(): LocalServiceStatus {
+    return this.localServiceSupervisor.getStatus()
+  }
+
+  onStatusChange(listener: (status: LocalServiceStatus) => void): () => void {
+    return this.localServiceSupervisor.onStatusChange(listener)
+  }
+
+  async stop(): Promise<void> {
+    await this.localServiceSupervisor.stop()
+  }
 
   async listProfiles(): Promise<EngineProfile[]> {
     return this.registry.getProfileCatalog().filter((profile) => profile.kind === 'local')
@@ -89,7 +134,7 @@ export class SpeechService {
           })
         }
 
-        const engine = this.registry.createForRuntimeConfig(runtimeConfig)
+        const engine = this.createEngine(runtimeConfig)
         const capabilities = await engine.getCapabilities()
 
         return {
@@ -106,7 +151,7 @@ export class SpeechService {
         }
       }
 
-      const engine = this.registry.createForRuntimeConfig(runtimeConfig)
+      const engine = this.createEngine(runtimeConfig)
       const capabilities = await engine.getCapabilities()
 
       return {
