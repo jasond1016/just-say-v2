@@ -34,6 +34,56 @@ describe('SessionCoordinator + PTTCoordinator', () => {
     ])
   })
 
+  it('prewarms the meeting engine', async () => {
+    const harness = createHarness()
+
+    await harness.sessionCoordinator.prewarm('meeting')
+
+    expect(harness.meetingEngine.warmupCalls).toEqual([
+      {
+        mode: 'meeting',
+        language: 'auto'
+      }
+    ])
+  })
+
+  it('rejects starting a meeting while ptt holds the recognition lease', async () => {
+    const harness = createHarness()
+
+    await harness.sessionCoordinator.startPtt()
+    harness.captureTransport.emit({
+      type: 'capture-started',
+      requestId: 'ptt-1',
+      sources: ['microphone']
+    })
+
+    await expect(harness.sessionCoordinator.startMeeting()).rejects.toMatchObject({
+      message: 'A PTT session is already active',
+      payload: {
+        code: 'E_CAPTURE_UNAVAILABLE',
+        retryable: false
+      }
+    })
+  })
+
+  it('rejects starting ptt while a meeting holds the recognition lease', async () => {
+    const harness = createHarness()
+
+    await harness.sessionCoordinator.startMeeting()
+    harness.meetingEngine.emit({
+      type: 'session-ready'
+    })
+    await flushAsyncWork()
+
+    await expect(harness.sessionCoordinator.startPtt()).rejects.toMatchObject({
+      message: 'A live meeting session is already active',
+      payload: {
+        code: 'E_CAPTURE_UNAVAILABLE',
+        retryable: false
+      }
+    })
+  })
+
   it('broadcasts runtime snapshots to subscribers', async () => {
     const harness = createHarness()
     const seenStatuses: string[] = []

@@ -20,6 +20,13 @@ import { transitionPttStatus } from '../../core/session/session-machine'
 import type { PttSessionEvent } from '../../core/session/session-types'
 import type { CaptureWindowService } from '../platform/capture-window-service'
 import type { TranslationPipeline } from './translation-pipeline'
+import {
+  abortRecognitionSession,
+  attachRecognitionEngine,
+  normalizeRecognitionError,
+  startRecognitionSession,
+  stopRecognitionCapture
+} from './recognition-session-runtime'
 
 export type PttRuntimeSnapshot = {
   status:
@@ -277,35 +284,22 @@ export class PttCoordinator {
       mode: 'ptt'
     })
 
-    this.activeEngineUnsubscribe = engine.onEvent((engineEvent) => {
+    this.activeEngineUnsubscribe = attachRecognitionEngine(engine, (engineEvent) => {
       void this.handleEngineEvent(engineEvent)
     })
 
     try {
-      await engine.startSession({
+      await startRecognitionSession({
+        engine,
+        captureWindowService: this.dependencies.captureWindowService,
         sessionId,
         mode: 'ptt',
         sources: ['microphone'],
-        language: String(runtimeConfig.engineConfig.language),
-        translation: {
-          enabled: Boolean(runtimeConfig.translationConfig) && runtimeConfig.engineProfile.capabilities.translation,
-          ...(runtimeConfig.translationConfig
-            ? {
-                targetLanguage: String(runtimeConfig.translationConfig.targetLanguage)
-              }
-            : {})
-        }
-      })
-
-      await this.dependencies.captureWindowService.startCapture({
-        requestId: sessionId,
-        sources: ['microphone'],
-        microphoneDeviceId: settings.input.microphoneDeviceId,
-        sampleRate: runtimeConfig.captureConfig.sampleRate,
-        chunkMs: runtimeConfig.captureConfig.chunkMs
+        runtimeConfig,
+        microphoneDeviceId: settings.input.microphoneDeviceId
       })
     } catch (errorLike) {
-      return { failed: normalizeErrorPayload(errorLike) }
+      return { failed: normalizeRecognitionError(errorLike, 'Unknown PTT error') }
     }
 
     return { followUps: { type: 'CAPTURE_STARTED' } }
@@ -313,13 +307,16 @@ export class PttCoordinator {
 
   private async runStopCaptureAndFlush(): Promise<PttEffectResult> {
     const session = this.requireActiveSession()
-    session.stopCapturePromise = this.dependencies.captureWindowService.stopCapture(session.sessionId)
+    session.stopCapturePromise = stopRecognitionCapture(
+      this.dependencies.captureWindowService,
+      session.sessionId
+    )
 
     try {
       await session.stopCapturePromise
       await waitForPttCompletion(session.completion.promise, this.completionTimeoutMs)
     } catch (errorLike) {
-      return { failed: normalizeErrorPayload(errorLike) }
+      return { failed: normalizeRecognitionError(errorLike, 'Unknown PTT error') }
     }
 
     return {}
@@ -328,17 +325,11 @@ export class PttCoordinator {
   private async runDiscardTranscript(): Promise<PttEffectResult> {
     const session = this.activeSession
 
-    try {
-      await session?.engine.abortSession()
-    } catch {
-      // best effort cleanup
-    }
-
-    try {
-      await this.dependencies.captureWindowService.abortCapture(session?.sessionId)
-    } catch {
-      // best effort cleanup
-    }
+    await abortRecognitionSession({
+      engine: session?.engine,
+      captureWindowService: this.dependencies.captureWindowService,
+      sessionId: session?.sessionId
+    })
 
     session?.completion.settle()
     return { followUps: { type: 'RESET', clearError: true } }
@@ -454,7 +445,7 @@ export class PttCoordinator {
 
       return { followUps: { type: 'DELIVERY_SUCCEEDED' } }
     } catch (errorLike) {
-      const error = normalizeErrorPayload(errorLike)
+      const error = normalizeRecognitionError(errorLike, 'Unknown PTT error')
       return { followUps: { type: 'DELIVERY_FAILED', error } }
     }
   }
@@ -534,17 +525,11 @@ export class PttCoordinator {
       })
     }
 
-    try {
-      await session?.engine.abortSession()
-    } catch {
-      // best effort cleanup
-    }
-
-    try {
-      await this.dependencies.captureWindowService.abortCapture(session?.sessionId)
-    } catch {
-      // best effort cleanup
-    }
+    await abortRecognitionSession({
+      engine: session?.engine,
+      captureWindowService: this.dependencies.captureWindowService,
+      sessionId: session?.sessionId
+    })
 
     session?.completion.settle()
     return { followUps: { type: 'RESET', clearError: false } }
@@ -638,7 +623,7 @@ export class PttCoordinator {
           return assertNever(event)
       }
     } catch (error) {
-      await this.dispatch({ type: 'FAILED', error: normalizeErrorPayload(error) })
+      await this.dispatch({ type: 'FAILED', error: normalizeRecognitionError(error, 'Unknown PTT error') })
     }
   }
 
@@ -676,7 +661,7 @@ export class PttCoordinator {
           return assertNever(event)
       }
     } catch (error) {
-      await this.dispatch({ type: 'FAILED', error: normalizeErrorPayload(error) })
+      await this.dispatch({ type: 'FAILED', error: normalizeRecognitionError(error, 'Unknown PTT error') })
     }
   }
 
@@ -733,62 +718,12 @@ function pttEffectNeedsPostEmit(effect: PttTransitionEffect): boolean {
   }
 }
 
-function normalizeErrorPayload(errorLike: unknown): AppErrorPayload {
-  if (isAppErrorPayload(errorLike)) {
-    return errorLike
-  }
-
-  if (errorLike instanceof Error) {
-    const payload = (errorLike as Error & { payload?: AppErrorPayload }).payload
-
-    if (payload && isAppErrorPayload(payload)) {
-      return payload
-    }
-
-    return {
-      code: 'E_ENGINE_PROTOCOL',
-      message: errorLike.message,
-      retryable: true
-    }
-  }
-
-  if (errorLike && typeof errorLike === 'object') {
-    const candidate = errorLike as Partial<AppErrorPayload>
-    if (
-      typeof candidate.code === 'string' &&
-      typeof candidate.message === 'string' &&
-      typeof candidate.retryable === 'boolean'
-    ) {
-      return candidate as AppErrorPayload
-    }
-  }
-
-  return {
-    code: 'E_ENGINE_PROTOCOL',
-    message: 'Unknown PTT error',
-    retryable: true
-  }
-}
-
 function normalizeStorageErrorPayload(errorLike: unknown): AppErrorPayload {
   return {
     code: 'E_STORAGE_WRITE',
     message: errorLike instanceof Error ? errorLike.message : 'Failed to persist PTT transcript',
     retryable: true
   }
-}
-
-function isAppErrorPayload(value: unknown): value is AppErrorPayload {
-  if (!value || typeof value !== 'object') {
-    return false
-  }
-
-  const candidate = value as Partial<AppErrorPayload>
-  return (
-    typeof candidate.code === 'string' &&
-    typeof candidate.message === 'string' &&
-    typeof candidate.retryable === 'boolean'
-  )
 }
 
 function createCompletionSignal(): { promise: Promise<void>; settle: () => void } {

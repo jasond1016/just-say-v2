@@ -13,6 +13,10 @@ import type { EngineFactory } from './engine-registry'
 import { EngineRegistry } from './engine-registry'
 import type { LocalServiceController } from './local-service-supervisor'
 import { LocalServiceSupervisor } from './local-service-supervisor'
+import {
+  createIdentityMismatchAppError,
+  establishRuntimeReadiness
+} from './runtime-readiness'
 
 export interface RuntimeConfigResolver {
   resolveRuntimeConfig(mode: SessionMode): Promise<ResolvedRuntimeConfig>
@@ -38,7 +42,31 @@ export class SpeechRuntime implements SpeechHandlerService {
     const supervisor = input.supervisor ?? new LocalServiceSupervisor(input.localServiceController)
     const engineFactory =
       input.engineFactory ??
-      ((config) => createRecognitionEngine(config, { localServiceSupervisor: supervisor }))
+      ((config) =>
+        createRecognitionEngine(config, {
+          establishReadiness: (warmupInput) => {
+            const target = config.engineConfig.localService
+
+            if (!target) {
+              throw new Error(`Profile "${config.engineProfile.id}" is missing local service configuration`)
+            }
+
+            return establishRuntimeReadiness(
+              { supervisor },
+              {
+                target,
+                runtimeFamilyId: config.engineProfile.runtimeFamilyId,
+                expectedIdentity: {
+                  runtimeFamilyId: config.engineProfile.runtimeFamilyId,
+                  modelIdentifier: config.engineProfile.modelIdentifier
+                },
+                mode: warmupInput.mode,
+                language: warmupInput.language,
+                intent: 'session-start'
+              }
+            )
+          }
+        }))
     const registry = new EngineRegistry(input.profiles, engineFactory)
 
     return new SpeechRuntime(registry, supervisor, input.runtimeConfigResolver)
@@ -116,24 +144,32 @@ export class SpeechRuntime implements SpeechHandlerService {
           throw new Error(`Profile "${profileId}" is missing local service configuration`)
         }
 
-        let health = await this.localServiceSupervisor.checkHealth(target)
-        let prewarmTriggered = false
-
-        if (profile.runtimeFamilyId === 'qwen3-asr') {
-          if (health.readiness === 'prewarm-required') {
-            health = await this.localServiceSupervisor.prewarm(target, {
-              mode: 'meeting',
-              language: String(runtimeConfig.engineConfig.language)
-            })
-            prewarmTriggered = true
-          }
-        } else if (health.readiness !== 'ready') {
-          health = await this.localServiceSupervisor.prewarm(target, {
+        const expectedIdentity = {
+          runtimeFamilyId: profile.runtimeFamilyId,
+          modelIdentifier: profile.modelIdentifier
+        }
+        const readiness = await establishRuntimeReadiness(
+          { supervisor: this.localServiceSupervisor },
+          {
+            target,
+            runtimeFamilyId: profile.runtimeFamilyId,
+            expectedIdentity,
             mode: 'meeting',
-            language: String(runtimeConfig.engineConfig.language)
-          })
+            language: String(runtimeConfig.engineConfig.language),
+            intent: 'profile-check'
+          }
+        )
+
+        if (readiness.identityMismatch) {
+          return {
+            ok: false,
+            profileId,
+            localService: this.localServiceSupervisor.getStatus(),
+            error: createIdentityMismatchAppError(expectedIdentity, readiness.health)
+          }
         }
 
+        const { health, prewarmTriggered } = readiness
         const engine = this.createEngine(runtimeConfig)
         const capabilities = await engine.getCapabilities()
 

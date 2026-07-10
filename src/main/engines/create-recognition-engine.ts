@@ -1,10 +1,10 @@
-import type { RecognitionEngine } from '../../core/contracts/engine'
+import type { RecognitionEngine, WarmupInput } from '../../core/contracts/engine'
 import type { ResolvedRuntimeConfig } from '../../shared/api-types'
-import type { LocalServiceSupervisor } from '../services/local-service-supervisor'
+import type { RuntimeReadinessEstablishmentResult } from '../services/runtime-readiness'
 import { LocalEngineAdapter } from './local-engine-adapter'
 
 export type CreateRecognitionEngineDependencies = {
-  localServiceSupervisor: LocalServiceSupervisor
+  establishReadiness: (input: WarmupInput) => Promise<RuntimeReadinessEstablishmentResult>
 }
 
 export function createRecognitionEngine(
@@ -13,8 +13,7 @@ export function createRecognitionEngine(
 ): RecognitionEngine {
   if (config.engineProfile.kind === 'local') {
     return new LocalEngineAdapter(config, {
-      ensureLocalServiceReady: (target) => dependencies.localServiceSupervisor.ensureReady(target),
-      prewarmLocalService: (target, input) => dependencies.localServiceSupervisor.prewarm(target, input)
+      establishReadiness: dependencies.establishReadiness
     })
   }
 

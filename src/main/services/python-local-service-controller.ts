@@ -5,22 +5,20 @@ import type { ChildProcessWithoutNullStreams, SpawnOptionsWithoutStdio } from 'n
 import { promisify } from 'node:util'
 import type { EngineCapabilities, LocalRuntimeFamilyId, ResolvedLocalServiceConfig } from '../../shared/api-types'
 import type { LocalServiceHealthResult, LocalServiceController } from './local-service-supervisor'
-import type {
-  LocalServiceClientMessage,
-  LocalServiceServerMessage
-} from '../../shared/local-service-types'
 import type { SessionMode } from '../../shared/primitive-types'
+import {
+  createLocalServiceUrl,
+  defaultWebSocketFactory,
+  LocalServiceProtocolClient,
+  type WebSocketLike
+} from './local-service-protocol-client'
 
-const execFile = promisify(execFileCallback)
-
-export interface WebSocketLike {
-  addEventListener(type: 'message', listener: (event: { data: string }) => void): void
-  addEventListener(type: 'error', listener: (event: unknown) => void): void
-  addEventListener(type: 'open', listener: () => void): void
-  addEventListener(type: 'close', listener: () => void): void
-  send(data: string): void
-  close(): void
-}
+export type { WebSocketLike } from './local-service-protocol-client'
+export {
+  createLocalServiceUrl,
+  defaultWebSocketFactory,
+  sendLocalServiceRequest
+} from './local-service-protocol-client'
 
 interface LocalServiceReadable {
   on(event: 'data', listener: (chunk: string | Buffer) => void): void
@@ -40,6 +38,8 @@ export type SpawnLocalServiceProcess = (
   args: string[],
   options: SpawnOptionsWithoutStdio
 ) => SpawnedLocalServiceProcess
+
+const execFile = promisify(execFileCallback)
 
 export type PythonLocalServiceControllerOptions = {
   host: string
@@ -63,7 +63,7 @@ export class PythonLocalServiceController implements LocalServiceController {
   private readonly healthTimeoutMs: number
   private readonly spawn: SpawnLocalServiceProcess
   private readonly terminateProcessTree: ((pid: number) => Promise<void>) | undefined
-  private readonly webSocketFactory: (url: string) => WebSocketLike
+  private readonly protocol: LocalServiceProtocolClient
   private childProcess: SpawnedLocalServiceProcess | null = null
   private stdoutBuffer = ''
   private stderrBuffer = ''
@@ -76,7 +76,10 @@ export class PythonLocalServiceController implements LocalServiceController {
     this.spawn = options.spawn ?? defaultSpawnLocalServiceProcess
     this.terminateProcessTree =
       options.terminateProcessTree ?? (process.platform === 'win32' ? terminateWindowsProcessTree : undefined)
-    this.webSocketFactory = options.webSocketFactory ?? defaultWebSocketFactory
+    this.protocol = new LocalServiceProtocolClient({
+      webSocketFactory: options.webSocketFactory ?? defaultWebSocketFactory,
+      healthTimeoutMs: this.healthTimeoutMs
+    })
   }
 
   async start(_target: ResolvedLocalServiceConfig): Promise<void> {
@@ -130,34 +133,11 @@ export class PythonLocalServiceController implements LocalServiceController {
     await this.stopChildProcess(child)
   }
 
-  async healthCheck(_target: ResolvedLocalServiceConfig): Promise<LocalServiceHealthResult> {
-    const response = await sendLocalServiceRequest(
-      this.webSocketFactory,
-      this.getServiceUrl(),
-      { type: 'health-check' },
-      this.healthTimeoutMs
-    )
-
-    if (response.type !== 'health-status') {
-      return {
-        ok: false,
-        runtimeFamilyId: this.getRuntimeFamilyId(),
-        modelIdentifier: this.modelName,
-        readiness: 'prewarm-required',
-        detail: {
-          reason: 'unexpected-response',
-          responseType: response.type
-        }
-      }
-    }
-
-    return {
-      ok: response.ok,
-      runtimeFamilyId: response.runtimeFamilyId,
-      modelIdentifier: response.modelIdentifier,
-      readiness: response.readiness,
-      ...(response.detail ? { detail: response.detail } : {})
-    }
+  async healthCheck(target: ResolvedLocalServiceConfig): Promise<LocalServiceHealthResult> {
+    return this.protocol.healthCheck(this.getServiceUrl(), {
+      runtimeFamilyId: target.runtimeFamilyId,
+      modelIdentifier: target.modelIdentifier
+    })
   }
 
   async prewarm(
@@ -167,41 +147,10 @@ export class PythonLocalServiceController implements LocalServiceController {
       language: string
     }
   ): Promise<LocalServiceHealthResult> {
-    const response = await sendLocalServiceRequest(
-      this.webSocketFactory,
-      this.getServiceUrl(),
-      {
-        type: 'prewarm',
-        mode: input.mode,
-        language: input.language
-      },
-      this.healthTimeoutMs
-    )
-
-    if (response.type === 'prewarm-complete') {
-      return this.healthCheck(target)
-    }
-
-    if (response.type !== 'health-status') {
-      return {
-        ok: false,
-        runtimeFamilyId: this.getRuntimeFamilyId(),
-        modelIdentifier: this.modelName,
-        readiness: 'prewarm-required',
-        detail: {
-          reason: 'unexpected-response',
-          responseType: response.type
-        }
-      }
-    }
-
-    return {
-      ok: response.ok,
-      runtimeFamilyId: response.runtimeFamilyId,
-      modelIdentifier: response.modelIdentifier,
-      readiness: response.readiness,
-      ...(response.detail ? { detail: response.detail } : {})
-    }
+    return this.protocol.prewarm(this.getServiceUrl(), input, {
+      runtimeFamilyId: target.runtimeFamilyId,
+      modelIdentifier: target.modelIdentifier
+    })
   }
 
   private async waitForHealth(): Promise<void> {
@@ -360,56 +309,6 @@ export function getDefaultLocalServiceCapabilities(): EngineCapabilities {
     requiresNetwork: false,
     requiresLocalService: true
   }
-}
-
-export async function sendLocalServiceRequest(
-  webSocketFactory: (url: string) => WebSocketLike,
-  url: string,
-  message: LocalServiceClientMessage,
-  timeoutMs: number
-): Promise<LocalServiceServerMessage> {
-  return new Promise<LocalServiceServerMessage>((resolve, reject) => {
-    const socket = webSocketFactory(url)
-    const timeout = setTimeout(() => {
-      socket.close()
-      reject(new Error('Timed out waiting for local service response'))
-    }, timeoutMs)
-
-    const settle = (callback: () => void) => {
-      clearTimeout(timeout)
-      socket.close()
-      callback()
-    }
-
-    socket.addEventListener('open', () => {
-      socket.send(JSON.stringify(message))
-    })
-    socket.addEventListener('message', (event) => {
-      settle(() => resolve(JSON.parse(event.data) as LocalServiceServerMessage))
-    })
-    socket.addEventListener('error', (event) => {
-      settle(() => reject(normalizeSocketError(event)))
-    })
-    socket.addEventListener('close', () => {
-      // ignored; timeout/error path handles failures
-    })
-  })
-}
-
-function normalizeSocketError(errorLike: unknown): Error {
-  if (errorLike instanceof Error) {
-    return errorLike
-  }
-
-  return new Error('Local service websocket request failed')
-}
-
-export function defaultWebSocketFactory(url: string): WebSocketLike {
-  return new WebSocket(url) as unknown as WebSocketLike
-}
-
-export function createLocalServiceUrl(host: string, port: number): string {
-  return `ws://${host}:${port}`
 }
 
 export async function terminateWindowsProcessTree(pid: number): Promise<void> {

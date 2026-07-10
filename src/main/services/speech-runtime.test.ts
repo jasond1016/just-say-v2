@@ -102,6 +102,27 @@ describe('SpeechRuntime', () => {
     })
   })
 
+  it('returns a structured error when profile check detects a runtime identity mismatch', async () => {
+    const runtime = createSpeechRuntime({
+      controller: createLocalServiceController({
+        healthIdentity: {
+          runtimeFamilyId: 'qwen3-asr',
+          modelIdentifier: 'Qwen3-ASR'
+        }
+      })
+    })
+
+    await expect(runtime.testProfile('local-fast')).resolves.toMatchObject({
+      ok: false,
+      profileId: 'local-fast',
+      error: {
+        code: 'E_ENGINE_UNAVAILABLE',
+        retryable: false,
+        message: expect.stringContaining('does not match service runtime')
+      }
+    })
+  })
+
   it('restarts the local service through the supervisor', async () => {
     const restart = vi.fn(async () => 'healthy' as const)
     const runtime = createSpeechRuntime({
@@ -195,6 +216,10 @@ function createResolvedRuntimeConfig(profileId: string): ResolvedRuntimeConfig {
 
 function createLocalServiceController(overrides: {
   healthReadiness?: RuntimeReadiness
+  healthIdentity?: {
+    runtimeFamilyId: 'sensevoice' | 'qwen3-asr'
+    modelIdentifier: string
+  }
   prewarm?: LocalServiceController['prewarm']
 } = {}): LocalServiceController {
   return {
@@ -203,8 +228,8 @@ function createLocalServiceController(overrides: {
     async healthCheck(target) {
       return {
         ok: true,
-        runtimeFamilyId: target.runtimeFamilyId,
-        modelIdentifier: target.modelIdentifier,
+        runtimeFamilyId: overrides.healthIdentity?.runtimeFamilyId ?? target.runtimeFamilyId,
+        modelIdentifier: overrides.healthIdentity?.modelIdentifier ?? target.modelIdentifier,
         readiness: overrides.healthReadiness ?? 'ready'
       }
     },

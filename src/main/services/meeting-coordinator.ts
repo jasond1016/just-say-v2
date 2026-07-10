@@ -22,6 +22,13 @@ import type { CaptureWindowService } from '../platform/capture-window-service'
 import type { SettingsProvider, TranscriptRepositoryLike } from './ptt-coordinator'
 import type { MeetingAudioRecorderLike } from './meeting-audio-storage'
 import type { TranslationPipeline } from './translation-pipeline'
+import {
+  abortRecognitionSession,
+  attachRecognitionEngine,
+  normalizeRecognitionError,
+  startRecognitionSession,
+  stopRecognitionCapture
+} from './recognition-session-runtime'
 
 export type MeetingRuntimeSnapshot = {
   sessionId: string
@@ -160,6 +167,15 @@ export class MeetingCoordinator {
     }
   }
 
+  async prewarm(): Promise<void> {
+    const runtimeConfig = this.dependencies.settingsProvider.resolveRuntimeConfig('meeting')
+    const engine = this.dependencies.engineFactory(runtimeConfig)
+    await engine.warmup({
+      mode: 'meeting',
+      language: String(runtimeConfig.engineConfig.language)
+    })
+  }
+
   async start(input: StartMeetingCommand = {}): Promise<void> {
     if (this.activeSession || this.status !== 'idle') {
       throw new Error('Meeting session is already active')
@@ -289,7 +305,7 @@ export class MeetingCoordinator {
     try {
       await this.startSessionRuntime(this.activeSession, settings.input.microphoneDeviceId)
     } catch (errorLike) {
-      return { failed: normalizeErrorPayload(errorLike) }
+      return { failed: normalizeRecognitionError(errorLike, 'Unknown meeting error') }
     }
 
     return {}
@@ -299,10 +315,10 @@ export class MeetingCoordinator {
     const session = this.requireActiveSession()
 
     try {
-      await this.dependencies.captureWindowService.stopCapture(session.sessionId)
+      await stopRecognitionCapture(this.dependencies.captureWindowService, session.sessionId)
       await session.engine.stopSession()
     } catch (errorLike) {
-      return { failed: normalizeErrorPayload(errorLike) }
+      return { failed: normalizeRecognitionError(errorLike, 'Unknown meeting error') }
     }
 
     return { followUps: { type: 'SESSION_ENDED' } }
@@ -332,7 +348,7 @@ export class MeetingCoordinator {
     try {
       await recoveryPromise
     } catch (errorLike) {
-      return { followUps: { type: 'FAILED', error: normalizeErrorPayload(errorLike) } }
+      return { followUps: { type: 'FAILED', error: normalizeRecognitionError(errorLike, 'Unknown meeting error') } }
     }
 
     return {}
@@ -588,7 +604,7 @@ export class MeetingCoordinator {
           return assertNever(event)
       }
     } catch (error) {
-      await this.enqueueControlEvent({ type: 'FAILED', error: normalizeErrorPayload(error) })
+      await this.enqueueControlEvent({ type: 'FAILED', error: normalizeRecognitionError(error, 'Unknown meeting error') })
     }
   }
 
@@ -652,7 +668,7 @@ export class MeetingCoordinator {
 
   private attachEngine(engine: RecognitionEngine): void {
     this.activeEngineUnsubscribe?.()
-    this.activeEngineUnsubscribe = engine.onEvent((event) => {
+    this.activeEngineUnsubscribe = attachRecognitionEngine(engine, (event) => {
       void this.handleEngineEvent(event)
     })
   }
@@ -666,43 +682,24 @@ export class MeetingCoordinator {
       throw new Error('No active meeting session')
     }
 
-    const sources = getMeetingSources(session.includeMicrophone)
-    await session.engine.warmup({
-      mode: 'meeting',
-      language: String(session.runtimeConfig.engineConfig.language)
-    })
-    await session.engine.startSession({
+    await startRecognitionSession({
+      engine: session.engine,
+      captureWindowService: this.dependencies.captureWindowService,
       sessionId: session.sessionId,
       mode: 'meeting',
-      sources,
-      language: String(session.runtimeConfig.engineConfig.language),
-      translation: {
-        enabled:
-          Boolean(session.runtimeConfig.translationConfig) &&
-          session.runtimeConfig.engineProfile.capabilities.translation,
-        ...(session.runtimeConfig.translationConfig
-          ? {
-              targetLanguage: String(session.runtimeConfig.translationConfig.targetLanguage)
-            }
-          : {})
-      }
+      sources: getMeetingSources(session.includeMicrophone),
+      runtimeConfig: session.runtimeConfig,
+      microphoneDeviceId: session.includeMicrophone ? microphoneDeviceId : undefined,
+      explicitWarmup: true,
+      startCapture: restartCapture
     })
-
-    if (restartCapture) {
-      await this.dependencies.captureWindowService.startCapture({
-        requestId: session.sessionId,
-        sources,
-        ...(session.includeMicrophone ? { microphoneDeviceId } : {}),
-        sampleRate: session.runtimeConfig.captureConfig.sampleRate,
-        chunkMs: session.runtimeConfig.captureConfig.chunkMs
-      })
-    }
   }
 
   private async performRecovery(
     session: MeetingSessionContext,
     recoveryReadySignal: { promise: Promise<void>; settle: () => void }
   ): Promise<void> {
+    // Keep engine-only abort inline so recovery does not yield before swapping engines.
     try {
       await session.engine.abortSession()
     } catch {
@@ -760,17 +757,11 @@ export class MeetingCoordinator {
   }
 
   private async abortActiveRuntime(session: MeetingSessionContext | null): Promise<void> {
-    try {
-      await session?.engine.abortSession()
-    } catch {
-      // best effort cleanup
-    }
-
-    try {
-      await this.dependencies.captureWindowService.abortCapture(session?.sessionId)
-    } catch {
-      // best effort cleanup
-    }
+    await abortRecognitionSession({
+      engine: session?.engine,
+      captureWindowService: this.dependencies.captureWindowService,
+      sessionId: session?.sessionId
+    })
   }
 
   private startTranslationTask(
@@ -1017,51 +1008,12 @@ async function waitForRecoveryReady(
   }
 }
 
-function normalizeErrorPayload(errorLike: unknown): AppErrorPayload {
-  if (isAppErrorPayload(errorLike)) {
-    return errorLike
-  }
-
-  if (errorLike instanceof Error) {
-    const payload = (errorLike as Error & { payload?: AppErrorPayload }).payload
-
-    if (payload && isAppErrorPayload(payload)) {
-      return payload
-    }
-
-    return {
-      code: 'E_ENGINE_PROTOCOL',
-      message: errorLike.message,
-      retryable: true
-    }
-  }
-
-  return {
-    code: 'E_ENGINE_PROTOCOL',
-    message: 'Unknown meeting error',
-    retryable: true
-  }
-}
-
 function normalizeStorageErrorPayload(errorLike: unknown): AppErrorPayload {
   return {
     code: 'E_STORAGE_WRITE',
     message: errorLike instanceof Error ? errorLike.message : 'Failed to persist meeting transcript',
     retryable: true
   }
-}
-
-function isAppErrorPayload(value: unknown): value is AppErrorPayload {
-  if (!value || typeof value !== 'object') {
-    return false
-  }
-
-  const candidate = value as Partial<AppErrorPayload>
-  return (
-    typeof candidate.code === 'string' &&
-    typeof candidate.message === 'string' &&
-    typeof candidate.retryable === 'boolean'
-  )
 }
 
 function createCompletionSignal(): { promise: Promise<void>; settle: () => void } {

@@ -1,15 +1,8 @@
 import type { IpcMain } from 'electron'
 import path from 'node:path'
-import { getProfileById, profileCatalog } from '../../core/settings/profile-catalog'
+import { profileCatalog } from '../../core/settings/profile-catalog'
 import type { ResolverCredentials } from '../../core/settings/settings-resolver'
-import type {
-  AppSettings,
-  LocalRuntimeFamilyId,
-  ResolvedRuntimeConfig,
-  SettingsPatch,
-  TranscriptNotesRuntimeConfig,
-  TranslationCredentialsInput
-} from '../../shared/api-types'
+import type { AppSettings, LocalRuntimeFamilyId } from '../../shared/api-types'
 import type { AppPaths } from '../app-paths'
 import { FileTranscriptExporter } from '../persistence/file-transcript-exporter'
 import { FileCredentialsRepository } from '../persistence/credentials-repository'
@@ -25,7 +18,6 @@ import { OutputWindowService } from '../platform/output-window-service'
 import { WindowsInputService } from '../platform/windows-input-service'
 import type { CreateAppServices } from './create-app'
 import { DiagnosticsService } from '../services/diagnostics-service'
-import { getEnvironmentCredentials } from '../services/environment-credentials-provider'
 import { HistoryService } from '../services/history-service'
 import { ConfigurableLocalServiceController } from '../services/configurable-local-service-controller'
 import { LiveSessionActionsService } from '../services/live-session-actions-service'
@@ -36,6 +28,7 @@ import { OutputDispatcher } from '../services/output-dispatcher'
 import { PttCoordinator } from '../services/ptt-coordinator'
 import { PttHotkeyController } from '../services/ptt-hotkey-controller'
 import { PttHudService } from '../services/ptt-hud-service'
+import { RuntimeSettingsContext } from '../services/runtime-settings-context'
 import { SessionCoordinator } from '../services/session-coordinator'
 import { SessionService } from '../services/session-service'
 import { SettingsService } from '../services/settings-service'
@@ -91,83 +84,17 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<AppR
       decryptString: (value) => safeStorage.decryptString(value)
     }
   )
-  let cachedStoredCredentials = (await credentialsRepository.get()) ?? {}
-  const getRuntimeCredentials = (): ResolverCredentials | undefined => {
-    const environmentCredentials = getEnvironmentCredentials()
-    const merged: ResolverCredentials = {
-      ...(environmentCredentials ?? {}),
-      ...cachedStoredCredentials
-    }
-
-    return merged.cloudApiKey || merged.translationApiKey ? merged : undefined
-  }
   const supportedManagedLocalRuntimes: LocalRuntimeFamilyId[] =
     platform === 'win32' ? ['sensevoice'] : ['sensevoice', 'qwen3-asr']
+  const credentialsProvider = {
+    getRuntimeCredentials: (): ResolverCredentials | undefined => undefined
+  }
   const baseSettingsService = new SettingsService(settingsRepository, {
-    credentialsProvider: getRuntimeCredentials,
+    credentialsProvider: () => credentialsProvider.getRuntimeCredentials(),
     platformProvider: () => ({
       supportedManagedLocalRuntimes: [...supportedManagedLocalRuntimes]
     })
   })
-  const settingsListeners = new Set<(settings: AppSettings) => void>()
-  baseSettingsService.onChanged((settings) => {
-    for (const listener of settingsListeners) {
-      listener(settings)
-    }
-  })
-  let cachedSettings = await baseSettingsService.getSettings()
-  let cachedRuntimeConfigs: Partial<Record<'ptt' | 'meeting', ResolvedRuntimeConfig>> = {}
-  let cachedRuntimeConfigErrors: Partial<Record<'ptt' | 'meeting', Error>> = {}
-
-  const refreshSettingsCache = async (): Promise<void> => {
-    cachedSettings = await baseSettingsService.getSettings()
-
-    const nextRuntimeConfigs: Partial<Record<'ptt' | 'meeting', ResolvedRuntimeConfig>> = {}
-    const nextRuntimeConfigErrors: Partial<Record<'ptt' | 'meeting', Error>> = {}
-
-    for (const mode of ['ptt', 'meeting'] as const) {
-      try {
-        nextRuntimeConfigs[mode] = await baseSettingsService.resolveRuntimeConfig(mode)
-      } catch (errorLike) {
-        nextRuntimeConfigErrors[mode] =
-          errorLike instanceof Error ? errorLike : new Error(`Could not resolve ${mode} runtime config`)
-      }
-    }
-
-    cachedRuntimeConfigs = nextRuntimeConfigs
-    cachedRuntimeConfigErrors = nextRuntimeConfigErrors
-  }
-  await refreshSettingsCache()
-
-  const resolveCachedRuntimeConfig = (mode: 'ptt' | 'meeting'): ResolvedRuntimeConfig => {
-    const error = cachedRuntimeConfigErrors[mode]
-
-    if (error) {
-      throw error
-    }
-
-    const runtimeConfig = cachedRuntimeConfigs[mode]
-
-    if (!runtimeConfig) {
-      throw new Error(`Runtime config for ${mode} is unavailable`)
-    }
-
-    return runtimeConfig
-  }
-
-  const settingsProvider = {
-    getSettings: () => cachedSettings,
-    resolveRuntimeConfig: (mode: 'ptt' | 'meeting') => resolveCachedRuntimeConfig(mode)
-  }
-  const getLocalServiceSettingsSignature = (settings: AppSettings) =>
-    JSON.stringify({
-      profileId: settings.speech.selectedProfileId,
-      mode: settings.advanced.localServiceMode,
-      localHost: settings.advanced.localServiceHost ?? null,
-      localPort: settings.advanced.localServicePort ?? null,
-      remoteHost: settings.advanced.remoteServiceHost ?? null,
-      remotePort: settings.advanced.remoteServicePort ?? null
-    })
   const speechRuntime = SpeechRuntime.create({
     profiles: profileCatalog,
     localServiceController: new ConfigurableLocalServiceController({
@@ -187,41 +114,29 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<AppR
         baseSettingsService.resolveProfileRuntimeConfig(profileId, mode)
     }
   })
-  const settingsService = {
-    getSettings: async () => baseSettingsService.getSettings(),
-    updateSettings: async (patch: SettingsPatch) => {
-      const previousLocalServiceSettingsSignature = getLocalServiceSettingsSignature(cachedSettings)
-      const updated = await baseSettingsService.updateSettings(patch)
-      await refreshSettingsCache()
-      if (getLocalServiceSettingsSignature(cachedSettings) !== previousLocalServiceSettingsSignature) {
-        await speechRuntime.stop()
-        void scheduleSelectedLocalServiceProbe()
-      }
-      return updated
-    },
-    saveTranslationCredentials: async (input: TranslationCredentialsInput) => {
-      await credentialsRepository.save({
-        ...cachedStoredCredentials,
-        translationApiKey: input.apiKey
-      })
-      cachedStoredCredentials = (await credentialsRepository.get()) ?? {}
-      await refreshSettingsCache()
-      const settings = await baseSettingsService.getSettings()
-
-      for (const listener of settingsListeners) {
-        listener(settings)
-      }
-
-      return settings
-    },
-    onChanged: (listener: (settings: Awaited<ReturnType<typeof baseSettingsService.getSettings>>) => void) => {
-      settingsListeners.add(listener)
-
-      return () => {
-        settingsListeners.delete(listener)
-      }
+  const scheduleSelectedLocalServiceProbe = async (runtimeSettings: RuntimeSettingsContext): Promise<void> => {
+    if (!runtimeSettings.shouldProbeSelectedLocalService()) {
+      return
     }
+
+    await speechRuntime.probeLocalService()
   }
+  const runtimeSettings = await RuntimeSettingsContext.create({
+    settingsService: baseSettingsService,
+    credentialsRepository,
+    onDeploymentSignatureChange: async () => {
+      await speechRuntime.stop()
+      void scheduleSelectedLocalServiceProbe(runtimeSettings)
+    }
+  })
+  credentialsProvider.getRuntimeCredentials = () => runtimeSettings.getRuntimeCredentials()
+  const settingsService = {
+    getSettings: () => runtimeSettings.getSettings(),
+    updateSettings: (patch) => runtimeSettings.updateSettings(patch),
+    saveTranslationCredentials: (input) => runtimeSettings.saveTranslationCredentials(input),
+    onChanged: (listener) => runtimeSettings.onChanged(listener)
+  }
+  const settingsProvider = runtimeSettings.createSettingsProvider()
   const captureTransport = new ElectronCaptureWindowTransport(ipcMain)
   const captureWindowService = new CaptureWindowService(captureTransport)
   const clipboardService = new ElectronClipboardService()
@@ -244,23 +159,14 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<AppR
     {
       repository: transcriptRepository,
       generationService: notesGenerationService,
-      configProvider: () => resolveTranscriptNotesRuntimeConfig(cachedSettings, getRuntimeCredentials())
+      configProvider: () => runtimeSettings.resolveTranscriptNotesRuntimeConfig()
     }
   )
   const diagnosticsService = new DiagnosticsService({
     exportDir: path.join(userDataPath, 'diagnostics'),
     appVersion,
-    selectedProfileProvider: () => cachedSettings.speech.selectedProfileId
+    selectedProfileProvider: () => runtimeSettings.getCachedSettings().speech.selectedProfileId
   })
-  const scheduleSelectedLocalServiceProbe = async (): Promise<void> => {
-    const selectedProfile = getProfileById(cachedSettings.speech.selectedProfileId)
-
-    if (!selectedProfile?.capabilities.requiresLocalService) {
-      return
-    }
-
-    await speechRuntime.probeLocalService()
-  }
   const translationPipeline = new TranslationPipeline()
   const pttCoordinator = new PttCoordinator({
     settingsProvider,
@@ -297,7 +203,7 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<AppR
     sessionCoordinator.setLocalServiceStatus(status)
     diagnosticsService.setLocalServiceStatus(status)
   })
-  void scheduleSelectedLocalServiceProbe()
+  void scheduleSelectedLocalServiceProbe(runtimeSettings)
   sessionCoordinator.onSnapshot((snapshot) => {
     if (snapshot.liveSession?.status === 'stopped_unexpectedly' || snapshot.ptt.error) {
       diagnosticsService.setLatestFailedSession(snapshot)
@@ -326,44 +232,12 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<AppR
     pttHotkeyController,
     speechRuntime,
     transcriptDatabase,
-    getSettings: () => cachedSettings,
+    getSettings: () => runtimeSettings.getCachedSettings(),
     shutdown: async () => {
       pttHotkeyController.dispose()
       pttHudService.dispose()
       await speechRuntime.stop()
       transcriptDatabase.close()
-    }
-  }
-}
-
-function resolveTranscriptNotesRuntimeConfig(
-  settings: AppSettings,
-  credentials: ResolverCredentials | undefined
-): TranscriptNotesRuntimeConfig {
-  const translationApiKey = credentials?.translationApiKey?.trim()
-
-  if (!translationApiKey) {
-    throw new Error('Translation API key is required before generating notes')
-  }
-
-  const envEndpoint = process.env.JUSTSAY_TRANSLATION_BASE_URL?.trim()
-  const envModel = process.env.JUSTSAY_TRANSLATION_MODEL?.trim()
-
-  return {
-    provider: settings.translation.provider,
-    language: settings.translation.targetLanguage,
-    ...(settings.translation.endpoint?.trim()
-      ? { endpoint: settings.translation.endpoint.trim() }
-      : envEndpoint
-        ? { endpoint: envEndpoint }
-        : {}),
-    ...(settings.translation.model?.trim()
-      ? { model: settings.translation.model.trim() }
-      : envModel
-        ? { model: envModel }
-        : {}),
-    credentials: {
-      translationApiKey
     }
   }
 }

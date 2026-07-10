@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { profileCatalog } from '../../core/settings/profile-catalog'
 import type { ResolvedRuntimeConfig } from '../../shared/api-types'
+import { establishRuntimeReadiness } from '../services/runtime-readiness'
 import { LocalServiceSupervisor } from '../services/local-service-supervisor'
 import { createRecognitionEngine } from './create-recognition-engine'
 import { LocalEngineAdapter } from './local-engine-adapter'
@@ -8,7 +9,7 @@ import { LocalEngineAdapter } from './local-engine-adapter'
 describe('createRecognitionEngine', () => {
   it('creates a local engine adapter for local profiles', () => {
     const engine = createRecognitionEngine(createConfig(profileCatalog[0]!), {
-      localServiceSupervisor: createLocalServiceSupervisor()
+      establishReadiness: createEstablishReadiness()
     })
 
     expect(engine).toBeInstanceOf(LocalEngineAdapter)
@@ -16,7 +17,7 @@ describe('createRecognitionEngine', () => {
 
   it('returns a structured unsupported engine for cloud profiles', async () => {
     const engine = createRecognitionEngine(createConfig(profileCatalog[2]!), {
-      localServiceSupervisor: createLocalServiceSupervisor()
+      establishReadiness: createEstablishReadiness()
     })
 
     await expect(engine.warmup({ mode: 'meeting', language: 'en' })).rejects.toMatchObject({
@@ -55,8 +56,8 @@ function createConfig(profile: ResolvedRuntimeConfig['engineProfile']): Resolved
   }
 }
 
-function createLocalServiceSupervisor(): LocalServiceSupervisor {
-  return new LocalServiceSupervisor({
+function createEstablishReadiness() {
+  const supervisor = new LocalServiceSupervisor({
     async start() {},
     async stop() {},
     async healthCheck(target) {
@@ -76,4 +77,24 @@ function createLocalServiceSupervisor(): LocalServiceSupervisor {
       }
     }
   })
+
+  return (input: { mode: 'meeting' | 'ptt'; language: string }) => {
+    const config = createConfig(profileCatalog[0]!)
+    const target = config.engineConfig.localService!
+
+    return establishRuntimeReadiness(
+      { supervisor },
+      {
+        target,
+        runtimeFamilyId: config.engineProfile.runtimeFamilyId,
+        expectedIdentity: {
+          runtimeFamilyId: config.engineProfile.runtimeFamilyId,
+          modelIdentifier: config.engineProfile.modelIdentifier
+        },
+        mode: input.mode,
+        language: input.language,
+        intent: 'session-start'
+      }
+    )
+  }
 }

@@ -19,8 +19,7 @@ describe('LocalEngineAdapter', () => {
       }
     })
 
-    expect(harness.ensureLocalServiceReady).toHaveBeenCalledTimes(1)
-    expect(harness.prewarmLocalService).toHaveBeenCalledTimes(1)
+    expect(harness.establishReadiness).toHaveBeenCalledTimes(1)
     expect(harness.socket.sentMessages).toContainEqual({
       type: 'start-session',
       sessionId: 'session-1',
@@ -50,8 +49,8 @@ describe('LocalEngineAdapter', () => {
       })
 
     await vi.waitFor(() => {
-      expect(harness.ensureLocalServiceReady).toHaveBeenCalledTimes(1)
-      expect(harness.prewarmLocalService).toHaveBeenCalledTimes(1)
+      expect(harness.establishReadiness).toHaveBeenCalledTimes(1)
+      expect(socket.openListenerCount()).toBe(1)
     })
     expect(resolved).toBe(false)
     expect(harness.socket.sentMessages).toEqual([])
@@ -198,12 +197,15 @@ describe('LocalEngineAdapter', () => {
 
 function createHarness(overrides: { socket?: ReturnType<typeof createFakeSocket> } = {}) {
   const socket = overrides.socket ?? createFakeSocket()
-  const ensureLocalServiceReady = vi.fn(async () => {})
-  const prewarmLocalService = vi.fn(async () => ({
-    ok: true,
-    runtimeFamilyId: 'sensevoice' as const,
-    modelIdentifier: 'iic/SenseVoiceSmall',
-    readiness: 'ready' as const
+  const establishReadiness = vi.fn(async () => ({
+    health: {
+      ok: true,
+      runtimeFamilyId: 'sensevoice' as const,
+      modelIdentifier: 'iic/SenseVoiceSmall',
+      readiness: 'ready' as const
+    },
+    prewarmTriggered: true,
+    identityMismatch: false
   }))
   const config: ResolvedRuntimeConfig = {
     engineProfile: profileCatalog[0]!,
@@ -231,16 +233,14 @@ function createHarness(overrides: { socket?: ReturnType<typeof createFakeSocket>
     }
   }
   const engine = new LocalEngineAdapter(config, {
-    ensureLocalServiceReady,
-    prewarmLocalService,
+    establishReadiness,
     webSocketFactory: () => socket
   })
 
   return {
     engine,
     socket,
-    ensureLocalServiceReady,
-    prewarmLocalService
+    establishReadiness
   }
 }
 
@@ -256,6 +256,9 @@ function createFakeSocket(options: { autoOpen?: boolean } = {}) {
 
   const socket = {
     sentMessages: [] as LocalServiceClientMessage[],
+    openListenerCount() {
+      return listeners.open.length
+    },
     addEventListener(type: keyof typeof listeners, listener: never) {
       listeners[type].push(listener)
 

@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { cloneTranscriptState } from '../../core/transcript/clone-transcript-state'
+import { freezeRuntimeSnapshot } from '../../core/runtime/freeze-runtime-snapshot'
 import type {
   AppRuntimeSnapshot,
   DiagnosticBundle,
@@ -38,7 +38,7 @@ export class DiagnosticsService {
   }
 
   setLatestFailedSession(snapshot: AppRuntimeSnapshot): void {
-    this.latestFailedSession = cloneRuntimeSnapshot(snapshot)
+    this.latestFailedSession = freezeRuntimeSnapshot(snapshot)
   }
 
   clearLatestFailedSession(): void {
@@ -52,7 +52,7 @@ export class DiagnosticsService {
       selectedProfileId: this.options.selectedProfileProvider?.() ?? 'unknown',
       localService: this.localServiceStatus,
       recentEvents: this.recentEvents.map(cloneDiagnosticEvent),
-      ...(this.latestFailedSession ? { latestFailedSession: cloneRuntimeSnapshot(this.latestFailedSession) } : {})
+      ...(this.latestFailedSession ? { latestFailedSession: freezeRuntimeSnapshot(this.latestFailedSession) } : {})
     }
   }
 
@@ -84,23 +84,4 @@ function cloneDiagnosticEvent(event: DiagnosticEvent): DiagnosticEvent {
     ...event,
     ...(event.type === 'capture-started' ? { sources: [...event.sources] } : {})
   } as DiagnosticEvent
-}
-
-function cloneRuntimeSnapshot(snapshot: AppRuntimeSnapshot): AppRuntimeSnapshot {
-  return {
-    ...snapshot,
-    ptt: {
-      ...snapshot.ptt,
-      ...(snapshot.ptt.lastResult ? { lastResult: { ...snapshot.ptt.lastResult } } : {})
-    },
-    liveSession: snapshot.liveSession
-      ? {
-          ...snapshot.liveSession,
-          transcript: cloneTranscriptState(snapshot.liveSession.transcript)
-        }
-      : null,
-    services: {
-      ...snapshot.services
-    }
-  }
 }

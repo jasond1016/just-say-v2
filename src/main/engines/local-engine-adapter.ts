@@ -10,15 +10,11 @@ import type {
   LocalServiceServerMessage
 } from '../../shared/local-service-types'
 import { encodeAudioChunkToBase64 } from '../../shared/local-service-types'
-import type { WebSocketLike } from '../services/python-local-service-controller'
-import type { LocalServiceHealthResult } from '../services/local-service-supervisor'
+import type { WebSocketLike } from '../services/local-service-protocol-client'
+import type { RuntimeReadinessEstablishmentResult } from '../services/runtime-readiness'
 
 export type LocalEngineAdapterOptions = {
-  ensureLocalServiceReady: (target: NonNullable<ResolvedRuntimeConfig['engineConfig']['localService']>) => Promise<unknown>
-  prewarmLocalService: (
-    target: NonNullable<ResolvedRuntimeConfig['engineConfig']['localService']>,
-    input: WarmupInput
-  ) => Promise<LocalServiceHealthResult>
+  establishReadiness: (input: WarmupInput) => Promise<RuntimeReadinessEstablishmentResult>
   webSocketFactory?: (url: string) => WebSocketLike
   connectTimeoutMs?: number
 }
@@ -44,13 +40,10 @@ export class LocalEngineAdapter implements RecognitionEngine {
     }
   }
 
-  async warmup(_input: WarmupInput): Promise<void> {
-    const localService = this.requireLocalServiceConfig()
-    await this.options.ensureLocalServiceReady(localService)
-    const health = await this.options.prewarmLocalService(localService, _input)
-    this.assertRuntimeIdentity(health)
+  async warmup(input: WarmupInput): Promise<void> {
+    const result = await this.options.establishReadiness(input)
 
-    if (!health.ok) {
+    if (!result.health.ok) {
       throw new Error('Local service reported unhealthy during prewarm')
     }
   }
@@ -243,28 +236,6 @@ export class LocalEngineAdapter implements RecognitionEngine {
     const host = localService?.host ?? '127.0.0.1'
     const port = localService?.port ?? 8765
     return `ws://${host}:${port}`
-  }
-
-  private requireLocalServiceConfig(): NonNullable<ResolvedRuntimeConfig['engineConfig']['localService']> {
-    const localService = this.config.engineConfig.localService
-
-    if (!localService) {
-      throw new Error(`Profile "${this.config.engineProfile.id}" is missing local service configuration`)
-    }
-
-    return localService
-  }
-
-  private assertRuntimeIdentity(health: LocalServiceHealthResult): void {
-    if (
-      health.runtimeFamilyId !== this.config.engineProfile.runtimeFamilyId ||
-      health.modelIdentifier !== this.config.engineProfile.modelIdentifier
-    ) {
-      throw new Error(
-        `Configured runtime "${this.config.engineProfile.runtimeFamilyId}" does not match service runtime ` +
-          `"${health.runtimeFamilyId}" (${health.modelIdentifier})`
-      )
-    }
   }
 
   private emit(event: RecognitionEvent): void {

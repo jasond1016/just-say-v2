@@ -5,10 +5,11 @@ import type {
   StartMeetingCommand
 } from '../../shared/api-types'
 import type { SessionMode } from '../../shared/primitive-types'
-import { cloneTranscriptState } from '../../core/transcript/clone-transcript-state'
+import { freezeRuntimeSnapshot } from '../../core/runtime/freeze-runtime-snapshot'
 import { INITIAL_RUNTIME_SNAPSHOT } from '../../shared/runtime-snapshot'
 import type { MeetingCoordinator } from './meeting-coordinator'
 import type { PttCoordinator } from './ptt-coordinator'
+import { assertRecognitionLeaseAvailable } from './session-lease'
 
 export class SessionCoordinator {
   private snapshot: AppRuntimeSnapshot = INITIAL_RUNTIME_SNAPSHOT
@@ -49,23 +50,7 @@ export class SessionCoordinator {
   }
 
   getRuntimeSnapshot(): AppRuntimeSnapshot {
-    // Clone live meeting transcripts here so coordinators can share mutable state internally.
-    return {
-      ...this.snapshot,
-      ptt: {
-        ...this.snapshot.ptt,
-        ...(this.snapshot.ptt.lastResult ? { lastResult: { ...this.snapshot.ptt.lastResult } } : {})
-      },
-      liveSession: this.snapshot.liveSession
-        ? {
-            ...this.snapshot.liveSession,
-            transcript: cloneTranscriptState(this.snapshot.liveSession.transcript)
-          }
-        : null,
-      services: {
-        ...this.snapshot.services
-      }
-    }
+    return freezeRuntimeSnapshot(this.snapshot)
   }
 
   onSnapshot(listener: (snapshot: AppRuntimeSnapshot) => void): () => void {
@@ -91,6 +76,7 @@ export class SessionCoordinator {
     }
 
     if (mode === 'meeting') {
+      await this.meetingCoordinator.prewarm()
       return
     }
 
@@ -98,6 +84,7 @@ export class SessionCoordinator {
   }
 
   async startPtt(): Promise<void> {
+    assertRecognitionLeaseAvailable(this.snapshot, 'ptt')
     await this.pttCoordinator.start()
   }
 
@@ -110,6 +97,7 @@ export class SessionCoordinator {
   }
 
   async startMeeting(input?: StartMeetingCommand): Promise<void> {
+    assertRecognitionLeaseAvailable(this.snapshot, 'meeting')
     await this.meetingCoordinator.start(input)
   }
 
@@ -129,7 +117,7 @@ export class SessionCoordinator {
   }
 
   private emitSnapshot(): void {
-    const snapshot = this.getRuntimeSnapshot()
+    const snapshot = freezeRuntimeSnapshot(this.snapshot)
 
     for (const listener of this.listeners) {
       listener(snapshot)

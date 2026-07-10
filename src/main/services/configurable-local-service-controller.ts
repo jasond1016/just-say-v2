@@ -1,12 +1,12 @@
 import path from 'node:path'
 import type { AppErrorPayload, ResolvedLocalServiceConfig } from '../../shared/api-types'
-import type { WebSocketLike } from './python-local-service-controller'
 import {
   createLocalServiceUrl,
   defaultWebSocketFactory,
-  PythonLocalServiceController,
-  sendLocalServiceRequest
-} from './python-local-service-controller'
+  LocalServiceProtocolClient,
+  type WebSocketLike
+} from './local-service-protocol-client'
+import { PythonLocalServiceController } from './python-local-service-controller'
 import type { LocalServiceController, LocalServiceHealthResult } from './local-service-supervisor'
 import type { SessionMode } from '../../shared/primitive-types'
 
@@ -145,8 +145,7 @@ export class ConfigurableLocalServiceController implements LocalServiceControlle
 }
 
 export class RemoteLocalServiceController implements LocalServiceController {
-  private readonly healthTimeoutMs: number
-  private readonly webSocketFactory: (url: string) => WebSocketLike
+  private readonly protocol: LocalServiceProtocolClient
 
   constructor(
     private readonly options: RemoteLocalServiceConfig & {
@@ -154,8 +153,10 @@ export class RemoteLocalServiceController implements LocalServiceController {
       webSocketFactory?: (url: string) => WebSocketLike
     }
   ) {
-    this.healthTimeoutMs = options.healthTimeoutMs ?? 10_000
-    this.webSocketFactory = options.webSocketFactory ?? defaultWebSocketFactory
+    this.protocol = new LocalServiceProtocolClient({
+      webSocketFactory: options.webSocketFactory ?? defaultWebSocketFactory,
+      healthTimeoutMs: options.healthTimeoutMs ?? 10_000
+    })
   }
 
   async start(_target: ResolvedLocalServiceConfig): Promise<void> {}
@@ -163,33 +164,10 @@ export class RemoteLocalServiceController implements LocalServiceController {
   async stop(): Promise<void> {}
 
   async healthCheck(_target: ResolvedLocalServiceConfig): Promise<LocalServiceHealthResult> {
-    const response = await sendLocalServiceRequest(
-      this.webSocketFactory,
-      createLocalServiceUrl(this.options.host, this.options.port),
-      { type: 'health-check' },
-      this.healthTimeoutMs
-    )
-
-    if (response.type !== 'health-status') {
-      return {
-        ok: false,
-        runtimeFamilyId: this.options.runtimeFamilyId,
-        modelIdentifier: this.options.modelIdentifier,
-        readiness: 'prewarm-required',
-        detail: {
-          reason: 'unexpected-response',
-          responseType: response.type
-        }
-      }
-    }
-
-    return {
-      ok: response.ok,
-      runtimeFamilyId: response.runtimeFamilyId,
-      modelIdentifier: response.modelIdentifier,
-      readiness: response.readiness,
-      ...(response.detail ? { detail: response.detail } : {})
-    }
+    return this.protocol.healthCheck(this.getServiceUrl(), {
+      runtimeFamilyId: this.options.runtimeFamilyId,
+      modelIdentifier: this.options.modelIdentifier
+    })
   }
 
   async prewarm(
@@ -199,41 +177,14 @@ export class RemoteLocalServiceController implements LocalServiceController {
       language: string
     }
   ): Promise<LocalServiceHealthResult> {
-    const response = await sendLocalServiceRequest(
-      this.webSocketFactory,
-      createLocalServiceUrl(this.options.host, this.options.port),
-      {
-        type: 'prewarm',
-        mode: input.mode,
-        language: input.language
-      },
-      this.healthTimeoutMs
-    )
+    return this.protocol.prewarm(this.getServiceUrl(), input, {
+      runtimeFamilyId: target.runtimeFamilyId,
+      modelIdentifier: target.modelIdentifier
+    })
+  }
 
-    if (response.type === 'prewarm-complete') {
-      return this.healthCheck(target)
-    }
-
-    if (response.type !== 'health-status') {
-      return {
-        ok: false,
-        runtimeFamilyId: this.options.runtimeFamilyId,
-        modelIdentifier: this.options.modelIdentifier,
-        readiness: 'prewarm-required',
-        detail: {
-          reason: 'unexpected-response',
-          responseType: response.type
-        }
-      }
-    }
-
-    return {
-      ok: response.ok,
-      runtimeFamilyId: response.runtimeFamilyId,
-      modelIdentifier: response.modelIdentifier,
-      readiness: response.readiness,
-      ...(response.detail ? { detail: response.detail } : {})
-    }
+  private getServiceUrl(): string {
+    return createLocalServiceUrl(this.options.host, this.options.port)
   }
 }
 
