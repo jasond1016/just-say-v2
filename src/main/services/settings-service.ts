@@ -48,9 +48,12 @@ export class SettingsService {
     }
   }
 
-  async resolveRuntimeConfig(mode: SessionMode): Promise<ResolvedRuntimeConfig> {
+  async resolveRuntimeConfig(
+    mode: SessionMode,
+    credentialsOverride?: ResolverCredentials
+  ): Promise<ResolvedRuntimeConfig> {
     const settings = await this.getSettings()
-    return this.resolveRuntimeConfigForSettings(settings, mode)
+    return this.resolveRuntimeConfigForSettings(settings, mode, credentialsOverride)
   }
 
   async resolveProfileRuntimeConfig(
@@ -73,9 +76,10 @@ export class SettingsService {
 
   private resolveRuntimeConfigForSettings(
     settings: AppSettings,
-    mode: SessionMode
+    mode: SessionMode,
+    credentialsOverride?: ResolverCredentials
   ): ResolvedRuntimeConfig {
-    const credentials = this.options.credentialsProvider?.()
+    const credentials = credentialsOverride ?? this.options.credentialsProvider?.()
     const platform = this.options.platformProvider?.()
 
     return resolveRuntimeConfig({

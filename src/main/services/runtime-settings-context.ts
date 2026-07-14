@@ -138,14 +138,24 @@ export class RuntimeSettingsContext {
   }
 
   private async refreshCache(): Promise<void> {
-    this.cachedSettings = await this.settingsService.getSettings()
+    this.cachedStoredCredentials = (await this.credentialsRepository.get()) ?? {}
+    const credentials = this.getRuntimeCredentials()
+    const settings = await this.settingsService.getSettings()
+    // Use context credentials so bootstrap works before create-runtime rebinds credentialsProvider.
+    this.cachedSettings = {
+      ...settings,
+      translation: {
+        ...settings.translation,
+        apiKeyConfigured: Boolean(credentials?.translationApiKey)
+      }
+    }
 
     const nextRuntimeConfigs: Partial<Record<SessionMode, ResolvedRuntimeConfig>> = {}
     const nextRuntimeConfigErrors: Partial<Record<SessionMode, Error>> = {}
 
     for (const mode of ['ptt', 'meeting'] as const) {
       try {
-        nextRuntimeConfigs[mode] = await this.settingsService.resolveRuntimeConfig(mode)
+        nextRuntimeConfigs[mode] = await this.settingsService.resolveRuntimeConfig(mode, credentials)
       } catch (errorLike) {
         nextRuntimeConfigErrors[mode] =
           errorLike instanceof Error ? errorLike : new Error(`Could not resolve ${mode} runtime config`)
