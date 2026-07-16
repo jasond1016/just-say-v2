@@ -21,12 +21,10 @@ import type { PttSessionEvent } from '../../core/session/session-types'
 import type { CaptureWindowService } from '../platform/capture-window-service'
 import type { TranslationPipeline } from './translation-pipeline'
 import {
-  abortRecognitionSession,
-  attachRecognitionEngine,
   normalizeRecognitionError,
-  startRecognitionSession,
-  stopRecognitionCapture
-} from './recognition-session-runtime'
+  RecognitionSessionBridge,
+  type RecognitionCaptureControlEvent
+} from './recognition-session-bridge'
 
 export type PttRuntimeSnapshot = {
   status:
@@ -107,10 +105,10 @@ export class PttCoordinator {
   private error: AppErrorPayload | undefined
   private lastFailedText: string | null = null
   private activeSession: PttSessionContext | null = null
-  private activeEngineUnsubscribe: (() => void) | null = null
   private pendingStartupFailure: AppErrorPayload | null = null
   private readonly listeners = new Set<(snapshot: PttRuntimeSnapshot) => void>()
   private readonly notificationListeners = new Set<(notification: RuntimeNotification) => void>()
+  private readonly recognitionSession: RecognitionSessionBridge
   private readonly sessionDispatch: SessionDispatchLoop<
     PttRuntimeSnapshot['status'],
     PttSessionEvent,
@@ -121,6 +119,7 @@ export class PttCoordinator {
     this.completionTimeoutMs = dependencies.completionTimeoutMs ?? 15_000
     this.now = dependencies.now ?? Date.now
     this.createSessionId = dependencies.createSessionId ?? (() => `ptt-${this.now()}`)
+    this.recognitionSession = new RecognitionSessionBridge(dependencies.captureWindowService)
     this.sessionDispatch = new SessionDispatchLoop({
       getStatus: () => this.status,
       setStatus: (status) => {
@@ -137,9 +136,6 @@ export class PttCoordinator {
         }
       },
       enableReentrantEnqueue: false
-    })
-    this.dependencies.captureWindowService.onEvent((event) => {
-      void this.handleCaptureEvent(event)
     })
   }
 
@@ -284,15 +280,21 @@ export class PttCoordinator {
       mode: 'ptt'
     })
 
-    this.activeEngineUnsubscribe = attachRecognitionEngine(engine, (engineEvent) => {
-      void this.handleEngineEvent(engineEvent)
+    this.recognitionSession.bind({
+      engine,
+      sessionId,
+      handlers: {
+        onEngineEvent: (engineEvent) => {
+          void this.handleEngineEvent(engineEvent)
+        },
+        onCaptureEvent: (captureEvent) => {
+          void this.handleCaptureEvent(captureEvent)
+        }
+      }
     })
 
     try {
-      await startRecognitionSession({
-        engine,
-        captureWindowService: this.dependencies.captureWindowService,
-        sessionId,
+      await this.recognitionSession.start({
         mode: 'ptt',
         sources: ['microphone'],
         runtimeConfig,
@@ -307,10 +309,7 @@ export class PttCoordinator {
 
   private async runStopCaptureAndFlush(): Promise<PttEffectResult> {
     const session = this.requireActiveSession()
-    session.stopCapturePromise = stopRecognitionCapture(
-      this.dependencies.captureWindowService,
-      session.sessionId
-    )
+    session.stopCapturePromise = this.recognitionSession.stopCapture()
 
     try {
       await session.stopCapturePromise
@@ -325,11 +324,7 @@ export class PttCoordinator {
   private async runDiscardTranscript(): Promise<PttEffectResult> {
     const session = this.activeSession
 
-    await abortRecognitionSession({
-      engine: session?.engine,
-      captureWindowService: this.dependencies.captureWindowService,
-      sessionId: session?.sessionId
-    })
+    await this.recognitionSession.abort()
 
     session?.completion.settle()
     return { followUps: { type: 'RESET', clearError: true } }
@@ -525,11 +520,7 @@ export class PttCoordinator {
       })
     }
 
-    await abortRecognitionSession({
-      engine: session?.engine,
-      captureWindowService: this.dependencies.captureWindowService,
-      sessionId: session?.sessionId
-    })
+    await this.recognitionSession.abort()
 
     session?.completion.settle()
     return { followUps: { type: 'RESET', clearError: false } }
@@ -627,9 +618,7 @@ export class PttCoordinator {
     }
   }
 
-  private async handleCaptureEvent(
-    event: Parameters<CaptureWindowService['onEvent']>[0] extends (payload: infer Event) => void ? Event : never
-  ): Promise<void> {
+  private async handleCaptureEvent(event: RecognitionCaptureControlEvent): Promise<void> {
     const session = this.activeSession
 
     if (!session || event.requestId !== session.sessionId) {
@@ -638,9 +627,6 @@ export class PttCoordinator {
 
     try {
       switch (event.type) {
-        case 'audio-chunk':
-          session.engine.pushAudio(event.chunk)
-          return
         case 'capture-error':
           await this.dispatch({ type: 'FAILED', error: event.error })
           return
@@ -654,7 +640,7 @@ export class PttCoordinator {
           return
         case 'capture-stopped':
           if (this.status === 'recognizing') {
-            await session.engine.stopSession()
+            await this.recognitionSession.stopSession()
           }
           return
         default:
@@ -677,8 +663,7 @@ export class PttCoordinator {
   }
 
   private cleanupActiveSession(): void {
-    this.activeEngineUnsubscribe?.()
-    this.activeEngineUnsubscribe = null
+    this.recognitionSession.clear()
     this.activeSession = null
   }
 

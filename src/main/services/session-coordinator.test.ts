@@ -849,17 +849,17 @@ describe('SessionCoordinator + PTTCoordinator', () => {
         recoverable: true
       }
     })
-    await flushAsyncWork()
-    await flushAsyncWork()
 
-    expect(harness.sessionCoordinator.getRuntimeSnapshot().liveSession).toMatchObject({
-      sessionId: 'meeting-1',
-      status: 'stopped_unexpectedly',
-      error: {
-        code: 'E_ENGINE_PROTOCOL',
-        message: 'Recovery engine could not start',
-        retryable: true
-      }
+    await vi.waitFor(() => {
+      expect(harness.sessionCoordinator.getRuntimeSnapshot().liveSession).toMatchObject({
+        sessionId: 'meeting-1',
+        status: 'stopped_unexpectedly',
+        error: {
+          code: 'E_ENGINE_PROTOCOL',
+          message: 'Recovery engine could not start',
+          retryable: true
+        }
+      })
     })
   })
 

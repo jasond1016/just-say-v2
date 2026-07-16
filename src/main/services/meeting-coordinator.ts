@@ -23,12 +23,10 @@ import type { SettingsProvider, TranscriptRepositoryLike } from './ptt-coordinat
 import type { MeetingAudioRecorderLike } from './meeting-audio-storage'
 import type { TranslationPipeline } from './translation-pipeline'
 import {
-  abortRecognitionSession,
-  attachRecognitionEngine,
   normalizeRecognitionError,
-  startRecognitionSession,
-  stopRecognitionCapture
-} from './recognition-session-runtime'
+  RecognitionSessionBridge,
+  type RecognitionCaptureControlEvent
+} from './recognition-session-bridge'
 
 export type MeetingRuntimeSnapshot = {
   sessionId: string
@@ -89,7 +87,6 @@ export class MeetingCoordinator {
   private readonly createSessionId: () => string
   private readonly recoveryTimeoutMs: number
   private activeSession: MeetingSessionContext | null = null
-  private activeEngineUnsubscribe: (() => void) | null = null
   private status: MeetingStatus = 'idle'
   private error: AppErrorPayload | undefined
   private pendingStartInput: StartMeetingCommand = {}
@@ -97,6 +94,7 @@ export class MeetingCoordinator {
   private readonly listeners = new Set<(snapshot: MeetingRuntimeSnapshot | null) => void>()
   private readonly notificationListeners = new Set<(notification: RuntimeNotification) => void>()
   private terminalSnapshot: MeetingRuntimeSnapshot | null = null
+  private readonly recognitionSession: RecognitionSessionBridge
   private readonly sessionDispatch: SessionDispatchLoop<MeetingStatus, MeetingSessionEvent, MeetingTransitionEffect>
   private awaitingStopSessionEnd = false
   private recoveryPromise: Promise<void> | null = null
@@ -106,6 +104,7 @@ export class MeetingCoordinator {
     this.now = dependencies.now ?? Date.now
     this.createSessionId = dependencies.createSessionId ?? (() => `meeting-${this.now()}`)
     this.recoveryTimeoutMs = dependencies.recoveryTimeoutMs ?? 5_000
+    this.recognitionSession = new RecognitionSessionBridge(dependencies.captureWindowService)
     this.sessionDispatch = new SessionDispatchLoop({
       getStatus: () => this.status,
       setStatus: (status) => {
@@ -128,9 +127,6 @@ export class MeetingCoordinator {
       },
       serializeTopLevel: true,
       enableReentrantEnqueue: true
-    })
-    this.dependencies.captureWindowService.onEvent((event) => {
-      void this.handleCaptureEvent(event)
     })
   }
 
@@ -300,7 +296,7 @@ export class MeetingCoordinator {
       sessionId,
       mode: 'meeting'
     })
-    this.attachEngine(engine)
+    this.bindRecognitionSession(engine)
 
     try {
       await this.startSessionRuntime(this.activeSession, settings.input.microphoneDeviceId)
@@ -315,8 +311,8 @@ export class MeetingCoordinator {
     const session = this.requireActiveSession()
 
     try {
-      await stopRecognitionCapture(this.dependencies.captureWindowService, session.sessionId)
-      await session.engine.stopSession()
+      await this.recognitionSession.stopCapture()
+      await this.recognitionSession.stopSession()
     } catch (errorLike) {
       return { failed: normalizeRecognitionError(errorLike, 'Unknown meeting error') }
     }
@@ -484,7 +480,6 @@ export class MeetingCoordinator {
 
   private runClearRuntime(event: MeetingSessionEvent): MeetingEffectResult {
     this.cleanupActiveSession()
-    this.cachedTranscriptSnapshot = null
 
     if (event.type === 'RESET' && event.clearError === false) {
       return {}
@@ -608,9 +603,7 @@ export class MeetingCoordinator {
     }
   }
 
-  private async handleCaptureEvent(
-    event: Parameters<CaptureWindowService['onEvent']>[0] extends (payload: infer Event) => void ? Event : never
-  ): Promise<void> {
+  private async handleCaptureEvent(event: RecognitionCaptureControlEvent): Promise<void> {
     const session = this.activeSession
 
     if (!session || event.requestId !== session.sessionId) {
@@ -618,10 +611,6 @@ export class MeetingCoordinator {
     }
 
     switch (event.type) {
-      case 'audio-chunk':
-        session.engine.pushAudio(event.chunk)
-        session.audioRecorder?.appendChunk(event.chunk)
-        return
       case 'capture-error':
         await this.enqueueControlEvent({ type: 'FAILED', error: event.error })
         return
@@ -641,8 +630,7 @@ export class MeetingCoordinator {
   }
 
   private cleanupActiveSession(): void {
-    this.activeEngineUnsubscribe?.()
-    this.activeEngineUnsubscribe = null
+    this.recognitionSession.clear()
     this.recoveryPromise = null
     this.recoveryReadySignal = null
     this.activeSession = null
@@ -666,10 +654,22 @@ export class MeetingCoordinator {
     }
   }
 
-  private attachEngine(engine: RecognitionEngine): void {
-    this.activeEngineUnsubscribe?.()
-    this.activeEngineUnsubscribe = attachRecognitionEngine(engine, (event) => {
-      void this.handleEngineEvent(event)
+  private bindRecognitionSession(engine: RecognitionEngine): void {
+    const session = this.requireActiveSession()
+    this.recognitionSession.bind({
+      engine,
+      sessionId: session.sessionId,
+      handlers: {
+        onEngineEvent: (event) => {
+          void this.handleEngineEvent(event)
+        },
+        onCaptureEvent: (event) => {
+          void this.handleCaptureEvent(event)
+        },
+        onAudioChunk: (chunk) => {
+          this.activeSession?.audioRecorder?.appendChunk(chunk)
+        }
+      }
     })
   }
 
@@ -682,14 +682,11 @@ export class MeetingCoordinator {
       throw new Error('No active meeting session')
     }
 
-    await startRecognitionSession({
-      engine: session.engine,
-      captureWindowService: this.dependencies.captureWindowService,
-      sessionId: session.sessionId,
+    await this.recognitionSession.start({
       mode: 'meeting',
       sources: getMeetingSources(session.includeMicrophone),
       runtimeConfig: session.runtimeConfig,
-      microphoneDeviceId: session.includeMicrophone ? microphoneDeviceId : undefined,
+      ...(session.includeMicrophone ? { microphoneDeviceId } : {}),
       explicitWarmup: true,
       startCapture: restartCapture
     })
@@ -699,17 +696,13 @@ export class MeetingCoordinator {
     session: MeetingSessionContext,
     recoveryReadySignal: { promise: Promise<void>; settle: () => void }
   ): Promise<void> {
-    // Keep engine-only abort inline so recovery does not yield before swapping engines.
-    try {
-      await session.engine.abortSession()
-    } catch {
-      // best effort cleanup before replacement
-    }
+    // Keep engine-only abort on the Recognition Session so recovery does not tear down capture.
+    await this.recognitionSession.abort({ abortCapture: false })
 
     const settings = this.dependencies.settingsProvider.getSettings()
     const nextEngine = this.dependencies.engineFactory(session.runtimeConfig)
     session.engine = nextEngine
-    this.attachEngine(nextEngine)
+    this.recognitionSession.rebind(nextEngine)
 
     await this.startSessionRuntime(session, settings.input.microphoneDeviceId, false)
     await waitForRecoveryReady(
@@ -756,12 +749,8 @@ export class MeetingCoordinator {
     return this.activeSession
   }
 
-  private async abortActiveRuntime(session: MeetingSessionContext | null): Promise<void> {
-    await abortRecognitionSession({
-      engine: session?.engine,
-      captureWindowService: this.dependencies.captureWindowService,
-      sessionId: session?.sessionId
-    })
+  private async abortActiveRuntime(_session: MeetingSessionContext | null): Promise<void> {
+    await this.recognitionSession.abort()
   }
 
   private startTranslationTask(
