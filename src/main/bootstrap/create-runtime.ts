@@ -1,8 +1,7 @@
 import type { IpcMain } from 'electron'
 import path from 'node:path'
 import { profileCatalog } from '../../core/settings/profile-catalog'
-import type { ResolverCredentials } from '../../core/settings/settings-resolver'
-import type { AppSettings, LocalRuntimeFamilyId } from '../../shared/api-types'
+import type { AppSettings, LocalRuntimeFamilyId, SettingsPatch, TranslationCredentialsInput } from '../../shared/api-types'
 import type { AppPaths } from '../app-paths'
 import { FileTranscriptExporter } from '../persistence/file-transcript-exporter'
 import { FileCredentialsRepository } from '../persistence/credentials-repository'
@@ -86,14 +85,14 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<AppR
   )
   const supportedManagedLocalRuntimes: LocalRuntimeFamilyId[] =
     platform === 'win32' ? ['sensevoice'] : ['sensevoice', 'qwen3-asr']
-  const credentialsProvider = {
-    getRuntimeCredentials: (): ResolverCredentials | undefined => undefined
-  }
   const baseSettingsService = new SettingsService(settingsRepository, {
-    credentialsProvider: () => credentialsProvider.getRuntimeCredentials(),
     platformProvider: () => ({
       supportedManagedLocalRuntimes: [...supportedManagedLocalRuntimes]
     })
+  })
+  const runtimeSettings = await RuntimeSettingsContext.create({
+    settingsService: baseSettingsService,
+    credentialsRepository
   })
   const speechRuntime = SpeechRuntime.create({
     profiles: profileCatalog,
@@ -108,33 +107,25 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<AppR
       },
       healthTimeoutMs: 60_000
     }),
-    runtimeConfigResolver: {
-      resolveRuntimeConfig: (mode) => baseSettingsService.resolveRuntimeConfig(mode),
-      resolveProfileRuntimeConfig: (profileId, mode) =>
-        baseSettingsService.resolveProfileRuntimeConfig(profileId, mode)
-    }
+    runtimeConfigResolver: runtimeSettings.createRuntimeConfigResolver()
   })
-  const scheduleSelectedLocalServiceProbe = async (runtimeSettings: RuntimeSettingsContext): Promise<void> => {
+  const scheduleSelectedLocalServiceProbe = async (): Promise<void> => {
     if (!runtimeSettings.shouldProbeSelectedLocalService()) {
       return
     }
 
     await speechRuntime.probeLocalService()
   }
-  const runtimeSettings = await RuntimeSettingsContext.create({
-    settingsService: baseSettingsService,
-    credentialsRepository,
-    onDeploymentSignatureChange: async () => {
-      await speechRuntime.stop()
-      void scheduleSelectedLocalServiceProbe(runtimeSettings)
-    }
+  runtimeSettings.onDeploymentSignatureChange(async () => {
+    await speechRuntime.stop()
+    void scheduleSelectedLocalServiceProbe()
   })
-  credentialsProvider.getRuntimeCredentials = () => runtimeSettings.getRuntimeCredentials()
   const settingsService = {
     getSettings: () => runtimeSettings.getSettings(),
-    updateSettings: (patch) => runtimeSettings.updateSettings(patch),
-    saveTranslationCredentials: (input) => runtimeSettings.saveTranslationCredentials(input),
-    onChanged: (listener) => runtimeSettings.onChanged(listener)
+    updateSettings: (patch: SettingsPatch) => runtimeSettings.updateSettings(patch),
+    saveTranslationCredentials: (input: TranslationCredentialsInput) =>
+      runtimeSettings.saveTranslationCredentials(input),
+    onChanged: (listener: (settings: AppSettings) => void) => runtimeSettings.onChanged(listener)
   }
   const settingsProvider = runtimeSettings.createSettingsProvider()
   const captureTransport = new ElectronCaptureWindowTransport(ipcMain)
@@ -203,7 +194,7 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<AppR
     sessionCoordinator.setLocalServiceStatus(status)
     diagnosticsService.setLocalServiceStatus(status)
   })
-  void scheduleSelectedLocalServiceProbe(runtimeSettings)
+  void scheduleSelectedLocalServiceProbe()
   sessionCoordinator.onSnapshot((snapshot) => {
     if (snapshot.liveSession?.status === 'stopped_unexpectedly' || snapshot.ptt.error) {
       diagnosticsService.setLatestFailedSession(snapshot)
@@ -232,7 +223,7 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<AppR
     pttHotkeyController,
     speechRuntime,
     transcriptDatabase,
-    getSettings: () => runtimeSettings.getCachedSettings(),
+    getSettings: () => runtimeSettings.getSettings(),
     shutdown: async () => {
       pttHotkeyController.dispose()
       pttHudService.dispose()

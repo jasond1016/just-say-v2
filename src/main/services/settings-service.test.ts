@@ -83,12 +83,9 @@ describe('SettingsService', () => {
     })
   })
 
-  it('resolves runtime config using stored settings and provider hooks', async () => {
+  it('resolves runtime config using explicit credentials and platform hooks', async () => {
     const repository = new InMemorySettingsRepository()
     const service = new SettingsService(repository, {
-      credentialsProvider: () => ({
-        translationApiKey: 'translation-secret'
-      }),
       platformProvider: () => ({
         localServiceAvailable: true
       })
@@ -100,7 +97,11 @@ describe('SettingsService', () => {
       }
     })
 
-    await expect(service.resolveRuntimeConfig('meeting')).resolves.toMatchObject({
+    await expect(
+      service.resolveRuntimeConfig('meeting', {
+        translationApiKey: 'translation-secret'
+      })
+    ).resolves.toMatchObject({
       engineProfile: {
         id: 'local-fast'
       },
@@ -112,13 +113,13 @@ describe('SettingsService', () => {
 
   it('resolves runtime config for an explicitly requested profile', async () => {
     const repository = new InMemorySettingsRepository()
-    const service = new SettingsService(repository, {
-      credentialsProvider: () => ({
+    const service = new SettingsService(repository)
+
+    await expect(
+      service.resolveProfileRuntimeConfig('cloud-low-cost', 'meeting', {
         cloudApiKey: 'cloud-secret'
       })
-    })
-
-    await expect(service.resolveProfileRuntimeConfig('cloud-low-cost', 'meeting')).resolves.toMatchObject({
+    ).resolves.toMatchObject({
       engineProfile: {
         id: 'cloud-low-cost'
       }
@@ -138,16 +139,12 @@ describe('SettingsService', () => {
     )
   })
 
-  it('marks translation credentials as configured when the provider supplies an API key', async () => {
-    const service = new SettingsService(new InMemorySettingsRepository(), {
-      credentialsProvider: () => ({
-        translationApiKey: 'translation-secret'
-      })
-    })
+  it('does not project credential configuration onto persisted settings reads', async () => {
+    const service = new SettingsService(new InMemorySettingsRepository())
 
     await expect(service.getSettings()).resolves.toMatchObject({
       translation: {
-        apiKeyConfigured: true
+        apiKeyConfigured: false
       }
     })
   })

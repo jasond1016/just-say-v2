@@ -2,7 +2,7 @@ import type { AppSettings, SettingsPatch, TranslationCredentialsInput } from '..
 import { IPC_CHANNELS } from './channels'
 
 export type SettingsHandlerService = {
-  getSettings(): Promise<AppSettings>
+  getSettings(): AppSettings | Promise<AppSettings>
   updateSettings(patch: SettingsPatch): Promise<AppSettings>
   saveTranslationCredentials?(input: TranslationCredentialsInput): Promise<AppSettings>
 }

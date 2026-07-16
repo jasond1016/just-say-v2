@@ -14,7 +14,6 @@ import {
 } from '../../core/settings/settings-resolver'
 
 export type SettingsServiceOptions = {
-  credentialsProvider?: () => ResolverCredentials | undefined
   platformProvider?: () => Partial<PlatformCapabilities> | undefined
 }
 
@@ -29,12 +28,12 @@ export class SettingsService {
   async getSettings(): Promise<AppSettings> {
     const stored = await this.repository.get()
     const normalized = stored ? normalizeSettings(stored) : createDefaultSettings()
-    return this.applyCredentialState(normalizeExposedSettings(normalized))
+    return normalizeExposedSettings(normalized)
   }
 
   async updateSettings(patch: SettingsPatch): Promise<AppSettings> {
     const current = await this.getSettings()
-    const next = this.applyCredentialState(normalizeExposedSettings(applySettingsPatch(current, patch)))
+    const next = normalizeExposedSettings(applySettingsPatch(current, patch))
     await this.repository.save(next)
     this.emitChanged(next)
     return next
@@ -48,38 +47,11 @@ export class SettingsService {
     }
   }
 
-  async resolveRuntimeConfig(
-    mode: SessionMode,
-    credentialsOverride?: ResolverCredentials
-  ): Promise<ResolvedRuntimeConfig> {
-    const settings = await this.getSettings()
-    return this.resolveRuntimeConfigForSettings(settings, mode, credentialsOverride)
-  }
-
-  async resolveProfileRuntimeConfig(
-    profileId: string,
-    mode: SessionMode
-  ): Promise<ResolvedRuntimeConfig> {
-    const settings = await this.getSettings()
-
-    return this.resolveRuntimeConfigForSettings(
-      {
-        ...settings,
-        speech: {
-          ...settings.speech,
-          selectedProfileId: profileId
-        }
-      },
-      mode
-    )
-  }
-
-  private resolveRuntimeConfigForSettings(
+  resolveFromSettings(
     settings: AppSettings,
     mode: SessionMode,
-    credentialsOverride?: ResolverCredentials
+    credentials?: ResolverCredentials
   ): ResolvedRuntimeConfig {
-    const credentials = credentialsOverride ?? this.options.credentialsProvider?.()
     const platform = this.options.platformProvider?.()
 
     return resolveRuntimeConfig({
@@ -90,16 +62,32 @@ export class SettingsService {
     })
   }
 
-  private applyCredentialState(settings: AppSettings): AppSettings {
-    const credentials = this.options.credentialsProvider?.()
+  async resolveRuntimeConfig(
+    mode: SessionMode,
+    credentials?: ResolverCredentials
+  ): Promise<ResolvedRuntimeConfig> {
+    const settings = await this.getSettings()
+    return this.resolveFromSettings(settings, mode, credentials)
+  }
 
-    return {
-      ...settings,
-      translation: {
-        ...settings.translation,
-        apiKeyConfigured: Boolean(credentials?.translationApiKey)
-      }
-    }
+  async resolveProfileRuntimeConfig(
+    profileId: string,
+    mode: SessionMode,
+    credentials?: ResolverCredentials
+  ): Promise<ResolvedRuntimeConfig> {
+    const settings = await this.getSettings()
+
+    return this.resolveFromSettings(
+      {
+        ...settings,
+        speech: {
+          ...settings.speech,
+          selectedProfileId: profileId
+        }
+      },
+      mode,
+      credentials
+    )
   }
 
   private emitChanged(settings: AppSettings): void {

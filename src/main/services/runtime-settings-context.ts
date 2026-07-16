@@ -11,6 +11,7 @@ import type { SessionMode } from '../../shared/primitive-types'
 import type { StoredCredentials } from '../persistence/credentials-repository'
 import { getEnvironmentCredentials } from './environment-credentials-provider'
 import type { SettingsService } from './settings-service'
+import type { RuntimeConfigResolver } from './speech-runtime'
 
 export type SettingsProvider = {
   getSettings(): AppSettings
@@ -25,7 +26,6 @@ export type CredentialsRepository = {
 export type RuntimeSettingsContextOptions = {
   settingsService: SettingsService
   credentialsRepository: CredentialsRepository
-  onDeploymentSignatureChange?: () => void | Promise<void>
 }
 
 export class RuntimeSettingsContext {
@@ -34,11 +34,12 @@ export class RuntimeSettingsContext {
   private cachedRuntimeConfigs: Partial<Record<SessionMode, ResolvedRuntimeConfig>> = {}
   private cachedRuntimeConfigErrors: Partial<Record<SessionMode, Error>> = {}
   private readonly settingsListeners = new Set<(settings: AppSettings) => void>()
+  private readonly deploymentSignatureListeners = new Set<() => void | Promise<void>>()
+  private ignoreExternalSettingsChanged = false
 
   private constructor(
     private readonly settingsService: SettingsService,
     private readonly credentialsRepository: CredentialsRepository,
-    private readonly onDeploymentSignatureChange?: () => void | Promise<void>,
     initial: {
       settings: AppSettings
       storedCredentials: StoredCredentials
@@ -49,15 +50,10 @@ export class RuntimeSettingsContext {
   }
 
   static async create(options: RuntimeSettingsContextOptions): Promise<RuntimeSettingsContext> {
-    const context = new RuntimeSettingsContext(
-      options.settingsService,
-      options.credentialsRepository,
-      options.onDeploymentSignatureChange,
-      {
-        settings: await options.settingsService.getSettings(),
-        storedCredentials: (await options.credentialsRepository.get()) ?? {}
-      }
-    )
+    const context = new RuntimeSettingsContext(options.settingsService, options.credentialsRepository, {
+      settings: await options.settingsService.getSettings(),
+      storedCredentials: (await options.credentialsRepository.get()) ?? {}
+    })
 
     await context.refreshCache()
     options.settingsService.onChanged(() => {
@@ -70,6 +66,11 @@ export class RuntimeSettingsContext {
     return this.cachedSettings
   }
 
+  /** Projected Runtime Settings — same view as getCachedSettings. */
+  getSettings(): AppSettings {
+    return this.cachedSettings
+  }
+
   createSettingsProvider(): SettingsProvider {
     return {
       getSettings: () => this.cachedSettings,
@@ -77,20 +78,30 @@ export class RuntimeSettingsContext {
     }
   }
 
-  async getSettings(): Promise<AppSettings> {
-    return this.settingsService.getSettings()
+  createRuntimeConfigResolver(): RuntimeConfigResolver {
+    return {
+      resolveRuntimeConfig: async (mode) => this.resolveCachedRuntimeConfig(mode),
+      resolveProfileRuntimeConfig: async (profileId, mode) =>
+        this.resolveProfileFromCache(profileId, mode)
+    }
   }
 
   async updateSettings(patch: SettingsPatch): Promise<AppSettings> {
     const previousDeploymentSignature = getLocalServiceSettingsSignature(this.cachedSettings)
-    const updated = await this.settingsService.updateSettings(patch)
+    this.ignoreExternalSettingsChanged = true
+    try {
+      await this.settingsService.updateSettings(patch)
+    } finally {
+      this.ignoreExternalSettingsChanged = false
+    }
     await this.refreshCache()
+    this.notifySettingsChanged(this.cachedSettings)
 
     if (getLocalServiceSettingsSignature(this.cachedSettings) !== previousDeploymentSignature) {
-      await this.onDeploymentSignatureChange?.()
+      await this.notifyDeploymentSignatureChanged()
     }
 
-    return updated
+    return this.cachedSettings
   }
 
   async saveTranslationCredentials(input: TranslationCredentialsInput): Promise<AppSettings> {
@@ -100,9 +111,8 @@ export class RuntimeSettingsContext {
     })
     this.cachedStoredCredentials = (await this.credentialsRepository.get()) ?? {}
     await this.refreshCache()
-    const settings = await this.settingsService.getSettings()
-    this.notifySettingsChanged(settings)
-    return settings
+    this.notifySettingsChanged(this.cachedSettings)
+    return this.cachedSettings
   }
 
   onChanged(listener: (settings: AppSettings) => void): () => void {
@@ -110,6 +120,14 @@ export class RuntimeSettingsContext {
 
     return () => {
       this.settingsListeners.delete(listener)
+    }
+  }
+
+  onDeploymentSignatureChange(listener: () => void | Promise<void>): () => void {
+    this.deploymentSignatureListeners.add(listener)
+
+    return () => {
+      this.deploymentSignatureListeners.delete(listener)
     }
   }
 
@@ -133,15 +151,23 @@ export class RuntimeSettingsContext {
   }
 
   private async handleExternalSettingsChanged(): Promise<void> {
+    if (this.ignoreExternalSettingsChanged) {
+      return
+    }
+
+    const previousDeploymentSignature = getLocalServiceSettingsSignature(this.cachedSettings)
     await this.refreshCache()
     this.notifySettingsChanged(this.cachedSettings)
+
+    if (getLocalServiceSettingsSignature(this.cachedSettings) !== previousDeploymentSignature) {
+      await this.notifyDeploymentSignatureChanged()
+    }
   }
 
   private async refreshCache(): Promise<void> {
     this.cachedStoredCredentials = (await this.credentialsRepository.get()) ?? {}
     const credentials = this.getRuntimeCredentials()
     const settings = await this.settingsService.getSettings()
-    // Use context credentials so bootstrap works before create-runtime rebinds credentialsProvider.
     this.cachedSettings = {
       ...settings,
       translation: {
@@ -155,7 +181,7 @@ export class RuntimeSettingsContext {
 
     for (const mode of ['ptt', 'meeting'] as const) {
       try {
-        nextRuntimeConfigs[mode] = await this.settingsService.resolveRuntimeConfig(mode, credentials)
+        nextRuntimeConfigs[mode] = this.settingsService.resolveFromSettings(settings, mode, credentials)
       } catch (errorLike) {
         nextRuntimeConfigErrors[mode] =
           errorLike instanceof Error ? errorLike : new Error(`Could not resolve ${mode} runtime config`)
@@ -164,6 +190,19 @@ export class RuntimeSettingsContext {
 
     this.cachedRuntimeConfigs = nextRuntimeConfigs
     this.cachedRuntimeConfigErrors = nextRuntimeConfigErrors
+  }
+
+  private resolveProfileFromCache(profileId: string, mode: SessionMode): ResolvedRuntimeConfig {
+    const credentials = this.getRuntimeCredentials()
+    const settings: AppSettings = {
+      ...this.cachedSettings,
+      speech: {
+        ...this.cachedSettings.speech,
+        selectedProfileId: profileId
+      }
+    }
+
+    return this.settingsService.resolveFromSettings(settings, mode, credentials)
   }
 
   private resolveCachedRuntimeConfig(mode: SessionMode): ResolvedRuntimeConfig {
@@ -185,6 +224,12 @@ export class RuntimeSettingsContext {
   private notifySettingsChanged(settings: AppSettings): void {
     for (const listener of this.settingsListeners) {
       listener(settings)
+    }
+  }
+
+  private async notifyDeploymentSignatureChanged(): Promise<void> {
+    for (const listener of this.deploymentSignatureListeners) {
+      await listener()
     }
   }
 }

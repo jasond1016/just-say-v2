@@ -24,7 +24,8 @@ describe('RuntimeSettingsContext', () => {
 
   it('refreshes coordinator cache and triggers deployment changes after settings updates', async () => {
     const onDeploymentSignatureChange = vi.fn()
-    const context = await createContext({ onDeploymentSignatureChange })
+    const context = await createContext()
+    context.onDeploymentSignatureChange(onDeploymentSignatureChange)
     const provider = context.createSettingsProvider()
 
     await context.updateSettings({
@@ -41,7 +42,8 @@ describe('RuntimeSettingsContext', () => {
 
   it('does not trigger deployment changes for unrelated settings updates', async () => {
     const onDeploymentSignatureChange = vi.fn()
-    const context = await createContext({ onDeploymentSignatureChange })
+    const context = await createContext()
+    context.onDeploymentSignatureChange(onDeploymentSignatureChange)
 
     await context.updateSettings({
       general: {
@@ -65,27 +67,32 @@ describe('RuntimeSettingsContext', () => {
         translationApiKey: 'translation-secret'
       }
     })
+    expect(context.getSettings().translation.apiKeyConfigured).toBe(true)
+  })
+
+  it('resolves profile checks from the cached Runtime Settings snapshot', async () => {
+    const context = await createContext()
+    const resolver = context.createRuntimeConfigResolver()
+
+    await expect(resolver.resolveProfileRuntimeConfig('local-fast', 'meeting')).resolves.toMatchObject({
+      engineProfile: {
+        id: 'local-fast'
+      }
+    })
   })
 })
 
 async function createContext(
   overrides: {
-    onDeploymentSignatureChange?: () => void | Promise<void>
     credentialsRepository?: ReturnType<typeof createCredentialsRepository>
   } = {}
 ) {
   const credentialsRepository = overrides.credentialsRepository ?? createCredentialsRepository()
-  const settingsService = new SettingsService(new InMemorySettingsRepository(), {
-    credentialsProvider: () => {
-      const stored = credentialsRepository.store
-      return stored.translationApiKey ? { translationApiKey: stored.translationApiKey } : undefined
-    }
-  })
+  const settingsService = new SettingsService(new InMemorySettingsRepository())
 
   return RuntimeSettingsContext.create({
     settingsService,
-    credentialsRepository,
-    onDeploymentSignatureChange: overrides.onDeploymentSignatureChange
+    credentialsRepository
   })
 }
 

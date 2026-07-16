@@ -3,7 +3,7 @@ import type { HotkeyService } from '../platform/hotkey-service'
 import type { SessionCoordinator } from './session-coordinator'
 
 export interface HotkeySettingsProvider {
-  getSettings(): Promise<AppSettings>
+  getSettings(): AppSettings | Promise<AppSettings>
   onChanged(listener: (settings: AppSettings) => void): () => void
 }
 
