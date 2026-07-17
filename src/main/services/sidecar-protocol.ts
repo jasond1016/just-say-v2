@@ -15,18 +15,37 @@ export interface WebSocketLike {
   close(): void
 }
 
-export type LocalServiceProtocolClientOptions = {
+export type SidecarProtocolOptions = {
   webSocketFactory?: (url: string) => WebSocketLike
   healthTimeoutMs?: number
+  connectTimeoutMs?: number
 }
 
-export class LocalServiceProtocolClient {
+export type SidecarSessionStreamHandlers = {
+  onMessage: (message: LocalServiceServerMessage) => void
+  onError?: (message: string) => void
+  onClose?: (info: { opened: boolean }) => void
+}
+
+export type SidecarSessionStream = {
+  send: (message: LocalServiceClientMessage) => void
+  close: () => void
+}
+
+/**
+ * Deep module for Managed Local / Remote Service WebSocket framing:
+ * short request/response (health, prewarm) and long-lived recognition streams.
+ * One sidecar instance remains one Runtime Family (ADR-0001); Prewarm stays explicit.
+ */
+export class SidecarProtocol {
   private readonly webSocketFactory: (url: string) => WebSocketLike
   private readonly healthTimeoutMs: number
+  private readonly connectTimeoutMs: number
 
-  constructor(options: LocalServiceProtocolClientOptions = {}) {
+  constructor(options: SidecarProtocolOptions = {}) {
     this.webSocketFactory = options.webSocketFactory ?? defaultWebSocketFactory
     this.healthTimeoutMs = options.healthTimeoutMs ?? 10_000
+    this.connectTimeoutMs = options.connectTimeoutMs ?? 5_000
   }
 
   async healthCheck(
@@ -67,6 +86,80 @@ export class LocalServiceProtocolClient {
     }
 
     return parseHealthStatusResponse(response, fallbackIdentity)
+  }
+
+  async openSessionStream(
+    url: string,
+    handlers: SidecarSessionStreamHandlers
+  ): Promise<SidecarSessionStream> {
+    const socket = this.webSocketFactory(url)
+    let isOpen = false
+    let hasSettled = false
+    let closed = false
+
+    const waitForOpen = new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        hasSettled = true
+        socket.close()
+        reject(new Error('Timed out waiting for local engine websocket to connect'))
+      }, this.connectTimeoutMs)
+
+      const settle = (callback: () => void) => {
+        if (hasSettled) {
+          return
+        }
+
+        hasSettled = true
+        clearTimeout(timeout)
+        callback()
+      }
+
+      socket.addEventListener('open', () => {
+        isOpen = true
+        settle(resolve)
+      })
+      socket.addEventListener('error', (event) => {
+        const message = normalizeSocketErrorMessage(event)
+        handlers.onError?.(message)
+
+        if (!isOpen) {
+          settle(() => reject(new Error(message)))
+        }
+      })
+      socket.addEventListener('close', () => {
+        if (!isOpen) {
+          settle(() => reject(new Error('Local engine websocket closed before connecting')))
+          return
+        }
+
+        if (closed) {
+          return
+        }
+
+        handlers.onClose?.({ opened: true })
+      })
+    })
+
+    socket.addEventListener('message', (event) => {
+      handlers.onMessage(JSON.parse(event.data) as LocalServiceServerMessage)
+    })
+
+    try {
+      await waitForOpen
+    } catch (error) {
+      socket.close()
+      throw error
+    }
+
+    return {
+      send(message: LocalServiceClientMessage) {
+        socket.send(JSON.stringify(message))
+      },
+      close() {
+        closed = true
+        socket.close()
+      }
+    }
   }
 }
 
@@ -139,9 +232,13 @@ function parseHealthStatusResponse(
 }
 
 function normalizeSocketError(errorLike: unknown): Error {
+  return new Error(normalizeSocketErrorMessage(errorLike))
+}
+
+function normalizeSocketErrorMessage(errorLike: unknown): string {
   if (errorLike instanceof Error) {
-    return errorLike
+    return errorLike.message
   }
 
-  return new Error('Local service websocket request failed')
+  return 'Local service websocket request failed'
 }

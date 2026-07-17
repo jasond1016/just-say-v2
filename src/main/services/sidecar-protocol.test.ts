@@ -4,12 +4,12 @@ import type {
   LocalServiceClientMessage,
   LocalServiceServerMessage
 } from '../../shared/local-service-types'
-import { LocalServiceProtocolClient } from './local-service-protocol-client'
 import { getDefaultLocalServiceCapabilities } from './python-local-service-controller'
+import { SidecarProtocol } from './sidecar-protocol'
 
-describe('LocalServiceProtocolClient', () => {
+describe('SidecarProtocol', () => {
   it('parses health-check responses into runtime identity results', async () => {
-    const client = new LocalServiceProtocolClient({
+    const protocol = new SidecarProtocol({
       webSocketFactory: createFakeWebSocketFactory([
         {
           type: 'health-status',
@@ -23,7 +23,7 @@ describe('LocalServiceProtocolClient', () => {
     })
 
     await expect(
-      client.healthCheck('ws://127.0.0.1:8765', {
+      protocol.healthCheck('ws://127.0.0.1:8765', {
         runtimeFamilyId: 'sensevoice',
         modelIdentifier: 'iic/SenseVoiceSmall'
       })
@@ -36,7 +36,7 @@ describe('LocalServiceProtocolClient', () => {
   })
 
   it('follows prewarm-complete with a health check', async () => {
-    const client = new LocalServiceProtocolClient({
+    const protocol = new SidecarProtocol({
       webSocketFactory: createFakeWebSocketFactory([
         { type: 'prewarm-complete', runtimeFamilyId: 'qwen3-asr', modelIdentifier: 'Qwen3-ASR' },
         {
@@ -51,7 +51,7 @@ describe('LocalServiceProtocolClient', () => {
     })
 
     await expect(
-      client.prewarm(
+      protocol.prewarm(
         'ws://127.0.0.1:8765',
         { mode: 'meeting', language: 'auto' },
         {
@@ -68,7 +68,7 @@ describe('LocalServiceProtocolClient', () => {
   })
 
   it('returns structured failures for unexpected protocol responses', async () => {
-    const client = new LocalServiceProtocolClient({
+    const protocol = new SidecarProtocol({
       webSocketFactory: createFakeWebSocketFactory([
         {
           type: 'session-ready',
@@ -78,7 +78,7 @@ describe('LocalServiceProtocolClient', () => {
     })
 
     await expect(
-      client.healthCheck('ws://127.0.0.1:8765', {
+      protocol.healthCheck('ws://127.0.0.1:8765', {
         runtimeFamilyId: 'sensevoice',
         modelIdentifier: 'iic/SenseVoiceSmall'
       })
@@ -92,6 +92,71 @@ describe('LocalServiceProtocolClient', () => {
         responseType: 'session-ready'
       }
     })
+  })
+
+  it('opens a long-lived session stream for recognition messages', async () => {
+    const socket = createStreamFakeSocket({ autoOpen: true })
+    const protocol = new SidecarProtocol({
+      webSocketFactory: () => socket
+    })
+    const onMessage = vi.fn()
+
+    const stream = await protocol.openSessionStream('ws://127.0.0.1:8765', {
+      onMessage
+    })
+
+    stream.send({
+      type: 'start-session',
+      sessionId: 'session-1',
+      mode: 'ptt',
+      language: 'auto',
+      translationEnabled: false
+    })
+
+    expect(socket.sentMessages).toEqual([
+      {
+        type: 'start-session',
+        sessionId: 'session-1',
+        mode: 'ptt',
+        language: 'auto',
+        translationEnabled: false
+      }
+    ])
+
+    socket.emitMessage({
+      type: 'session-ready',
+      sessionId: 'session-1'
+    })
+
+    expect(onMessage).toHaveBeenCalledWith({
+      type: 'session-ready',
+      sessionId: 'session-1'
+    })
+  })
+
+  it('waits for the websocket to open before resolving the session stream', async () => {
+    const socket = createStreamFakeSocket({ autoOpen: false })
+    const protocol = new SidecarProtocol({
+      webSocketFactory: () => socket
+    })
+    let resolved = false
+
+    const openPromise = protocol
+      .openSessionStream('ws://127.0.0.1:8765', {
+        onMessage: vi.fn()
+      })
+      .then(() => {
+        resolved = true
+      })
+
+    await vi.waitFor(() => {
+      expect(socket.openListenerCount()).toBe(1)
+    })
+    expect(resolved).toBe(false)
+
+    socket.emitOpen()
+    await openPromise
+    expect(resolved).toBe(true)
   })
 })
 
@@ -147,4 +212,50 @@ function createFakeWebSocketFactory(responses: LocalServiceServerMessage[]) {
       }
     }
   })
+}
+
+function createStreamFakeSocket(options: { autoOpen: boolean }) {
+  const listeners = {
+    open: [] as Array<() => void>,
+    message: [] as Array<(event: { data: string }) => void>,
+    error: [] as Array<(event: unknown) => void>,
+    close: [] as Array<() => void>
+  }
+  const sentMessages: LocalServiceClientMessage[] = []
+
+  const socket = {
+    sentMessages,
+    addEventListener(type: keyof typeof listeners, listener: never) {
+      listeners[type].push(listener)
+    },
+    send(data: string) {
+      sentMessages.push(JSON.parse(data) as LocalServiceClientMessage)
+    },
+    close() {
+      for (const listener of listeners.close) {
+        listener()
+      }
+    },
+    openListenerCount() {
+      return listeners.open.length
+    },
+    emitOpen() {
+      for (const listener of listeners.open) {
+        listener()
+      }
+    },
+    emitMessage(message: LocalServiceServerMessage) {
+      for (const listener of listeners.message) {
+        listener({ data: JSON.stringify(message) })
+      }
+    }
+  }
+
+  if (options.autoOpen) {
+    queueMicrotask(() => {
+      socket.emitOpen()
+    })
+  }
+
+  return socket
 }

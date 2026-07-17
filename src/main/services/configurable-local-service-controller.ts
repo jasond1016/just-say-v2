@@ -3,9 +3,9 @@ import type { AppErrorPayload, ResolvedLocalServiceConfig } from '../../shared/a
 import {
   createLocalServiceUrl,
   defaultWebSocketFactory,
-  LocalServiceProtocolClient,
+  SidecarProtocol,
   type WebSocketLike
-} from './local-service-protocol-client'
+} from './sidecar-protocol'
 import { PythonLocalServiceController } from './python-local-service-controller'
 import type { LocalServiceController, LocalServiceHealthResult } from './local-service-supervisor'
 import type { SessionMode } from '../../shared/primitive-types'
@@ -145,7 +145,7 @@ export class ConfigurableLocalServiceController implements LocalServiceControlle
 }
 
 export class RemoteLocalServiceController implements LocalServiceController {
-  private readonly protocol: LocalServiceProtocolClient
+  private readonly protocol: SidecarProtocol
 
   constructor(
     private readonly options: RemoteLocalServiceConfig & {
@@ -153,7 +153,7 @@ export class RemoteLocalServiceController implements LocalServiceController {
       webSocketFactory?: (url: string) => WebSocketLike
     }
   ) {
-    this.protocol = new LocalServiceProtocolClient({
+    this.protocol = new SidecarProtocol({
       webSocketFactory: options.webSocketFactory ?? defaultWebSocketFactory,
       healthTimeoutMs: options.healthTimeoutMs ?? 10_000
     })

@@ -9,16 +9,16 @@ import type { SessionMode } from '../../shared/primitive-types'
 import {
   createLocalServiceUrl,
   defaultWebSocketFactory,
-  LocalServiceProtocolClient,
+  SidecarProtocol,
   type WebSocketLike
-} from './local-service-protocol-client'
+} from './sidecar-protocol'
 
-export type { WebSocketLike } from './local-service-protocol-client'
+export type { WebSocketLike } from './sidecar-protocol'
 export {
   createLocalServiceUrl,
   defaultWebSocketFactory,
   sendLocalServiceRequest
-} from './local-service-protocol-client'
+} from './sidecar-protocol'
 
 interface LocalServiceReadable {
   on(event: 'data', listener: (chunk: string | Buffer) => void): void
@@ -63,7 +63,7 @@ export class PythonLocalServiceController implements LocalServiceController {
   private readonly healthTimeoutMs: number
   private readonly spawn: SpawnLocalServiceProcess
   private readonly terminateProcessTree: ((pid: number) => Promise<void>) | undefined
-  private readonly protocol: LocalServiceProtocolClient
+  private readonly protocol: SidecarProtocol
   private childProcess: SpawnedLocalServiceProcess | null = null
   private stdoutBuffer = ''
   private stderrBuffer = ''
@@ -76,7 +76,7 @@ export class PythonLocalServiceController implements LocalServiceController {
     this.spawn = options.spawn ?? defaultSpawnLocalServiceProcess
     this.terminateProcessTree =
       options.terminateProcessTree ?? (process.platform === 'win32' ? terminateWindowsProcessTree : undefined)
-    this.protocol = new LocalServiceProtocolClient({
+    this.protocol = new SidecarProtocol({
       webSocketFactory: options.webSocketFactory ?? defaultWebSocketFactory,
       healthTimeoutMs: this.healthTimeoutMs
     })
