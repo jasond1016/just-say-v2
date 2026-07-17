@@ -1,29 +1,48 @@
 # JustSay V2
 
-This repository is the clean-slate V2 rebuild of JustSay.
+Desktop voice workstation: fast push-to-talk dictation and stable live meeting transcription.
 
-## Purpose
+Product intent and design principles: see [`PRODUCT.md`](PRODUCT.md).
 
-V2 is not an incremental refactor of V1. It is a fresh implementation built around:
+## Layout
 
-1. a unified speech-to-text core
-2. explicit session state machines
-3. a single transcript reducer
-4. a clean Electron runtime boundary
+| Path | Role |
+|------|------|
+| `src/core` | Domain core — session, transcript, settings, runtime (Electron-free) |
+| `src/main` | Electron main — IPC, engines, sidecar supervisors, platform, persistence |
+| `src/preload` | Preload bridges |
+| `src/renderer` | UI, capture, pages |
+| `src/shared` | Shared types/utilities |
+| `native/windows-hotkey-helper` | Global hotkey helper (Go) — **not** an ASR sidecar |
 
-## Starting Point
+ASR runs through sidecar protocol clients in main (one **Runtime Family** per sidecar). Domain language: [`CONTEXT.md`](CONTEXT.md). Sidecar shape: [`docs/adr/0001-runtime-specific-asr-sidecars.md`](docs/adr/0001-runtime-specific-asr-sidecars.md).
 
-Read these documents first:
+## Starting point
 
-1. `docs/rebuild-v2-blueprint.md`
-2. `docs/rebuild-v2-technical-design.md`
+Read in this order:
 
-## Repository Status
+1. [`PRODUCT.md`](PRODUCT.md) — users, purpose, design principles
+2. [`CONTEXT.md`](CONTEXT.md) — Engine Profile vs Runtime Family and related terms
+3. [`AGENTS.md`](AGENTS.md) — agent skills, issue tracker, triage labels
 
-This repo currently contains:
+Design background (not a current-status guide):
 
-1. the V2 design docs
-2. the target folder structure
-3. the first code skeleton files
+- [`docs/rebuild-v2-blueprint.md`](docs/rebuild-v2-blueprint.md)
+- [`docs/rebuild-v2-technical-design.md`](docs/rebuild-v2-technical-design.md)
 
-Implementation should begin from `src/core`, then `src/main/ipc`, then the first PTT vertical slice.
+## How to run
+
+```bash
+pnpm install
+pnpm test
+pnpm typecheck
+pnpm dev
+```
+
+## Status
+
+This repo is an implemented, testable Electron + React + TypeScript codebase (pnpm). Run `pnpm test` for the current vitest suite.
+
+## Branch
+
+Active work is on `refactor/improve-codebase-architecture` until it lands on `main`.
