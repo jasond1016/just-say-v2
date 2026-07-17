@@ -4,7 +4,10 @@ import type { RecognitionEngine, RecognitionEvent } from '../../core/contracts/e
 import { profileCatalog } from '../../core/settings/profile-catalog'
 import type { CaptureEvent, ResolvedRuntimeConfig } from '../../shared/api-types'
 import type { CaptureWindowService } from '../platform/capture-window-service'
-import { RecognitionSessionBridge } from './recognition-session-bridge'
+import {
+  normalizeRecognitionError,
+  RecognitionSessionBridge
+} from './recognition-session-bridge'
 
 describe('RecognitionSessionBridge', () => {
   it('pushes matching audio chunks to the bound engine and optional side handler', () => {
@@ -123,7 +126,51 @@ describe('RecognitionSessionBridge', () => {
     bridge.dispose()
   })
 
-  it('starts and stops capture through the bound Recognition Session', async () => {
+  it('builds start-session input with translation settings from runtime config', async () => {
+    const capture = createCaptureService()
+    const bridge = new RecognitionSessionBridge(capture as unknown as CaptureWindowService)
+    const engine = createEngine()
+
+    bridge.bind({
+      engine: engine as unknown as RecognitionEngine,
+      sessionId: 'session-1',
+      handlers: {
+        onEngineEvent: vi.fn(),
+        onCaptureEvent: vi.fn()
+      }
+    })
+
+    await bridge.start({
+      mode: 'meeting',
+      sources: ['system', 'microphone'],
+      runtimeConfig: createRuntimeConfig({
+        translationConfig: {
+          provider: 'openai-compatible',
+          targetLanguage: 'en',
+          sourceLanguage: 'auto',
+          credentials: { translationApiKey: 'test-key' }
+        }
+      }),
+      startCapture: false
+    })
+
+    expect(engine.startSessionCalls).toEqual([
+      {
+        sessionId: 'session-1',
+        mode: 'meeting',
+        sources: ['system', 'microphone'],
+        language: 'auto',
+        translation: {
+          enabled: false,
+          targetLanguage: 'en'
+        }
+      }
+    ])
+
+    bridge.dispose()
+  })
+
+  it('starts ptt sessions through startSession then capture', async () => {
     const capture = createCaptureService()
     const bridge = new RecognitionSessionBridge(capture as unknown as CaptureWindowService)
     const engine = createEngine()
@@ -140,10 +187,20 @@ describe('RecognitionSessionBridge', () => {
     await bridge.start({
       mode: 'ptt',
       sources: ['microphone'],
-      runtimeConfig: createRuntimeConfig(),
+      runtimeConfig: createRuntimeConfig({
+        engineConfig: {
+          mode: 'ptt',
+          profileId: 'local-fast',
+          preset: 'local-fast',
+          language: 'auto',
+          diagnosticsEnabled: true,
+          experimentalFlags: []
+        }
+      }),
       microphoneDeviceId: 'mic-1'
     })
 
+    expect(engine.warmupCalls).toEqual([])
     expect(engine.startSessionCalls).toHaveLength(1)
     expect(capture.startCaptureCalls).toEqual([
       {
@@ -160,13 +217,133 @@ describe('RecognitionSessionBridge', () => {
 
     bridge.dispose()
   })
+
+  it('starts meeting sessions with explicit warmup before capture', async () => {
+    const capture = createCaptureService()
+    const bridge = new RecognitionSessionBridge(capture as unknown as CaptureWindowService)
+    const engine = createEngine()
+
+    bridge.bind({
+      engine: engine as unknown as RecognitionEngine,
+      sessionId: 'meeting-1',
+      handlers: {
+        onEngineEvent: vi.fn(),
+        onCaptureEvent: vi.fn()
+      }
+    })
+
+    await bridge.start({
+      mode: 'meeting',
+      sources: ['system'],
+      runtimeConfig: createRuntimeConfig(),
+      explicitWarmup: true,
+      startCapture: true
+    })
+
+    expect(engine.warmupCalls).toEqual([{ mode: 'meeting', language: 'auto' }])
+    expect(engine.startSessionCalls).toHaveLength(1)
+    expect(capture.startCaptureCalls).toHaveLength(1)
+
+    bridge.dispose()
+  })
+
+  it('can restart meeting engine sessions without restarting capture', async () => {
+    const capture = createCaptureService()
+    const bridge = new RecognitionSessionBridge(capture as unknown as CaptureWindowService)
+    const engine = createEngine()
+
+    bridge.bind({
+      engine: engine as unknown as RecognitionEngine,
+      sessionId: 'meeting-1',
+      handlers: {
+        onEngineEvent: vi.fn(),
+        onCaptureEvent: vi.fn()
+      }
+    })
+
+    await bridge.start({
+      mode: 'meeting',
+      sources: ['system', 'microphone'],
+      runtimeConfig: createRuntimeConfig(),
+      microphoneDeviceId: 'mic-1',
+      explicitWarmup: true,
+      startCapture: false
+    })
+
+    expect(engine.startSessionCalls).toHaveLength(1)
+    expect(capture.startCaptureCalls).toEqual([])
+
+    bridge.dispose()
+  })
+
+  it('aborts engine and capture best-effort', async () => {
+    const capture = createCaptureService()
+    const bridge = new RecognitionSessionBridge(capture as unknown as CaptureWindowService)
+    const engine = createEngine()
+
+    bridge.bind({
+      engine: engine as unknown as RecognitionEngine,
+      sessionId: 'session-1',
+      handlers: {
+        onEngineEvent: vi.fn(),
+        onCaptureEvent: vi.fn()
+      }
+    })
+
+    await bridge.abort()
+
+    expect(engine.abortSessionCalls).toBe(1)
+    expect(capture.abortCaptureCalls).toEqual(['session-1'])
+
+    bridge.dispose()
+  })
+
+  it('can abort only the engine during recovery', async () => {
+    const capture = createCaptureService()
+    const bridge = new RecognitionSessionBridge(capture as unknown as CaptureWindowService)
+    const engine = createEngine()
+
+    bridge.bind({
+      engine: engine as unknown as RecognitionEngine,
+      sessionId: 'session-1',
+      handlers: {
+        onEngineEvent: vi.fn(),
+        onCaptureEvent: vi.fn()
+      }
+    })
+
+    await bridge.abort({ abortCapture: false })
+
+    expect(engine.abortSessionCalls).toBe(1)
+    expect(capture.abortCaptureCalls).toEqual([])
+
+    bridge.dispose()
+  })
+
+  it('normalizes structured recognition errors', () => {
+    expect(
+      normalizeRecognitionError(
+        Object.assign(new Error('boom'), {
+          payload: {
+            code: 'E_ENGINE_UNAVAILABLE',
+            message: 'Engine down',
+            retryable: true
+          }
+        })
+      )
+    ).toEqual({
+      code: 'E_ENGINE_UNAVAILABLE',
+      message: 'Engine down',
+      retryable: true
+    })
+  })
 })
 
-function createRuntimeConfig(): ResolvedRuntimeConfig {
+function createRuntimeConfig(overrides: Partial<ResolvedRuntimeConfig> = {}): ResolvedRuntimeConfig {
   return {
     engineProfile: profileCatalog[0]!,
     engineConfig: {
-      mode: 'ptt',
+      mode: 'meeting',
       profileId: 'local-fast',
       preset: 'local-fast',
       language: 'auto',
@@ -179,7 +356,8 @@ function createRuntimeConfig(): ResolvedRuntimeConfig {
     },
     outputConfig: {
       method: 'simulate_input'
-    }
+    },
+    ...overrides
   }
 }
 
