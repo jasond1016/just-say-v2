@@ -51,11 +51,11 @@ export function createLeaseConflictError(
         ? 'A PTT session is already active'
         : 'Another recognition session is already active'
 
-  return Object.assign(new Error(message), {
-    payload: {
-      code: 'E_CAPTURE_UNAVAILABLE',
-      message,
-      retryable: false
-    }
-  })
+  const payload: AppErrorPayload = {
+    code: 'E_CAPTURE_UNAVAILABLE',
+    message,
+    retryable: false
+  }
+
+  return Object.assign(new Error(message), { payload })
 }

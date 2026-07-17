@@ -5,6 +5,7 @@ import type {
   LocalServiceServerMessage
 } from '../../shared/local-service-types'
 import { LocalServiceProtocolClient } from './local-service-protocol-client'
+import { getDefaultLocalServiceCapabilities } from './python-local-service-controller'
 
 describe('LocalServiceProtocolClient', () => {
   it('parses health-check responses into runtime identity results', async () => {
@@ -15,7 +16,8 @@ describe('LocalServiceProtocolClient', () => {
           ok: true,
           runtimeFamilyId: 'sensevoice',
           modelIdentifier: 'iic/SenseVoiceSmall',
-          readiness: 'ready'
+          readiness: 'ready',
+          capabilities: getDefaultLocalServiceCapabilities()
         }
       ])
     })
@@ -36,13 +38,14 @@ describe('LocalServiceProtocolClient', () => {
   it('follows prewarm-complete with a health check', async () => {
     const client = new LocalServiceProtocolClient({
       webSocketFactory: createFakeWebSocketFactory([
-        { type: 'prewarm-complete' },
+        { type: 'prewarm-complete', runtimeFamilyId: 'qwen3-asr', modelIdentifier: 'Qwen3-ASR' },
         {
           type: 'health-status',
           ok: true,
           runtimeFamilyId: 'qwen3-asr',
           modelIdentifier: 'Qwen3-ASR',
-          readiness: 'ready'
+          readiness: 'ready',
+          capabilities: getDefaultLocalServiceCapabilities()
         }
       ])
     })

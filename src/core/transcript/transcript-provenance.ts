@@ -63,7 +63,7 @@ export function buildPttSavedTranscript(input: BuildPttSavedTranscriptInput): Sa
     }),
     ...buildTranslationFields({
       runtimeConfig: input.runtimeConfig,
-      translatedPlainText: input.translatedText ?? undefined
+      ...(input.translatedText ? { translatedPlainText: input.translatedText } : {})
     })
   }
 }
@@ -94,11 +94,11 @@ export function buildMeetingSavedTranscript(input: BuildMeetingSavedTranscriptIn
       runtimeConfig: input.runtimeConfig,
       includeMicrophone: input.includeMicrophone,
       translationEnabled: Boolean(input.runtimeConfig.translationConfig),
-      audio: input.audioMetadata
+      ...(input.audioMetadata !== undefined ? { audio: input.audioMetadata } : {})
     }),
     ...buildTranslationFields({
       runtimeConfig: input.runtimeConfig,
-      translatedPlainText: input.translatedPlainText
+      ...(input.translatedPlainText ? { translatedPlainText: input.translatedPlainText } : {})
     })
   }
 }

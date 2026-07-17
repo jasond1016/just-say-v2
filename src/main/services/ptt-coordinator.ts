@@ -180,11 +180,16 @@ export class PttCoordinator {
     this.pendingStartupFailure = null
     await this.dispatch({ type: 'PTT_HOTKEY_DOWN' })
 
-    if (this.pendingStartupFailure) {
-      const error = this.pendingStartupFailure
-      this.pendingStartupFailure = null
-      throw Object.assign(new Error(error.message), { payload: error })
+    const failure = this.consumePendingStartupFailure()
+    if (failure) {
+      throw Object.assign(new Error(failure.message), { payload: failure })
     }
+  }
+
+  private consumePendingStartupFailure(): AppErrorPayload | null {
+    const failure = this.pendingStartupFailure
+    this.pendingStartupFailure = null
+    return failure
   }
 
   async stop(): Promise<void> {
@@ -488,7 +493,7 @@ export class PttCoordinator {
   }
 
   private async runRecordError(event: PttSessionEvent): Promise<PttEffectResult> {
-    const error =
+    const error: AppErrorPayload =
       (event.type === 'FAILED' || event.type === 'DELIVERY_FAILED') && event.error
         ? event.error
         : {

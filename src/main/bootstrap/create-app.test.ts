@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { createApp } from './create-app'
+import type { SessionService } from '../services/session-service'
+import type { SpeechRuntime } from '../services/speech-runtime'
 
 describe('createApp', () => {
   it('registers IPC handlers and forwards runtime events to the main window', async () => {
@@ -96,6 +98,23 @@ describe('createApp', () => {
       }),
       getAudioPlayback: vi.fn().mockResolvedValue(null),
       delete: vi.fn().mockResolvedValue(false),
+      updateTitle: vi.fn().mockResolvedValue({
+        id: 'tx-1',
+        mode: 'ptt' as const,
+        title: 'Renamed transcript',
+        startedAt: 1000,
+        endedAt: 2000,
+        plainText: '',
+        blocks: [],
+        metadata: {
+          engineProfileId: 'local-fast',
+          runtimeFamilyId: 'sensevoice' as const,
+          modelIdentifier: 'sensevoice-small',
+          deploymentMode: 'managed-local' as const,
+          includeMicrophone: true,
+          translationEnabled: false
+        }
+      }),
       copy: vi.fn().mockResolvedValue(undefined),
       export: vi.fn().mockResolvedValue({ ok: false, error: 'not implemented' })
     }
@@ -124,9 +143,9 @@ describe('createApp', () => {
         }
       },
       services: {
-        sessionService,
+        sessionService: sessionService as unknown as SessionService,
         pttHudService,
-        speechService,
+        speechService: speechService as unknown as SpeechRuntime,
         historyService,
         settingsService,
         diagnosticsService

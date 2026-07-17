@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { SessionDispatchLoop } from './session-dispatch'
+import { SessionDispatchLoop, type SessionEffectResult } from './session-dispatch'
 
 type TestStatus = 'idle' | 'running' | 'error'
 type TestEvent =
@@ -64,9 +64,9 @@ describe('SessionDispatchLoop', () => {
         }
         throw new Error(`invalid: ${current} ${event.type}`)
       },
-      runEffect: async (effect) => {
+      runEffect: async (effect): Promise<SessionEffectResult<TestEvent>> => {
         if (effect === 'fail') {
-          return { failed: { code: 'E_TEST', message: 'boom', retryable: true } }
+          return { failed: { code: 'E_ENGINE_UNAVAILABLE', message: 'boom', retryable: true } }
         }
         return {}
       },
@@ -80,7 +80,7 @@ describe('SessionDispatchLoop', () => {
     expect(onEffectFailed).toHaveBeenCalledWith({
       effect: 'fail',
       event: { type: 'START' },
-      failed: { code: 'E_TEST', message: 'boom', retryable: true }
+      failed: { code: 'E_ENGINE_UNAVAILABLE', message: 'boom', retryable: true }
     })
     expect(status).toBe('error')
   })

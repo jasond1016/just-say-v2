@@ -189,11 +189,16 @@ export class MeetingCoordinator {
     this.pendingStartupFailure = null
     await this.dispatch({ type: 'START_REQUESTED' })
 
-    if (this.pendingStartupFailure) {
-      const error = this.pendingStartupFailure
-      this.pendingStartupFailure = null
-      throw Object.assign(new Error(error.message), { payload: error })
+    const failure = this.consumePendingStartupFailure()
+    if (failure) {
+      throw Object.assign(new Error(failure.message), { payload: failure })
     }
+  }
+
+  private consumePendingStartupFailure(): AppErrorPayload | null {
+    const failure = this.pendingStartupFailure
+    this.pendingStartupFailure = null
+    return failure
   }
 
   async stop(): Promise<void> {
@@ -225,7 +230,7 @@ export class MeetingCoordinator {
     void this.dispatch({
       type: 'FAILED',
       error: {
-        code: 'E_CAPTURE_PROCESS_GONE',
+        code: 'E_CAPTURE_UNAVAILABLE',
         message: 'The capture process crashed unexpectedly',
         retryable: false
       }

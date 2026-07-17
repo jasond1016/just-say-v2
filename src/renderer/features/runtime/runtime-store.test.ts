@@ -131,6 +131,7 @@ describe('RuntimeStore', () => {
       }),
       getHistoryAudioPlayback: async () => null,
       deleteHistory: async () => false,
+      updateHistoryTitle: async (id, title) => createSavedTranscript(id, title),
       copyHistory: async () => undefined,
       exportHistory: async () => ({ ok: false, error: 'not implemented' }),
       exportDiagnostics: async () => ({ ok: false, error: 'not implemented' })
@@ -199,6 +200,7 @@ describe('RuntimeStore', () => {
       }),
       getHistoryAudioPlayback: async () => null,
       deleteHistory: async () => false,
+      updateHistoryTitle: async (id, title) => createSavedTranscript(id, title),
       copyHistory: async () => undefined,
       exportHistory: async () => ({ ok: false, error: 'not implemented' }),
       exportDiagnostics: async () => ({ ok: false, error: 'not implemented' })
@@ -216,6 +218,29 @@ describe('RuntimeStore', () => {
     expect(store.getSnapshot()).toEqual(nextSnapshot)
   })
 })
+
+function createSavedTranscript(
+  id: string,
+  title: string
+): import('../../../shared/api-types').SavedTranscript {
+  return {
+    id,
+    mode: 'meeting',
+    title,
+    startedAt: 1,
+    endedAt: 2,
+    plainText: 'hello',
+    blocks: [],
+    metadata: {
+      engineProfileId: 'local-fast',
+      runtimeFamilyId: 'sensevoice',
+      modelIdentifier: 'iic/SenseVoiceSmall',
+      deploymentMode: 'managed-local',
+      includeMicrophone: true,
+      translationEnabled: false
+    }
+  }
+}
 
 function createSettings(): import('../../../shared/api-types').AppSettings {
   return {

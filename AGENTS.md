@@ -11,3 +11,7 @@ Use the default five-label vocabulary: `needs-triage`, `needs-info`, `ready-for-
 ### Domain docs
 
 This repo uses a single-context layout. See `docs/agents/domain.md`.
+
+### Type bar
+
+Keep `pnpm typecheck` green, forbid explicit `any` in `src/` (`pnpm check:no-explicit-any`), and hold `pnpm type-coverage` at ≥99.5%.

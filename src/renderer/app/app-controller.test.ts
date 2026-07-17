@@ -468,7 +468,7 @@ describe('AppController', () => {
   })
 
   it('deletes multiple history items through the API and refreshes the archive', async () => {
-    const deleteHistory = vi.fn(async () => true)
+    const deleteHistory = vi.fn(async (_id: string) => true)
     let historyItems = [createHistoryItem('tx-1', 'meeting'), createHistoryItem('tx-2', 'meeting')]
     const listHistory = vi.fn(async (query?: { mode?: string }) => {
       if (query?.mode === 'ptt') {
@@ -631,9 +631,9 @@ function createApi(overrides: Partial<AppApi> & {
         blocks: [],
         metadata: {
           engineProfileId: 'local-fast',
-          runtimeFamilyId: 'sensevoice',
+          runtimeFamilyId: 'sensevoice' as const,
           modelIdentifier: 'iic/SenseVoiceSmall',
-          deploymentMode: 'managed-local',
+          deploymentMode: 'managed-local' as const,
           includeMicrophone: true,
           translationEnabled: false
         }

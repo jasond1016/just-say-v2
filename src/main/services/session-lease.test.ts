@@ -22,7 +22,7 @@ describe('session-lease', () => {
         status: 'streaming',
         startedAt: 1,
         durationSec: 0,
-        transcript: { committedBlocks: [], activeDrafts: [], revision: 0 },
+        transcript: { committedBlocks: [], activeDrafts: {}, revision: 0 },
         engineProfileId: 'local-fast',
         translationEnabled: false
       })
@@ -39,7 +39,7 @@ describe('session-lease', () => {
           status: 'streaming',
           startedAt: 1,
           durationSec: 0,
-          transcript: { committedBlocks: [], activeDrafts: [], revision: 0 },
+          transcript: { committedBlocks: [], activeDrafts: {}, revision: 0 },
           engineProfileId: 'local-fast',
           translationEnabled: false
         }

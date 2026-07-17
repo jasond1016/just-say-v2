@@ -10,7 +10,9 @@
     "start": "electron .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "type-coverage": "type-coverage --project tsconfig.json --at-least 99.5 --detail --strict",
+    "check:no-explicit-any": "node scripts/check-no-explicit-any.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
@@ -21,6 +23,7 @@
     "lucide-react": "^1.21.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "type-coverage": "^2.29.7",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"
   },

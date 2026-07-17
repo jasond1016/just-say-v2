@@ -36,8 +36,12 @@ Design background (not a current-status guide):
 pnpm install
 pnpm test
 pnpm typecheck
+pnpm type-coverage
+pnpm check:no-explicit-any
 pnpm dev
 ```
+
+Type bar: `pnpm typecheck` must stay green; no explicit `any` in `src/`; `pnpm type-coverage` at least 99.5%.
 
 ## Status
 

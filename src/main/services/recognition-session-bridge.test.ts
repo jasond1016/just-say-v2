@@ -27,12 +27,24 @@ describe('RecognitionSessionBridge', () => {
     capture.emit({
       type: 'audio-chunk',
       requestId: 'session-1',
-      chunk: { pcm16: new Int16Array([1, 2]), sampleRate: 16000 }
+      chunk: {
+        source: 'microphone',
+        data: new Uint8Array([1, 2]),
+        sampleRate: 16000,
+        channels: 1,
+        timestamp: 0
+      }
     })
     capture.emit({
       type: 'audio-chunk',
       requestId: 'other',
-      chunk: { pcm16: new Int16Array([3]), sampleRate: 16000 }
+      chunk: {
+        source: 'microphone',
+        data: new Uint8Array([3]),
+        sampleRate: 16000,
+        channels: 1,
+        timestamp: 0
+      }
     })
     capture.emit({
       type: 'capture-started',
@@ -96,7 +108,10 @@ describe('RecognitionSessionBridge', () => {
     await bridge.abort({ abortCapture: false })
     bridge.rebind(second as unknown as RecognitionEngine)
 
-    first.emit({ type: 'warning', payload: { message: 'stale', recoverable: true } })
+    first.emit({
+      type: 'warning',
+      payload: { code: 'E_ENGINE_PROTOCOL', message: 'stale', recoverable: true }
+    })
     second.emit({ type: 'session-ready' })
 
     expect(bridge.sessionId).toBe('meeting-1')

@@ -21,7 +21,10 @@ describe('recognition-session-runtime', () => {
         sources: ['system', 'microphone'],
         runtimeConfig: createRuntimeConfig({
           translationConfig: {
-            targetLanguage: 'en'
+            provider: 'openai-compatible',
+            targetLanguage: 'en',
+            sourceLanguage: 'auto',
+            credentials: { translationApiKey: 'test-key' }
           }
         })
       })
@@ -197,7 +200,7 @@ function createRuntimeConfig(
 function createEngine() {
   const listeners = new Set<(event: RecognitionEvent) => void>()
 
-  return {
+  const engine = {
     warmupCalls: [] as Array<{ mode: 'ptt' | 'meeting'; language: string }>,
     startSessionCalls: [] as Array<unknown>,
     abortSessionCalls: 0,
@@ -219,16 +222,14 @@ function createEngine() {
         listener(event)
       }
     }
-  } satisfies Pick<RecognitionEngine, 'warmup' | 'startSession' | 'abortSession' | 'onEvent'> & {
-    warmupCalls: Array<{ mode: 'ptt' | 'meeting'; language: string }>
-    startSessionCalls: Array<unknown>
-    abortSessionCalls: number
-    emit(event: RecognitionEvent): void
   }
+
+  // Test double only implements the subset of RecognitionEngine exercised here.
+  return engine as unknown as RecognitionEngine & typeof engine
 }
 
 function createCaptureWindowService() {
-  return {
+  const service = {
     startCaptureCalls: [] as Array<Record<string, unknown>>,
     abortCaptureCalls: [] as Array<string | undefined>,
     async startCapture(input: Record<string, unknown>) {
@@ -241,8 +242,8 @@ function createCaptureWindowService() {
       this.abortCaptureCalls.push(sessionId)
       return true
     }
-  } satisfies Pick<CaptureWindowService, 'startCapture' | 'abortCapture'> & {
-    startCaptureCalls: Array<Record<string, unknown>>
-    abortCaptureCalls: Array<string | undefined>
   }
+
+  // Test double only implements the subset of CaptureWindowService exercised here.
+  return service as unknown as CaptureWindowService & typeof service
 }

@@ -42,7 +42,7 @@ function createSnapshot(): AppRuntimeSnapshot {
         committedBlocks: [],
         activeDrafts: {
           system: {
-            blockId: 'draft-1',
+            id: 'draft-1',
             source: 'system',
             stableText: 'hello',
             previewText: 'hello wor',

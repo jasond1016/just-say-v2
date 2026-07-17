@@ -221,7 +221,7 @@ function SessionStopButton(props: {
       disabled={props.disabled}
       onClick={props.onStop}
     >
-      <Square {...appIconProps(12, 'session-action-btn__icon')} fill="currentColor" strokeWidth={0} />
+      <Square {...appIconProps(14, 'session-action-btn__icon')} fill="currentColor" strokeWidth={0} />
       {props.busyAction === 'meeting-stop' ? t.sessionStopBusy : t.sessionStop}
     </button>
   )
