@@ -25,6 +25,7 @@ import {
   RecognitionSessionBridge,
   type RecognitionCaptureControlEvent
 } from './recognition-session-bridge'
+import { prepareRecognitionSession } from './prepare-recognition-session'
 
 export type PttRuntimeSnapshot = {
   status:
@@ -261,49 +262,48 @@ export class PttCoordinator {
 
   private async runPrepareCaptureRequest(): Promise<PttEffectResult> {
     const settings = this.dependencies.settingsProvider.getSettings()
-    const runtimeConfig = this.dependencies.settingsProvider.resolveRuntimeConfig('ptt')
-    const engine = this.dependencies.engineFactory(runtimeConfig)
     const sessionId = this.createSessionId()
     const startedAt = this.now()
 
-    this.activeSession = {
-      sessionId,
-      startedAt,
-      settings,
-      runtimeConfig,
-      engine,
-      stopCapturePromise: null,
-      finalText: null,
-      translatedText: null,
-      committedBlock: null,
-      completion: createCompletionSignal()
-    }
-    this.dependencies.diagnostics?.record({
-      type: 'session-started',
-      timestamp: startedAt,
-      sessionId,
-      mode: 'ptt'
-    })
-
-    this.recognitionSession.bind({
-      engine,
-      sessionId,
-      handlers: {
-        onEngineEvent: (engineEvent) => {
-          void this.handleEngineEvent(engineEvent)
-        },
-        onCaptureEvent: (captureEvent) => {
-          void this.handleCaptureEvent(captureEvent)
-        }
-      }
-    })
-
     try {
-      await this.recognitionSession.start({
+      await prepareRecognitionSession({
+        recognitionSession: this.recognitionSession,
+        settingsProvider: this.dependencies.settingsProvider,
+        engineFactory: this.dependencies.engineFactory,
         mode: 'ptt',
-        sources: ['microphone'],
-        runtimeConfig,
-        microphoneDeviceId: settings.input.microphoneDeviceId
+        sessionId,
+        handlers: {
+          onEngineEvent: (engineEvent) => {
+            void this.handleEngineEvent(engineEvent)
+          },
+          onCaptureEvent: (captureEvent) => {
+            void this.handleCaptureEvent(captureEvent)
+          }
+        },
+        start: {
+          sources: ['microphone'],
+          microphoneDeviceId: settings.input.microphoneDeviceId
+        },
+        onPrepared: ({ runtimeConfig, engine }) => {
+          this.activeSession = {
+            sessionId,
+            startedAt,
+            settings,
+            runtimeConfig,
+            engine,
+            stopCapturePromise: null,
+            finalText: null,
+            translatedText: null,
+            committedBlock: null,
+            completion: createCompletionSignal()
+          }
+          this.dependencies.diagnostics?.record({
+            type: 'session-started',
+            timestamp: startedAt,
+            sessionId,
+            mode: 'ptt'
+          })
+        }
       })
     } catch (errorLike) {
       return { failed: normalizeRecognitionError(errorLike, 'Unknown PTT error') }

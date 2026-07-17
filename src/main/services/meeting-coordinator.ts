@@ -24,6 +24,7 @@ import {
   RecognitionSessionBridge,
   type RecognitionCaptureControlEvent
 } from './recognition-session-bridge'
+import { prepareRecognitionSession } from './prepare-recognition-session'
 
 export type MeetingRuntimeSnapshot = {
   sessionId: string
@@ -278,39 +279,57 @@ export class MeetingCoordinator {
   private async runResolveConfigAndWarmup(): Promise<MeetingEffectResult> {
     const input = this.pendingStartInput
     const settings = this.dependencies.settingsProvider.getSettings()
-    const runtimeConfig = applyMeetingOverrides(
-      this.dependencies.settingsProvider.resolveRuntimeConfig('meeting'),
-      input
-    )
     const includeMicrophone = input.includeMicrophone ?? settings.input.includeMicrophoneInMeeting
-    const engine = this.dependencies.engineFactory(runtimeConfig)
     const sessionId = this.createSessionId()
     const startedAt = this.now()
 
-    this.activeSession = {
-      sessionId,
-      startedAt,
-      runtimeConfig,
-      includeMicrophone,
-      engine,
-      audioRecorder: this.dependencies.audioRecorderFactory?.({
-        sessionId,
-        chunkMs: runtimeConfig.captureConfig.chunkMs
-      }),
-      pendingPersist: null,
-      completion: createCompletionSignal()
-    }
-    this.liveTranscript.reset(sessionId, runtimeConfig)
-    this.dependencies.diagnostics?.record({
-      type: 'session-started',
-      timestamp: startedAt,
-      sessionId,
-      mode: 'meeting'
-    })
-    this.bindRecognitionSession(engine)
-
     try {
-      await this.startSessionRuntime(this.activeSession, settings.input.microphoneDeviceId)
+      await prepareRecognitionSession({
+        recognitionSession: this.recognitionSession,
+        settingsProvider: this.dependencies.settingsProvider,
+        engineFactory: this.dependencies.engineFactory,
+        mode: 'meeting',
+        sessionId,
+        adaptRuntimeConfig: (config) => applyMeetingOverrides(config, input),
+        handlers: {
+          onEngineEvent: (event) => {
+            void this.handleEngineEvent(event)
+          },
+          onCaptureEvent: (event) => {
+            void this.handleCaptureEvent(event)
+          },
+          onAudioChunk: (chunk) => {
+            this.activeSession?.audioRecorder?.appendChunk(chunk)
+          }
+        },
+        start: {
+          sources: getMeetingSources(includeMicrophone),
+          ...(includeMicrophone ? { microphoneDeviceId: settings.input.microphoneDeviceId } : {}),
+          explicitWarmup: true
+        },
+        onPrepared: ({ runtimeConfig, engine }) => {
+          this.activeSession = {
+            sessionId,
+            startedAt,
+            runtimeConfig,
+            includeMicrophone,
+            engine,
+            audioRecorder: this.dependencies.audioRecorderFactory?.({
+              sessionId,
+              chunkMs: runtimeConfig.captureConfig.chunkMs
+            }),
+            pendingPersist: null,
+            completion: createCompletionSignal()
+          }
+          this.liveTranscript.reset(sessionId, runtimeConfig)
+          this.dependencies.diagnostics?.record({
+            type: 'session-started',
+            timestamp: startedAt,
+            sessionId,
+            mode: 'meeting'
+          })
+        }
+      })
     } catch (errorLike) {
       return { failed: normalizeRecognitionError(errorLike, 'Unknown meeting error') }
     }
@@ -622,25 +641,6 @@ export class MeetingCoordinator {
     for (const listener of this.notificationListeners) {
       listener(notification)
     }
-  }
-
-  private bindRecognitionSession(engine: RecognitionEngine): void {
-    const session = this.requireActiveSession()
-    this.recognitionSession.bind({
-      engine,
-      sessionId: session.sessionId,
-      handlers: {
-        onEngineEvent: (event) => {
-          void this.handleEngineEvent(event)
-        },
-        onCaptureEvent: (event) => {
-          void this.handleCaptureEvent(event)
-        },
-        onAudioChunk: (chunk) => {
-          this.activeSession?.audioRecorder?.appendChunk(chunk)
-        }
-      }
-    })
   }
 
   private async startSessionRuntime(
