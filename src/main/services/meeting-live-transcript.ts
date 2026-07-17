@@ -9,6 +9,10 @@ import { cloneTranscriptState } from '../../core/transcript/clone-transcript-sta
 import { transcriptReducer, INITIAL_TRANSCRIPT_STATE } from '../../core/transcript/transcript-reducer'
 import { selectPlainText, selectTranslatedPlainText } from '../../core/transcript/transcript-selectors'
 import type { TranscriptEvent } from '../../core/transcript/transcript-types'
+import {
+  CROSS_SOURCE_NEAR_DUP_WINDOW_MS,
+  isCrossSourceNearDuplicate
+} from './cross-source-near-duplicate'
 import type { TranslationPipeline } from './translation-pipeline'
 
 export type MeetingLiveTranscriptDependencies = {
@@ -65,7 +69,17 @@ export class MeetingLiveTranscript {
     }
 
     switch (event.type) {
-      case 'draft-updated':
+      case 'draft-updated': {
+        const draftText = `${event.payload.stableText}${event.payload.previewText}`
+        if (
+          event.payload.source === 'microphone' &&
+          this.shouldSuppressMicrophoneEcho(session, draftText, event.payload.updatedAt)
+        ) {
+          this.clearMicrophoneDraft(session)
+          this.emitChanged()
+          return true
+        }
+
         this.applyTranscriptEvent(session, {
           type: 'draft-updated',
           payload: event.payload
@@ -75,11 +89,25 @@ export class MeetingLiveTranscript {
           timestamp: this.now(),
           sessionId: session.sessionId,
           source: event.payload.source,
-          chars: `${event.payload.stableText}${event.payload.previewText}`.trim().length
+          chars: draftText.trim().length
         })
         this.emitChanged()
         return true
-      case 'block-committed':
+      }
+      case 'block-committed': {
+        if (
+          event.payload.block.source === 'microphone' &&
+          this.shouldSuppressMicrophoneEcho(
+            session,
+            event.payload.block.text,
+            event.payload.block.endedAt
+          )
+        ) {
+          this.clearMicrophoneDraft(session)
+          this.emitChanged()
+          return true
+        }
+
         this.applyTranscriptEvent(session, {
           type: 'block-committed',
           payload: event.payload
@@ -101,6 +129,7 @@ export class MeetingLiveTranscript {
         }
 
         return true
+      }
       case 'translation-updated':
         this.applyTranscriptEvent(session, {
           type: 'translation-updated',
@@ -167,6 +196,52 @@ export class MeetingLiveTranscript {
 
   private applyTranscriptEvent(session: ActiveLiveTranscript, event: TranscriptEvent): void {
     session.transcript = transcriptReducer(session.transcript, event)
+  }
+
+  private shouldSuppressMicrophoneEcho(
+    session: ActiveLiveTranscript,
+    microphoneText: string,
+    at: number
+  ): boolean {
+    const systemDraft = session.transcript.activeDrafts.system
+    if (systemDraft) {
+      const systemText = `${systemDraft.stableText}${systemDraft.previewText}`
+      const systemAt = systemDraft.updatedAt
+      if (
+        Math.abs(at - systemAt) <= CROSS_SOURCE_NEAR_DUP_WINDOW_MS &&
+        isCrossSourceNearDuplicate(microphoneText, systemText)
+      ) {
+        return true
+      }
+    }
+
+    for (const block of session.transcript.committedBlocks) {
+      if (block.source !== 'system') {
+        continue
+      }
+
+      if (
+        Math.abs(at - block.endedAt) <= CROSS_SOURCE_NEAR_DUP_WINDOW_MS &&
+        isCrossSourceNearDuplicate(microphoneText, block.text)
+      ) {
+        return true
+      }
+    }
+
+    return false
+  }
+
+  private clearMicrophoneDraft(session: ActiveLiveTranscript): void {
+    if (!session.transcript.activeDrafts.microphone) {
+      return
+    }
+
+    const { microphone: _removed, ...rest } = session.transcript.activeDrafts
+    session.transcript = {
+      ...session.transcript,
+      activeDrafts: rest,
+      revision: session.transcript.revision + 1
+    }
   }
 
   private emitChanged(): void {

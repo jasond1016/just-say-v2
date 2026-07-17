@@ -116,6 +116,79 @@ describe('MeetingLiveTranscript', () => {
     expect(live.getSnapshotFields().transcript.committedBlocks).toHaveLength(0)
     expect(live.handleRecognitionEvent({ type: 'session-ready' })).toBe(false)
   })
+
+  it('suppresses microphone blocks that near-duplicate recent system text', () => {
+    const live = new MeetingLiveTranscript()
+    live.reset('meeting-1', createRuntimeConfig())
+
+    live.handleRecognitionEvent({
+      type: 'block-committed',
+      payload: {
+        block: {
+          id: 'sys-1',
+          text: '元々予定になかったところではつくばが新規構築なので 元々の',
+          source: 'system',
+          startedAt: 1000,
+          endedAt: 2000
+        }
+      }
+    })
+
+    expect(
+      live.handleRecognitionEvent({
+        type: 'block-committed',
+        payload: {
+          block: {
+            id: 'mic-1',
+            text: 'でえっと元々予定になかったところではつくばがえっと新規構築なので えっと元々',
+            source: 'microphone',
+            startedAt: 1500,
+            endedAt: 2500
+          }
+        }
+      })
+    ).toBe(true)
+
+    const transcript = live.getTranscript()
+    expect(transcript.committedBlocks).toHaveLength(1)
+    expect(transcript.committedBlocks[0]?.source).toBe('system')
+    expect(transcript.activeDrafts.microphone).toBeUndefined()
+  })
+
+  it('keeps distinct microphone speech beside system audio', () => {
+    const live = new MeetingLiveTranscript()
+    live.reset('meeting-1', createRuntimeConfig())
+
+    live.handleRecognitionEvent({
+      type: 'block-committed',
+      payload: {
+        block: {
+          id: 'sys-1',
+          text: '元々予定になかったところではつくばが新規構築なので',
+          source: 'system',
+          startedAt: 1000,
+          endedAt: 2000
+        }
+      }
+    })
+
+    live.handleRecognitionEvent({
+      type: 'block-committed',
+      payload: {
+        block: {
+          id: 'mic-1',
+          text: '今日の天気はどうですか',
+          source: 'microphone',
+          startedAt: 1500,
+          endedAt: 2500
+        }
+      }
+    })
+
+    const transcript = live.getTranscript()
+    expect(transcript.committedBlocks).toHaveLength(2)
+    expect(transcript.committedBlocks.map((block) => block.source)).toEqual(['system', 'microphone'])
+  })
 })
 
 function createRuntimeConfig(options?: { withTranslation?: boolean }): ResolvedRuntimeConfig {
