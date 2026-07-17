@@ -14,14 +14,11 @@ import type { MeetingTransitionEffect } from '../../core/session/session-machine
 import { transitionMeetingStatus } from '../../core/session/session-machine'
 import type { MeetingSessionEvent } from '../../core/session/session-types'
 import { buildMeetingSavedTranscript } from '../../core/transcript/transcript-provenance'
-import { cloneTranscriptState } from '../../core/transcript/clone-transcript-state'
-import { transcriptReducer, INITIAL_TRANSCRIPT_STATE } from '../../core/transcript/transcript-reducer'
-import { selectPlainText, selectTranslatedPlainText } from '../../core/transcript/transcript-selectors'
-import type { TranscriptEvent } from '../../core/transcript/transcript-types'
 import type { CaptureWindowService } from '../platform/capture-window-service'
 import type { SettingsProvider, TranscriptRepositoryLike } from './ptt-coordinator'
 import type { MeetingAudioRecorderLike } from './meeting-audio-storage'
 import type { TranslationPipeline } from './translation-pipeline'
+import { MeetingLiveTranscript } from './meeting-live-transcript'
 import {
   normalizeRecognitionError,
   RecognitionSessionBridge,
@@ -61,8 +58,6 @@ type MeetingSessionContext = {
   runtimeConfig: ResolvedRuntimeConfig
   includeMicrophone: boolean
   engine: RecognitionEngine
-  transcript: TranscriptState
-  pendingTranslations: Set<Promise<void>>
   audioRecorder: MeetingAudioRecorderLike | undefined
   pendingPersist: PendingPersistContext | null
   completion: {
@@ -74,7 +69,7 @@ type MeetingSessionContext = {
 type PendingPersistContext = {
   endedAt: number
   plainText: string
-  translatedPlainText: string | undefined
+  translatedPlainText?: string
   audioMetadata: TranscriptAudioMetadata | null
 }
 
@@ -95,6 +90,7 @@ export class MeetingCoordinator {
   private readonly notificationListeners = new Set<(notification: RuntimeNotification) => void>()
   private terminalSnapshot: MeetingRuntimeSnapshot | null = null
   private readonly recognitionSession: RecognitionSessionBridge
+  private readonly liveTranscript: MeetingLiveTranscript
   private readonly sessionDispatch: SessionDispatchLoop<MeetingStatus, MeetingSessionEvent, MeetingTransitionEffect>
   private awaitingStopSessionEnd = false
   private recoveryPromise: Promise<void> | null = null
@@ -105,6 +101,15 @@ export class MeetingCoordinator {
     this.createSessionId = dependencies.createSessionId ?? (() => `meeting-${this.now()}`)
     this.recoveryTimeoutMs = dependencies.recoveryTimeoutMs ?? 5_000
     this.recognitionSession = new RecognitionSessionBridge(dependencies.captureWindowService)
+    this.liveTranscript = new MeetingLiveTranscript({
+      ...(dependencies.translationPipeline
+        ? { translationPipeline: dependencies.translationPipeline }
+        : {}),
+      ...(dependencies.diagnostics ? { diagnostics: dependencies.diagnostics } : {}),
+      now: this.now,
+      notify: (notification) => this.notify(notification),
+      onChanged: () => this.emitSnapshot()
+    })
     this.sessionDispatch = new SessionDispatchLoop({
       getStatus: () => this.status,
       setStatus: (status) => {
@@ -135,14 +140,16 @@ export class MeetingCoordinator {
       return this.terminalSnapshot
     }
 
+    const { transcript, translationEnabled } = this.liveTranscript.getSnapshotFields()
+
     return {
       sessionId: this.activeSession.sessionId,
       status: this.status,
       startedAt: this.activeSession.startedAt,
       durationSec: Math.max(0, Math.floor((this.now() - this.activeSession.startedAt) / 1000)),
-      transcript: this.activeSession.transcript,
+      transcript,
       engineProfileId: this.activeSession.runtimeConfig.engineProfile.id,
-      translationEnabled: Boolean(this.activeSession.runtimeConfig.translationConfig),
+      translationEnabled,
       ...(this.error ? { error: { ...this.error } } : {})
     }
   }
@@ -281,8 +288,6 @@ export class MeetingCoordinator {
       runtimeConfig,
       includeMicrophone,
       engine,
-      transcript: INITIAL_TRANSCRIPT_STATE,
-      pendingTranslations: new Set(),
       audioRecorder: this.dependencies.audioRecorderFactory?.({
         sessionId,
         chunkMs: runtimeConfig.captureConfig.chunkMs
@@ -290,6 +295,7 @@ export class MeetingCoordinator {
       pendingPersist: null,
       completion: createCompletionSignal()
     }
+    this.liveTranscript.reset(sessionId, runtimeConfig)
     this.dependencies.diagnostics?.record({
       type: 'session-started',
       timestamp: startedAt,
@@ -353,16 +359,15 @@ export class MeetingCoordinator {
   private async runFinalizeTranscript(): Promise<MeetingEffectResult> {
     const session = this.requireActiveSession()
 
-    await Promise.allSettled([...session.pendingTranslations])
+    await this.liveTranscript.awaitPendingTranslations()
     const endedAt = this.now()
-    const plainText = selectPlainText(session.transcript)
-    const translatedPlainText = selectTranslatedPlainText(session.transcript)
+    const saved = this.liveTranscript.buildSavedTranscriptInput()
     const audioMetadata = await this.finalizeSessionAudio(session, 'complete')
 
     session.pendingPersist = {
       endedAt,
-      plainText,
-      translatedPlainText,
+      plainText: saved.plainText,
+      ...(saved.translatedPlainText ? { translatedPlainText: saved.translatedPlainText } : {}),
       audioMetadata
     }
 
@@ -384,6 +389,7 @@ export class MeetingCoordinator {
     }
 
     const { endedAt, plainText, translatedPlainText, audioMetadata } = pendingPersist
+    const { blocks } = this.liveTranscript.buildSavedTranscriptInput()
 
     try {
       await this.dependencies.transcriptRepository.save(
@@ -394,8 +400,8 @@ export class MeetingCoordinator {
           runtimeConfig: session.runtimeConfig,
           includeMicrophone: session.includeMicrophone,
           plainText,
-          translatedPlainText,
-          blocks: session.transcript.committedBlocks,
+          ...(translatedPlainText ? { translatedPlainText } : {}),
+          blocks,
           audioMetadata
         })
       )
@@ -411,7 +417,7 @@ export class MeetingCoordinator {
       type: 'session-persisted',
       timestamp: endedAt,
       sessionId: session.sessionId,
-      blockCount: session.transcript.committedBlocks.length
+      blockCount: blocks.length
     })
 
     session.pendingPersist = null
@@ -515,47 +521,9 @@ export class MeetingCoordinator {
           }
           return
         case 'draft-updated':
-          this.applyTranscriptEvent(session, {
-            type: 'draft-updated',
-            payload: event.payload
-          })
-          this.dependencies.diagnostics?.record({
-            type: 'draft-received',
-            timestamp: this.now(),
-            sessionId: session.sessionId,
-            source: event.payload.source,
-            chars: `${event.payload.stableText}${event.payload.previewText}`.trim().length
-          })
-          this.emitSnapshot()
-          return
         case 'block-committed':
-          this.applyTranscriptEvent(session, {
-            type: 'block-committed',
-            payload: event.payload
-          })
-          this.dependencies.diagnostics?.record({
-            type: 'block-committed',
-            timestamp: this.now(),
-            sessionId: session.sessionId,
-            blockId: event.payload.block.id,
-            chars: event.payload.block.text.length
-          })
-          this.emitSnapshot()
-
-          if (
-            session.runtimeConfig.translationConfig &&
-            !session.runtimeConfig.engineProfile.capabilities.translation
-          ) {
-            this.startTranslationTask(session, event.payload.block)
-          }
-
-          return
         case 'translation-updated':
-          this.applyTranscriptEvent(session, {
-            type: 'translation-updated',
-            payload: event.payload
-          })
-          this.emitSnapshot()
+          this.liveTranscript.handleRecognitionEvent(event)
           return
         case 'session-ended':
           if (this.awaitingStopSessionEnd) {
@@ -631,13 +599,10 @@ export class MeetingCoordinator {
 
   private cleanupActiveSession(): void {
     this.recognitionSession.clear()
+    this.liveTranscript.clear()
     this.recoveryPromise = null
     this.recoveryReadySignal = null
     this.activeSession = null
-  }
-
-  private applyTranscriptEvent(session: MeetingSessionContext, event: TranscriptEvent): void {
-    session.transcript = reduceTranscript(session.transcript, event)
   }
 
   private emitSnapshot(): void {
@@ -729,14 +694,16 @@ export class MeetingCoordinator {
     session: MeetingSessionContext,
     error: AppErrorPayload | undefined = this.error
   ): MeetingRuntimeSnapshot {
+    const { transcript, translationEnabled } = this.liveTranscript.getSnapshotFields()
+
     return {
       sessionId: session.sessionId,
       status: this.status,
       startedAt: session.startedAt,
       durationSec: Math.max(0, Math.floor((this.now() - session.startedAt) / 1000)),
-      transcript: cloneTranscriptState(session.transcript),
+      transcript,
       engineProfileId: session.runtimeConfig.engineProfile.id,
-      translationEnabled: Boolean(session.runtimeConfig.translationConfig),
+      translationEnabled,
       ...(error ? { error: { ...error } } : {})
     }
   }
@@ -753,70 +720,12 @@ export class MeetingCoordinator {
     await this.recognitionSession.abort()
   }
 
-  private startTranslationTask(
-    session: MeetingSessionContext,
-    block: TranscriptState['committedBlocks'][number]
-  ): void {
-    const task = this.translateCommittedBlock(session, block)
-    session.pendingTranslations.add(task)
-    void task.finally(() => {
-      session.pendingTranslations.delete(task)
-    })
-  }
-
-  private async translateCommittedBlock(
-    session: MeetingSessionContext,
-    block: TranscriptState['committedBlocks'][number]
-  ): Promise<void> {
-    if (!session.runtimeConfig.translationConfig || !this.dependencies.translationPipeline) {
-      this.notify({
-        level: 'warning',
-        message: 'Translation is enabled but no translation pipeline is configured. Continuing without translated text.'
-      })
-      return
-    }
-
-    try {
-      const translation = await this.dependencies.translationPipeline.translateBlock({
-        runtimeConfig: session.runtimeConfig,
-        block
-      })
-
-      if (this.activeSession?.sessionId !== session.sessionId) {
-        return
-      }
-
-      this.applyTranscriptEvent(session, {
-        type: 'translation-updated',
-        payload: translation
-      })
-      this.emitSnapshot()
-    } catch (errorLike) {
-      if (this.activeSession?.sessionId !== session.sessionId) {
-        return
-      }
-
-      this.dependencies.diagnostics?.record({
-        type: 'translation-failed',
-        timestamp: this.now(),
-        sessionId: session.sessionId,
-        reason: errorLike instanceof Error ? errorLike.message : 'Unknown translation failure'
-      })
-      this.notify({
-        level: 'warning',
-        message: 'Translation failed for one transcript block. Continuing with the original transcript.'
-      })
-    }
-  }
-
   private async persistInterruptedSession(session: MeetingSessionContext): Promise<void> {
-    await Promise.allSettled([...session.pendingTranslations])
+    await this.liveTranscript.awaitPendingTranslations()
     const endedAt = this.now()
-    const plainText = selectPlainText(session.transcript)
-    const translatedPlainText = selectTranslatedPlainText(session.transcript)
+    const { plainText, translatedPlainText, blocks } = this.liveTranscript.buildSavedTranscriptInput()
     const audioMetadata = await this.finalizeSessionAudio(session, 'partial')
-    const hasTranscriptContent =
-      plainText.trim().length > 0 || session.transcript.committedBlocks.length > 0
+    const hasTranscriptContent = plainText.trim().length > 0 || blocks.length > 0
 
     if (!hasTranscriptContent && !audioMetadata) {
       return
@@ -831,8 +740,8 @@ export class MeetingCoordinator {
           runtimeConfig: session.runtimeConfig,
           includeMicrophone: session.includeMicrophone,
           plainText,
-          translatedPlainText,
-          blocks: session.transcript.committedBlocks,
+          ...(translatedPlainText ? { translatedPlainText } : {}),
+          blocks,
           audioMetadata
         })
       )
@@ -840,7 +749,7 @@ export class MeetingCoordinator {
         type: 'session-persisted',
         timestamp: endedAt,
         sessionId: session.sessionId,
-        blockCount: session.transcript.committedBlocks.length
+        blockCount: blocks.length
       })
     } catch (error) {
       if (audioMetadata) {
@@ -909,10 +818,6 @@ export class MeetingCoordinator {
       // best effort cleanup of orphaned audio
     }
   }
-}
-
-function reduceTranscript(state: TranscriptState, event: TranscriptEvent): TranscriptState {
-  return transcriptReducer(state, event)
 }
 
 function applyMeetingOverrides(
