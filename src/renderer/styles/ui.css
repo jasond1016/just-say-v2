@@ -1250,7 +1250,7 @@
 
 .session-entry {
   display: grid;
-  grid-template-columns: 80px minmax(0, 1fr) auto;
+  grid-template-columns: 96px minmax(0, 1fr);
   gap: 16px;
   padding: 20px 0;
   border-bottom: 1px solid color-mix(in oklab, var(--border) 40%, transparent);
@@ -1268,17 +1268,29 @@
   background: color-mix(in oklab, var(--accent-muted) 15%, transparent);
 }
 
+.session-entry__meta {
+  display: grid;
+  gap: 4px;
+  padding-top: 2px;
+}
+
 .session-entry__time {
   font-family: var(--font-mono);
   font-size: 13px;
   color: var(--text-tertiary);
   font-variant-numeric: tabular-nums;
-  padding-top: 2px;
   font-style: italic;
 }
 
 .session-entry__time--live {
   color: var(--accent-text);
+}
+
+.session-entry__source {
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--text-tertiary);
+  letter-spacing: 0.01em;
 }
 
 .session-entry__body {

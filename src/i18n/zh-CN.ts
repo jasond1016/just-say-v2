@@ -32,6 +32,8 @@ export const zhCN: Messages = {
   sessionCopyBusy: '复制中...',
   sessionCopyText: '复制文本',
   sessionViewHistory: '查看历史',
+  sourceMicrophone: '麦克风',
+  sourceSystemAudio: '系统音频',
 
   // -- Archive page --
   archiveSearchPlaceholder: '搜索记录内容...',

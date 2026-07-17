@@ -10,7 +10,11 @@ import type {
 import type { CaptureSource, SessionMode } from '../../shared/primitive-types'
 import type { Messages } from '../../i18n'
 
-export function describeCaptureSource(source: CaptureSource): string {
+export function describeCaptureSource(source: CaptureSource, t?: Messages): string {
+  if (t) {
+    return source === 'microphone' ? t.sourceMicrophone : t.sourceSystemAudio
+  }
+
   return source === 'microphone' ? 'Microphone' : 'System audio'
 }
 

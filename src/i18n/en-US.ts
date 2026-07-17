@@ -32,6 +32,8 @@ export const enUS: Messages = {
   sessionCopyBusy: 'Copying...',
   sessionCopyText: 'Copy text',
   sessionViewHistory: 'View history',
+  sourceMicrophone: 'Microphone',
+  sourceSystemAudio: 'System audio',
 
   // -- Archive page --
   archiveSearchPlaceholder: 'Search records...',

@@ -30,6 +30,8 @@ export type Messages = {
   sessionCopyBusy: string
   sessionCopyText: string
   sessionViewHistory: string
+  sourceMicrophone: string
+  sourceSystemAudio: string
 
   // -- Archive page --
   archiveSearchPlaceholder: string
