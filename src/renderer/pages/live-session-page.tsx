@@ -10,7 +10,7 @@ import type {
 } from '../../shared/api-types'
 import { selectVisibleTimeline } from '../../core/transcript/transcript-selectors'
 import { useT } from '../i18n-context'
-import { describeCaptureSource } from '../ui/copy'
+import { CaptureSourceLabel } from '../ui/capture-source-label'
 import { appIconProps } from '../ui/icons'
 import { ArchiveAudioBar } from '../ui/archive-audio-bar'
 import { EditableInlineTitle } from '../ui/editable-inline-title'
@@ -328,17 +328,14 @@ function SessionTranscriptArea(props: {
                       <div className={`session-entry__time ${isDraft ? 'session-entry__time--live' : ''}`}>
                         {formatElapsedTime(item.startedAt)}
                       </div>
-                      <div className="session-entry__source">{describeCaptureSource(item.source, t)}</div>
+                      <CaptureSourceLabel source={item.source} />
                     </div>
                     <div className="session-entry__body">
                       <div className="session-entry__primary">
                         {item.primaryText || '...'}
                       </div>
                       {item.secondaryText ? (
-                        <div className="session-entry__secondary">
-                          <span className="session-entry__translate-icon" aria-hidden="true">↩</span>
-                          {item.secondaryText}
-                        </div>
+                        <div className="session-entry__secondary">{item.secondaryText}</div>
                       ) : null}
                     </div>
                   </article>

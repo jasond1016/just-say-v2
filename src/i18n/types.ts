@@ -32,6 +32,8 @@ export type Messages = {
   sessionViewHistory: string
   sourceMicrophone: string
   sourceSystemAudio: string
+  sourceMicrophoneShort: string
+  sourceSystemAudioShort: string
 
   // -- Archive page --
   archiveSearchPlaceholder: string

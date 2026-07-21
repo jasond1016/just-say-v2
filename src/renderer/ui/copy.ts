@@ -18,6 +18,14 @@ export function describeCaptureSource(source: CaptureSource, t?: Messages): stri
   return source === 'microphone' ? 'Microphone' : 'System audio'
 }
 
+export function describeCaptureSourceShort(source: CaptureSource, t?: Messages): string {
+  if (t) {
+    return source === 'microphone' ? t.sourceMicrophoneShort : t.sourceSystemAudioShort
+  }
+
+  return source === 'microphone' ? 'Mic' : 'System'
+}
+
 export function describeSessionMode(mode: SessionMode): string {
   return mode === 'ptt' ? 'Quick dictation' : 'Live session'
 }

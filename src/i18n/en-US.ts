@@ -34,6 +34,8 @@ export const enUS: Messages = {
   sessionViewHistory: 'View history',
   sourceMicrophone: 'Microphone',
   sourceSystemAudio: 'System audio',
+  sourceMicrophoneShort: 'Mic',
+  sourceSystemAudioShort: 'System',
 
   // -- Archive page --
   archiveSearchPlaceholder: 'Search records...',

@@ -22,6 +22,7 @@ import type {
 import type { CaptureSource } from '../../shared/primitive-types'
 import { Button, TextInput } from '../ui/controls'
 import { ArchiveAudioBar } from '../ui/archive-audio-bar'
+import { CaptureSourceLabel } from '../ui/capture-source-label'
 import { appIconProps } from '../ui/icons'
 import { useT } from '../i18n-context'
 
@@ -590,9 +591,12 @@ export function HistoryPage(props: {
           <section className="archive-detail__transcript">
             <div className="archive-detail__transcript-stack">
               {filteredBlocks.map((block) => (
-                <article key={block.id} className="archive-transcript-entry">
-                  <div className="archive-transcript-entry__time">
-                    {formatRelativeTimestamp(block.startedAt, selectedTranscript.startedAt)}
+                <article key={block.id} className="archive-transcript-entry" data-source={block.source}>
+                  <div className="archive-transcript-entry__meta">
+                    <div className="archive-transcript-entry__time">
+                      {formatRelativeTimestamp(block.startedAt, selectedTranscript.startedAt)}
+                    </div>
+                    <CaptureSourceLabel source={block.source} />
                   </div>
                   <div className="archive-transcript-entry__body">
                     <div className="archive-transcript-entry__primary">

@@ -34,6 +34,8 @@ export const zhCN: Messages = {
   sessionViewHistory: '查看历史',
   sourceMicrophone: '麦克风',
   sourceSystemAudio: '系统音频',
+  sourceMicrophoneShort: '麦克',
+  sourceSystemAudioShort: '系统',
 
   // -- Archive page --
   archiveSearchPlaceholder: '搜索记录内容...',

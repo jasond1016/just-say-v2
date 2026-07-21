@@ -1286,11 +1286,19 @@
   color: var(--accent-text);
 }
 
-.session-entry__source {
+.capture-source-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 11px;
   line-height: 1.3;
   color: var(--text-tertiary);
   letter-spacing: 0.01em;
+}
+
+.capture-source-label__icon {
+  flex-shrink: 0;
+  opacity: 0.9;
 }
 
 .session-entry__body {
@@ -1304,19 +1312,13 @@
   color: var(--text-primary);
 }
 
-.session-entry__secondary {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
+.session-entry__secondary,
+.archive-transcript-entry__secondary {
+  border-left: 2px solid color-mix(in oklab, var(--border) 85%, var(--text-tertiary));
+  padding-left: 10px;
   font-size: 14px;
   line-height: 1.6;
   color: var(--text-secondary);
-}
-
-.session-entry__translate-icon {
-  flex-shrink: 0;
-  color: var(--text-tertiary);
-  font-size: 12px;
 }
 
 .session-transcript__typing {
@@ -1809,12 +1811,18 @@
 
 .archive-transcript-entry {
   display: grid;
-  grid-template-columns: 80px minmax(0, 1fr);
-  gap: 24px;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.archive-transcript-entry__meta {
+  display: grid;
+  gap: 4px;
+  padding-top: 2px;
 }
 
 .archive-transcript-entry__time {
-  padding-top: 2px;
   font-family: var(--font-mono);
   font-size: 13px;
   color: var(--text-tertiary);
@@ -1838,11 +1846,8 @@
 }
 
 .archive-transcript-entry__secondary {
-  font-size: 14px;
-  line-height: 1.7;
-  color: var(--text-tertiary);
   max-width: 72ch;
-  padding-left: 0;
+  line-height: 1.7;
 }
 
 .archive-audio-bar {
