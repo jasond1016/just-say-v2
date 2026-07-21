@@ -13,6 +13,10 @@ import {
   CROSS_SOURCE_NEAR_DUP_WINDOW_MS,
   isCrossSourceNearDuplicate
 } from './cross-source-near-duplicate'
+import {
+  isMicrophoneShortJunkCommit,
+  isMicrophoneShortJunkText
+} from './mic-short-junk'
 import type { TranslationPipeline } from './translation-pipeline'
 
 export type MeetingLiveTranscriptDependencies = {
@@ -71,13 +75,18 @@ export class MeetingLiveTranscript {
     switch (event.type) {
       case 'draft-updated': {
         const draftText = `${event.payload.stableText}${event.payload.previewText}`
-        if (
-          event.payload.source === 'microphone' &&
-          this.shouldSuppressMicrophoneEcho(session, draftText, event.payload.updatedAt)
-        ) {
-          this.clearMicrophoneDraft(session)
-          this.emitChanged()
-          return true
+        if (event.payload.source === 'microphone') {
+          if (this.shouldSuppressMicrophoneEcho(session, draftText, event.payload.updatedAt)) {
+            this.clearMicrophoneDraft(session)
+            this.emitChanged()
+            return true
+          }
+
+          if (isMicrophoneShortJunkText(draftText)) {
+            this.clearMicrophoneDraft(session)
+            this.emitChanged()
+            return true
+          }
         }
 
         this.applyTranscriptEvent(session, {
@@ -95,17 +104,30 @@ export class MeetingLiveTranscript {
         return true
       }
       case 'block-committed': {
-        if (
-          event.payload.block.source === 'microphone' &&
-          this.shouldSuppressMicrophoneEcho(
-            session,
-            event.payload.block.text,
-            event.payload.block.endedAt
-          )
-        ) {
-          this.clearMicrophoneDraft(session)
-          this.emitChanged()
-          return true
+        if (event.payload.block.source === 'microphone') {
+          if (
+            this.shouldSuppressMicrophoneEcho(
+              session,
+              event.payload.block.text,
+              event.payload.block.endedAt
+            )
+          ) {
+            this.clearMicrophoneDraft(session)
+            this.emitChanged()
+            return true
+          }
+
+          if (
+            isMicrophoneShortJunkCommit({
+              text: event.payload.block.text,
+              startedAt: event.payload.block.startedAt,
+              endedAt: event.payload.block.endedAt
+            })
+          ) {
+            this.clearMicrophoneDraft(session)
+            this.emitChanged()
+            return true
+          }
         }
 
         this.applyTranscriptEvent(session, {

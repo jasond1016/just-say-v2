@@ -189,6 +189,80 @@ describe('MeetingLiveTranscript', () => {
     expect(transcript.committedBlocks).toHaveLength(2)
     expect(transcript.committedBlocks.map((block) => block.source)).toEqual(['system', 'microphone'])
   })
+
+  it('drops screenshot-class short microphone junk commits', () => {
+    const live = new MeetingLiveTranscript()
+    live.reset('meeting-1', createRuntimeConfig())
+
+    live.handleRecognitionEvent({
+      type: 'block-committed',
+      payload: {
+        block: {
+          id: 'sys-1',
+          text: 'This is a long system audio segment about the design review.',
+          source: 'system',
+          startedAt: 1000,
+          endedAt: 5000
+        }
+      }
+    })
+
+    for (const [id, text] of [
+      ['mic-oh', '哦'],
+      ['mic-dui', '对'],
+      ['mic-yuan', '原名']
+    ] as const) {
+      live.handleRecognitionEvent({
+        type: 'block-committed',
+        payload: {
+          block: {
+            id,
+            text,
+            source: 'microphone',
+            startedAt: 2000,
+            endedAt: 2800
+          }
+        }
+      })
+    }
+
+    live.handleRecognitionEvent({
+      type: 'block-committed',
+      payload: {
+        block: {
+          id: 'mic-ok',
+          text: '有一次',
+          source: 'microphone',
+          startedAt: 3000,
+          endedAt: 3600
+        }
+      }
+    })
+
+    const transcript = live.getTranscript()
+    expect(transcript.committedBlocks.map((block) => block.id)).toEqual(['sys-1', 'mic-ok'])
+  })
+
+  it('does not apply short-junk gate to system commits', () => {
+    const live = new MeetingLiveTranscript()
+    live.reset('meeting-1', createRuntimeConfig())
+
+    live.handleRecognitionEvent({
+      type: 'block-committed',
+      payload: {
+        block: {
+          id: 'sys-short',
+          text: '对',
+          source: 'system',
+          startedAt: 1000,
+          endedAt: 1100
+        }
+      }
+    })
+
+    expect(live.getTranscript().committedBlocks).toHaveLength(1)
+    expect(live.getTranscript().committedBlocks[0]?.text).toBe('对')
+  })
 })
 
 function createRuntimeConfig(options?: { withTranslation?: boolean }): ResolvedRuntimeConfig {
