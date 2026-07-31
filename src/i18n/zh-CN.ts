@@ -197,10 +197,13 @@ export const zhCN: Messages = {
   // -- Engine profiles --
   profileLocalFast: '本地快速',
   profileLocalAccurate: '本地精准',
+  profileLocalAccurateLite: '本地精准 Lite',
   profileCloudLowLatency: '云端低延迟',
   profileCloudLowCost: '云端低消耗',
   profileSummaryLocalFast: 'SenseVoice 运行时，本地响应最快。',
   profileSummaryLocalAccurate: 'Qwen 1.7B 运行时，准确率更高。Windows 下请使用远程服务（WSL/Docker）后执行检测/加载。',
+  profileSummaryLocalAccurateLite:
+    'Qwen 0.6B 运行时，显存压力更小、准确率仍较强。Windows 下请使用远程服务（WSL/Docker）后执行检测/加载。',
   profileSummaryCloudLowLatency: '云端快速预设，适合对延迟要求较高的场景。',
   profileSummaryCloudLowCost: '云端经济预设，适合较轻量的使用场景。',
   profileTestFailed: '检测失败。',

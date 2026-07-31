@@ -1,8 +1,8 @@
 # JustSay Qwen Local Service
 
-This directory contains the Qwen3-ASR sidecar used by JustSay for the `local-accurate` profile.
+This directory contains the Qwen3-ASR sidecar used by JustSay for the `local-accurate` / `local-accurate-lite` profiles.
 
-The sidecar speaks the same JustSay WebSocket protocol as the SenseVoice service, but it uses **Qwen3-ASR-1.7B + Silero VAD** internally.
+The sidecar speaks the same JustSay WebSocket protocol as the SenseVoice service, but it uses **Qwen3-ASR + Silero VAD** internally. Default weights are **Qwen3-ASR-1.7B**; set `JUSTSAY_LOCAL_SERVICE_MODEL=Qwen/Qwen3-ASR-0.6B` for the lite profile.
 
 ## Supported deployment
 
@@ -45,7 +45,7 @@ The container publishes the sidecar on `127.0.0.1:8765` and persists Hugging Fac
 
 In the Windows client:
 
-- choose **Local Accurate**
+- choose **Local Accurate** (1.7B) or **Local Accurate Lite** (0.6B), matching the model loaded on the host
 - switch **Deployment mode** to **Remote service**
 - set host to `127.0.0.1`
 - set port to `8765`
@@ -74,10 +74,12 @@ Notes:
    export JUSTSAY_LOCAL_SERVICE_MODEL=Qwen/Qwen3-ASR-1.7B
    export JUSTSAY_LOCAL_SERVICE_RUNTIME_FAMILY=qwen3-asr
    export JUSTSAY_QWEN_PREWARM_POLICY=background
-   export JUSTSAY_QWEN_GPU_MEMORY_UTILIZATION=0.9
-   export JUSTSAY_QWEN_MAX_MODEL_LEN=32768
+   export JUSTSAY_QWEN_GPU_MEMORY_UTILIZATION=0.55
+   export JUSTSAY_QWEN_MAX_MODEL_LEN=8192
    uv run --project resources/local-service-qwen python resources/local-service-qwen/service.py
    ```
+
+   For `local-accurate-lite`, use `JUSTSAY_LOCAL_SERVICE_MODEL=Qwen/Qwen3-ASR-0.6B` instead.
 
 4. Open the chosen TCP port on the host firewall.
 
@@ -85,7 +87,7 @@ Notes:
 
 1. Start the Qwen sidecar in WSL/Docker or on another Linux host.
 2. In the Windows client:
-   - choose **Local Accurate**
+   - choose **Local Accurate** or **Local Accurate Lite**, matching the model loaded on the host
    - switch **Deployment mode** to **Remote service**
    - use `127.0.0.1` and the published port for a local WSL/Docker host, or the remote machine IP / hostname for another host
    - run **Check / Load**
@@ -94,5 +96,6 @@ Notes:
 
 - The first successful `Check / Load` may take time because it triggers the explicit Qwen prewarm path.
 - With the default `background` policy, `Check / Load` should usually return quickly once the host has already started warming in the background.
-- On 16 GB GPUs, `JUSTSAY_QWEN_MAX_MODEL_LEN=32768` is a safer default than the vLLM/Qwen default of 65536.
+- Meeting-oriented defaults use `JUSTSAY_QWEN_MAX_MODEL_LEN=8192` and `JUSTSAY_QWEN_GPU_MEMORY_UTILIZATION=0.55` so a 16 GB card keeps headroom for other GPU work. `0.45` is too tight for 1.7B (model weights leave no KV room); raise further only if you need longer context or higher concurrency.
+- If Hugging Face downloads are blocked, set `JUSTSAY_LOCAL_SERVICE_MODEL_PATH` to a local ModelScope/HF snapshot directory while keeping `JUSTSAY_LOCAL_SERVICE_MODEL` as the hub id (`Qwen/Qwen3-ASR-1.7B` or `Qwen/Qwen3-ASR-0.6B`) for client identity matching.
 - Timestamps are intentionally out of scope for this first batch.

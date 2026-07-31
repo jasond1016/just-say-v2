@@ -3,6 +3,7 @@ import type { CaptureSource, SessionMode, WordTiming } from './primitive-types'
 export type EngineProfilePreset =
   | 'local-fast'
   | 'local-accurate'
+  | 'local-accurate-lite'
   | 'cloud-low-latency'
   | 'cloud-low-cost'
 

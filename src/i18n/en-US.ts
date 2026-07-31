@@ -197,10 +197,13 @@ export const enUS: Messages = {
   // -- Engine profiles --
   profileLocalFast: 'Local Fast',
   profileLocalAccurate: 'Local Accurate',
+  profileLocalAccurateLite: 'Local Accurate Lite',
   profileCloudLowLatency: 'Cloud Low Latency',
   profileCloudLowCost: 'Cloud Low Cost',
   profileSummaryLocalFast: 'SenseVoice runtime for the quickest local turnaround.',
   profileSummaryLocalAccurate: 'Qwen 1.7B runtime for higher accuracy. On Windows, use Remote service via WSL/Docker and then run Check / Load.',
+  profileSummaryLocalAccurateLite:
+    'Qwen 0.6B runtime for lighter GPU load with strong accuracy. On Windows, use Remote service via WSL/Docker and then run Check / Load.',
   profileSummaryCloudLowLatency: 'Fast cloud preset when low delay matters most.',
   profileSummaryCloudLowCost: 'Lower-cost cloud preset for lighter workloads.',
   profileTestFailed: 'Check failed.',

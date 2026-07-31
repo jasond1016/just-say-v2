@@ -126,6 +126,29 @@ describe('resolveRuntimeConfig', () => {
     })
   })
 
+  it('allows local-accurate-lite to resolve as managed-local when the platform supports qwen3-asr', () => {
+    const config = resolveRuntimeConfig({
+      settings: {
+        ...DEFAULT_SETTINGS,
+        speech: {
+          ...DEFAULT_SETTINGS.speech,
+          selectedProfileId: 'local-accurate-lite'
+        }
+      },
+      mode: 'meeting',
+      platform: {
+        supportedManagedLocalRuntimes: ['sensevoice', 'qwen3-asr']
+      }
+    })
+
+    expect(config.engineProfile.id).toBe('local-accurate-lite')
+    expect(config.engineConfig.localService).toMatchObject({
+      mode: 'managed-local',
+      runtimeFamilyId: 'qwen3-asr',
+      modelIdentifier: 'Qwen/Qwen3-ASR-0.6B'
+    })
+  })
+
   it('requires remote service for local-accurate when qwen managed-local is not supported on this machine', () => {
     try {
       resolveRuntimeConfig({

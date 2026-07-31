@@ -274,7 +274,7 @@ export type EngineProfile = {
   label: string
   kind: EngineKind
   capabilities: EngineCapabilities
-  preset: 'local-fast' | 'local-accurate' | 'cloud-low-latency' | 'cloud-low-cost'
+  preset: 'local-fast' | 'local-accurate' | 'local-accurate-lite' | 'cloud-low-latency' | 'cloud-low-cost'
 }
 ```
 

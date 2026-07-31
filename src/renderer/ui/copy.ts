@@ -142,6 +142,8 @@ export function describeProfileLabel(profile: EngineProfile, t?: Messages): stri
       return t?.profileLocalFast ?? 'Local Fast'
     case 'local-accurate':
       return t?.profileLocalAccurate ?? 'Local Accurate'
+    case 'local-accurate-lite':
+      return t?.profileLocalAccurateLite ?? 'Local Accurate Lite'
     case 'cloud-low-latency':
       return t?.profileCloudLowLatency ?? 'Cloud Low Latency'
     case 'cloud-low-cost':
@@ -157,6 +159,11 @@ export function describeProfileSummary(profile: EngineProfile, t?: Messages): st
       return t?.profileSummaryLocalFast ?? 'SenseVoice runtime for the quickest local turnaround.'
     case 'local-accurate':
       return t?.profileSummaryLocalAccurate ?? 'Qwen 1.7B runtime for higher accuracy. On Windows, use Remote service via WSL/Docker and then run Check / Load.'
+    case 'local-accurate-lite':
+      return (
+        t?.profileSummaryLocalAccurateLite ??
+        'Qwen 0.6B runtime for lighter GPU load with strong accuracy. On Windows, use Remote service via WSL/Docker and then run Check / Load.'
+      )
     case 'cloud-low-latency':
       return t?.profileSummaryCloudLowLatency ?? 'Fast cloud preset when low delay matters most.'
     case 'cloud-low-cost':
@@ -172,6 +179,8 @@ export function describeProfileId(profileId: string, t?: Messages): string {
       return t?.profileLocalFast ?? 'Local Fast'
     case 'local-accurate':
       return t?.profileLocalAccurate ?? 'Local Accurate'
+    case 'local-accurate-lite':
+      return t?.profileLocalAccurateLite ?? 'Local Accurate Lite'
     case 'cloud-low-latency':
       return t?.profileCloudLowLatency ?? 'Cloud Low Latency'
     case 'cloud-low-cost':

@@ -14,9 +14,11 @@ from websockets.exceptions import ConnectionClosed
 HOST = os.environ.get("JUSTSAY_LOCAL_SERVICE_HOST", "127.0.0.1")
 PORT = int(os.environ.get("JUSTSAY_LOCAL_SERVICE_PORT", "8765"))
 MODEL_NAME = os.environ.get("JUSTSAY_LOCAL_SERVICE_MODEL", "Qwen/Qwen3-ASR-1.7B")
+# Optional local weight path (e.g. ModelScope snapshot). Identity still reports MODEL_NAME.
+MODEL_PATH = os.environ.get("JUSTSAY_LOCAL_SERVICE_MODEL_PATH", MODEL_NAME)
 RUNTIME_FAMILY = os.environ.get("JUSTSAY_LOCAL_SERVICE_RUNTIME_FAMILY", "qwen3-asr")
-GPU_MEMORY_UTILIZATION = float(os.environ.get("JUSTSAY_QWEN_GPU_MEMORY_UTILIZATION", "0.8"))
-MAX_MODEL_LEN = int(os.environ.get("JUSTSAY_QWEN_MAX_MODEL_LEN", "32768"))
+GPU_MEMORY_UTILIZATION = float(os.environ.get("JUSTSAY_QWEN_GPU_MEMORY_UTILIZATION", "0.55"))
+MAX_MODEL_LEN = int(os.environ.get("JUSTSAY_QWEN_MAX_MODEL_LEN", "8192"))
 MAX_NEW_TOKENS = int(os.environ.get("JUSTSAY_QWEN_MAX_NEW_TOKENS", "32"))
 PUSH_MS = int(os.environ.get("JUSTSAY_QWEN_PUSH_MS", "500"))
 END_OF_SPEECH_MS = int(os.environ.get("JUSTSAY_QWEN_END_OF_SPEECH_MS", "600"))
@@ -48,8 +50,9 @@ CAPABILITIES = {
 
 
 class QwenRuntime:
-    def __init__(self, model_name: str) -> None:
+    def __init__(self, model_name: str, model_path: str | None = None) -> None:
         self.model_name = model_name
+        self.model_path = model_path or model_name
         self.model: Any | None = None
         self.backend = "uninitialized"
         self.error: str | None = None
@@ -67,7 +70,7 @@ class QwenRuntime:
 
             self.backend = "vllm"
             self.model = Qwen3ASRModel.LLM(
-                model=self.model_name,
+                model=self.model_path,
                 gpu_memory_utilization=GPU_MEMORY_UTILIZATION,
                 max_model_len=MAX_MODEL_LEN,
                 max_new_tokens=MAX_NEW_TOKENS,
@@ -624,7 +627,7 @@ def split_stable_preview(previous_text: str, current_text: str) -> tuple[str, st
 
 
 async def main() -> None:
-    runtime = QwenRuntime(MODEL_NAME)
+    runtime = QwenRuntime(MODEL_NAME, MODEL_PATH)
     vad_runtime = SileroRuntime()
     service = JustSayQwenService(runtime, vad_runtime, PREWARM_POLICY)
 

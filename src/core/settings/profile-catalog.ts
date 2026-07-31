@@ -34,6 +34,22 @@ export const profileCatalog = [
     }
   },
   {
+    id: 'local-accurate-lite',
+    label: 'Local Accurate Lite',
+    kind: 'local',
+    preset: 'local-accurate-lite',
+    runtimeFamilyId: 'qwen3-asr',
+    modelIdentifier: 'Qwen/Qwen3-ASR-0.6B',
+    capabilities: {
+      streaming: true,
+      translation: false,
+      wordTiming: false,
+      speakerSeparation: false,
+      requiresNetwork: false,
+      requiresLocalService: true
+    }
+  },
+  {
     id: 'cloud-low-latency',
     label: 'Cloud Low Latency',
     kind: 'cloud',

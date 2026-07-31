@@ -6,13 +6,14 @@ Turn the current profile labels into real, comparable ASR runtime selections wit
 
 - `local-fast` -> `SenseVoiceSmall`
 - `local-accurate` -> `Qwen3-ASR-1.7B`
+- `local-accurate-lite` -> `Qwen3-ASR-0.6B`
 
 The target outcome is that JustSay can switch between the two profiles for real A/B comparison while keeping the existing product model intact: one fast profile, one accurate profile, one shared Electron workflow, and deployment mode that stays separate from profile choice.
 
 ## Confirmed decisions
 
 1. `local-fast` stays on the current SenseVoice path.
-2. `local-accurate` uses `Qwen3-ASR-1.7B`.
+2. `local-accurate` uses `Qwen3-ASR-1.7B`; `local-accurate-lite` uses `Qwen3-ASR-0.6B`.
 3. Qwen must use **vLLM + official streaming-style stateful decoding**.
 4. Meeting mode uses **Silero VAD** for utterance boundaries.
 5. PTT does **not** use VAD; key-down/key-up remains the utterance boundary.

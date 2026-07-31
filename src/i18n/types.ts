@@ -195,10 +195,12 @@ export type Messages = {
   // -- Engine profiles --
   profileLocalFast: string
   profileLocalAccurate: string
+  profileLocalAccurateLite: string
   profileCloudLowLatency: string
   profileCloudLowCost: string
   profileSummaryLocalFast: string
   profileSummaryLocalAccurate: string
+  profileSummaryLocalAccurateLite: string
   profileSummaryCloudLowLatency: string
   profileSummaryCloudLowCost: string
   profileTestFailed: string
