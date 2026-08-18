@@ -10,6 +10,8 @@ import type {
 } from '../../shared/api-types'
 import { getProfileById } from './profile-catalog'
 
+export const NATIVE_SENSEVOICE_EXPERIMENTAL_FLAG = 'native-sensevoice'
+
 export const DEFAULT_SETTINGS: AppSettings = {
   general: {
     language: 'zh-CN',

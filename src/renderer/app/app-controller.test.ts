@@ -285,6 +285,7 @@ describe('AppController', () => {
     await controller.setTranslationEndpoint('https://example.test/v1')
     await controller.setTranslationModel('gpt-4o-mini')
     await controller.setLocalServiceMode('remote-service')
+    await controller.setNativeSenseVoiceEnabled(true)
     await controller.setLocalServiceHost('10.0.0.8')
     await controller.setLocalServicePort(9001)
     await controller.setRemoteServiceHost('10.0.0.42')
@@ -304,6 +305,9 @@ describe('AppController', () => {
     expect(updateSettings).toHaveBeenCalledWith({ translation: { endpoint: 'https://example.test/v1' } })
     expect(updateSettings).toHaveBeenCalledWith({ translation: { model: 'gpt-4o-mini' } })
     expect(updateSettings).toHaveBeenCalledWith({ advanced: { localServiceMode: 'remote-service' } })
+    expect(updateSettings).toHaveBeenCalledWith({
+      advanced: { experimentalFlags: ['native-sensevoice'] }
+    })
     expect(updateSettings).toHaveBeenCalledWith({ advanced: { localServiceHost: '10.0.0.8' } })
     expect(updateSettings).toHaveBeenCalledWith({ advanced: { localServicePort: 9001 } })
     expect(updateSettings).toHaveBeenCalledWith({ advanced: { remoteServiceHost: '10.0.0.42' } })
@@ -334,6 +338,7 @@ describe('AppController', () => {
       },
       advanced: {
         localServiceMode: 'remote-service',
+        experimentalFlags: ['native-sensevoice'],
         localServiceHost: '10.0.0.8',
         localServicePort: 9001,
         remoteServiceHost: '10.0.0.42',

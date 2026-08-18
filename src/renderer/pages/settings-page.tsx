@@ -13,6 +13,7 @@ import type {
   TranslationProvider
 } from '../../shared/api-types'
 import type { Messages } from '../../i18n'
+import { NATIVE_SENSEVOICE_EXPERIMENTAL_FLAG } from '../../core/settings/settings-schema'
 import type { SettingsSectionId } from '../app/app-model'
 import { Button, SelectField } from '../ui/controls'
 import {
@@ -62,6 +63,7 @@ export function SettingsPage(props: {
   onTranslationModelChange: (model: string) => void
   onSaveTranslationApiKey: (apiKey: string) => Promise<void>
   onLocalServiceModeChange: (mode: LocalServiceMode) => void
+  onNativeSenseVoiceChange: (enabled: boolean) => void
   onLocalServiceHostChange: (host: string) => void
   onLocalServicePortChange: (port: number | undefined) => void
   onRemoteServiceHostChange: (host: string) => void
@@ -85,6 +87,9 @@ export function SettingsPage(props: {
   const translationEnabled = props.settings.translation.enabledForPtt || props.settings.translation.enabledForMeeting
   const translationApiKeyConfigured = Boolean(props.settings.translation.apiKeyConfigured)
   const localServiceMode = props.settings.advanced.localServiceMode
+  const nativeSenseVoiceEnabled = props.settings.advanced.experimentalFlags.includes(
+    NATIVE_SENSEVOICE_EXPERIMENTAL_FLAG
+  )
   const managedPortValue = draftManagedPort.trim()
   const remotePortValue = draftRemotePort.trim()
   const invalidManagedPort = managedPortValue.length > 0 && !/^\d+$/.test(managedPortValue)
@@ -480,6 +485,14 @@ export function SettingsPage(props: {
 
                   {localServiceMode === 'managed-local' ? (
                     <>
+                      <CardRow label={t.settingsNativeSenseVoice}>
+                        <ToggleSwitch
+                          checked={nativeSenseVoiceEnabled}
+                          disabled={disabled}
+                          onClick={() => props.onNativeSenseVoiceChange(!nativeSenseVoiceEnabled)}
+                        />
+                      </CardRow>
+                      <div className="settings-card__note">{t.settingsNativeSenseVoiceNote}</div>
                       <CardRow label={t.settingsLocalHost}>
                         <input
                           type="text"

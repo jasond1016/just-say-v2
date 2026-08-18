@@ -131,6 +131,8 @@ export const zhCN: Messages = {
   settingsDeployMode: '部署模式',
   settingsDeployLocal: '本地托管',
   settingsDeployRemote: '远程服务',
+  settingsNativeSenseVoice: 'Native SenseVoice（实验）',
+  settingsNativeSenseVoiceNote: '启用 C++/GGUF 实时服务；关闭后使用现有 Python/FunASR 服务。',
   settingsLocalHost: '本地绑定地址',
   settingsLocalPort: '本地绑定端口',
   settingsRemoteHost: '远程服务地址',

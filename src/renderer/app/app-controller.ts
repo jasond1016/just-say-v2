@@ -15,7 +15,10 @@ import type {
   TranslationProvider
 } from '../../shared/api-types'
 import type { CaptureSource } from '../../shared/primitive-types'
-import { createDefaultSettings } from '../../core/settings/settings-schema'
+import {
+  createDefaultSettings,
+  NATIVE_SENSEVOICE_EXPERIMENTAL_FLAG
+} from '../../core/settings/settings-schema'
 import type { AppApi } from '../../preload/api'
 import type { AppSection, SettingsSectionId } from './app-model'
 import { getPreferredSection } from './app-model'
@@ -567,6 +570,17 @@ export class AppController {
       advanced: {
         localServiceMode
       }
+    })
+  }
+
+  async setNativeSenseVoiceEnabled(enabled: boolean): Promise<void> {
+    const currentFlags = this.state.settings.advanced.experimentalFlags
+    const experimentalFlags = enabled
+      ? [...new Set([...currentFlags, NATIVE_SENSEVOICE_EXPERIMENTAL_FLAG])]
+      : currentFlags.filter((flag) => flag !== NATIVE_SENSEVOICE_EXPERIMENTAL_FLAG)
+
+    await this.updateSettings('settings:native-sensevoice', {
+      advanced: { experimentalFlags }
     })
   }
 

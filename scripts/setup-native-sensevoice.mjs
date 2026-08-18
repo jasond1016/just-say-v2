@@ -23,7 +23,20 @@ const patchPath = path.join(
   'patches',
   '0001-justsay-realtime-metadata.patch'
 )
-const cudaEnabled = process.argv.includes('--cuda')
+const forceCuda = process.argv.includes('--cuda')
+const forceCpu = process.argv.includes('--cpu')
+if (forceCuda && forceCpu) {
+  throw new Error('Choose only one native SenseVoice backend override: --cuda or --cpu')
+}
+const cudaDetected =
+  (await commandSucceeds('nvcc', ['--version'])) &&
+  (await commandSucceeds('nvidia-smi', ['--list-gpus']))
+const cudaEnabled = forceCuda || (!forceCpu && cudaDetected)
+const cmakeCommand = await resolveCmakeCommand()
+
+if (!forceCuda && !forceCpu) {
+  console.log(`Auto-detected native backend: ${cudaEnabled ? 'CUDA' : 'CPU'}`)
+}
 
 await mkdir(cacheDir, { recursive: true })
 await prepareSource()
@@ -65,7 +78,7 @@ async function buildServer() {
   await rm(buildDir, { recursive: true, force: true })
   const sourceRuntimeDir = path.join(sourceDir, 'runtime', 'llama.cpp')
   await execFile(
-    'cmake',
+    cmakeCommand,
     [
       '-S',
       sourceRuntimeDir,
@@ -77,7 +90,7 @@ async function buildServer() {
     { cwd: rootDir }
   )
   await execFile(
-    'cmake',
+    cmakeCommand,
     ['--build', buildDir, '--config', 'Release', '--target', 'sensevoice-server', '--parallel'],
     { cwd: rootDir, maxBuffer: 32 * 1024 * 1024 }
   )
@@ -130,4 +143,46 @@ async function exists(filePath) {
   } catch {
     return false
   }
+}
+
+async function commandSucceeds(command, args) {
+  try {
+    await execFile(command, args)
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function resolveCmakeCommand() {
+  if (await commandSucceeds('cmake', ['--version'])) {
+    return 'cmake'
+  }
+
+  if (process.platform === 'win32') {
+    const programFiles = process.env.ProgramFiles ?? 'C:\\Program Files'
+    for (const edition of ['BuildTools', 'Community', 'Professional', 'Enterprise']) {
+      const candidate = path.join(
+        programFiles,
+        'Microsoft Visual Studio',
+        '2022',
+        edition,
+        'Common7',
+        'IDE',
+        'CommonExtensions',
+        'Microsoft',
+        'CMake',
+        'CMake',
+        'bin',
+        'cmake.exe'
+      )
+      if (await exists(candidate)) {
+        return candidate
+      }
+    }
+  }
+
+  throw new Error(
+    'CMake was not found. On Windows, add "C++ CMake tools for Windows" in Visual Studio Installer.'
+  )
 }

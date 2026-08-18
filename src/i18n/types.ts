@@ -129,6 +129,8 @@ export type Messages = {
   settingsDeployMode: string
   settingsDeployLocal: string
   settingsDeployRemote: string
+  settingsNativeSenseVoice: string
+  settingsNativeSenseVoiceNote: string
   settingsLocalHost: string
   settingsLocalPort: string
   settingsRemoteHost: string

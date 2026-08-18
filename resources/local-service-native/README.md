@@ -3,22 +3,25 @@
 This directory is populated by the opt-in native SenseVoice setup:
 
 ```bash
-# CPU build
+# Auto-detect CUDA, otherwise build for CPU
 pnpm setup:native-sensevoice
 
-# CUDA build (requires the CUDA toolkit)
+# Optional overrides
 pnpm setup:native-sensevoice -- --cuda
+pnpm setup:native-sensevoice -- --cpu
 ```
 
 The setup script pins QwenAudio/SenseVoice at commit
 `b054623cca8f015b73ec471dce4f473ac47413da`, applies JustSay's small realtime
 metadata patch, builds `sensevoice-server`, and downloads the Q8 SenseVoiceSmall
 and FSMN-VAD GGUF files. Generated binaries and model files are intentionally
-gitignored.
+gitignored. Automatic CUDA selection requires both `nvcc` (the CUDA toolkit) and
+`nvidia-smi`; the CUDA-enabled server also falls back to CPU at runtime if no
+compatible GPU is available.
 
-Enable the validation runtime by adding `native-sensevoice` to
-`advanced.experimentalFlags` in JustSay's settings. Removing the flag restores
-the existing Python/FunASR Managed Local Service.
+Enable the validation runtime with **Settings → Recognition → Native
+SenseVoice (experimental)**. Turning it off restores the existing Python/FunASR
+Managed Local Service.
 
 The validation scope is PTT and single-source Meeting. A Meeting configured with
 both system audio and microphone is rejected until native dual-source scheduling

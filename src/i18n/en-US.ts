@@ -131,6 +131,8 @@ export const enUS: Messages = {
   settingsDeployMode: 'Deployment mode',
   settingsDeployLocal: 'Managed locally',
   settingsDeployRemote: 'Remote service',
+  settingsNativeSenseVoice: 'Native SenseVoice (experimental)',
+  settingsNativeSenseVoiceNote: 'Uses the C++/GGUF realtime service. Turn off to use the existing Python/FunASR service.',
   settingsLocalHost: 'Local bind address',
   settingsLocalPort: 'Local bind port',
   settingsRemoteHost: 'Remote host',

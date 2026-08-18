@@ -9,7 +9,7 @@ import type {
 } from '../../shared/api-types'
 import type { SessionMode } from '../../shared/primitive-types'
 import { getProfileById, profileCatalog } from './profile-catalog'
-import { normalizeSettings } from './settings-schema'
+import { NATIVE_SENSEVOICE_EXPERIMENTAL_FLAG, normalizeSettings } from './settings-schema'
 
 export type ResolverCredentials = {
   cloudApiKey?: string
@@ -53,7 +53,6 @@ const DEFAULT_CAPTURE_CONFIG: ResolvedRuntimeConfig['captureConfig'] = {
 
 const DEFAULT_LOCAL_SERVICE_HOST = '127.0.0.1'
 const DEFAULT_LOCAL_SERVICE_PORT = 8765
-export const NATIVE_SENSEVOICE_EXPERIMENTAL_FLAG = 'native-sensevoice'
 
 export function resolveRuntimeConfig(input: ResolveRuntimeConfigInput): ResolvedRuntimeConfig {
   const settings = normalizeSettings(input.settings)
