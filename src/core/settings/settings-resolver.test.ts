@@ -35,6 +35,25 @@ describe('resolveRuntimeConfig', () => {
     })
   })
 
+  it('selects the native SenseVoice protocol only when the experimental flag is enabled', () => {
+    const config = resolveRuntimeConfig({
+      settings: {
+        ...DEFAULT_SETTINGS,
+        advanced: {
+          ...DEFAULT_SETTINGS.advanced,
+          experimentalFlags: ['native-sensevoice']
+        }
+      },
+      mode: 'meeting'
+    })
+
+    expect(config.engineConfig.localService).toMatchObject({
+      mode: 'managed-local',
+      runtimeFamilyId: 'sensevoice',
+      protocol: 'openai-realtime'
+    })
+  })
+
   it('enables translation per mode and requires translation credentials', () => {
     const config = resolveRuntimeConfig({
       settings: {

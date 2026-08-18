@@ -53,6 +53,7 @@ const DEFAULT_CAPTURE_CONFIG: ResolvedRuntimeConfig['captureConfig'] = {
 
 const DEFAULT_LOCAL_SERVICE_HOST = '127.0.0.1'
 const DEFAULT_LOCAL_SERVICE_PORT = 8765
+export const NATIVE_SENSEVOICE_EXPERIMENTAL_FLAG = 'native-sensevoice'
 
 export function resolveRuntimeConfig(input: ResolveRuntimeConfigInput): ResolvedRuntimeConfig {
   const settings = normalizeSettings(input.settings)
@@ -115,6 +116,9 @@ function resolveLocalServiceConfig(
   platform: PlatformCapabilities
 ) {
   const runtimeFamilyId = toLocalRuntimeFamilyId(profile.runtimeFamilyId, profile.id)
+  const useNativeSenseVoice =
+    runtimeFamilyId === 'sensevoice' &&
+    settings.advanced.experimentalFlags.includes(NATIVE_SENSEVOICE_EXPERIMENTAL_FLAG)
 
   if (settings.advanced.localServiceMode === 'remote-service') {
     const host = settings.advanced.remoteServiceHost?.trim()
@@ -136,7 +140,8 @@ function resolveLocalServiceConfig(
       host,
       port: settings.advanced.remoteServicePort ?? DEFAULT_LOCAL_SERVICE_PORT,
       runtimeFamilyId,
-      modelIdentifier: profile.modelIdentifier
+      modelIdentifier: profile.modelIdentifier,
+      protocol: 'justsay-sidecar' as const
     }
   }
 
@@ -159,7 +164,8 @@ function resolveLocalServiceConfig(
     host: settings.advanced.localServiceHost ?? DEFAULT_LOCAL_SERVICE_HOST,
     port: settings.advanced.localServicePort ?? DEFAULT_LOCAL_SERVICE_PORT,
     runtimeFamilyId,
-    modelIdentifier: profile.modelIdentifier
+    modelIdentifier: profile.modelIdentifier,
+    protocol: useNativeSenseVoice ? ('openai-realtime' as const) : ('justsay-sidecar' as const)
   }
 }
 

@@ -2,6 +2,7 @@ import type { RecognitionEngine, WarmupInput } from '../../core/contracts/engine
 import type { ResolvedRuntimeConfig } from '../../shared/api-types'
 import type { RuntimeReadinessEstablishmentResult } from '../services/runtime-readiness'
 import { LocalEngineAdapter } from './local-engine-adapter'
+import { SenseVoiceRealtimeEngineAdapter } from './sensevoice-realtime-engine-adapter'
 
 export type CreateRecognitionEngineDependencies = {
   establishReadiness: (input: WarmupInput) => Promise<RuntimeReadinessEstablishmentResult>
@@ -12,6 +13,12 @@ export function createRecognitionEngine(
   dependencies: CreateRecognitionEngineDependencies
 ): RecognitionEngine {
   if (config.engineProfile.kind === 'local') {
+    if (config.engineConfig.localService?.protocol === 'openai-realtime') {
+      return new SenseVoiceRealtimeEngineAdapter(config, {
+        establishReadiness: dependencies.establishReadiness
+      })
+    }
+
     return new LocalEngineAdapter(config, {
       establishReadiness: dependencies.establishReadiness
     })

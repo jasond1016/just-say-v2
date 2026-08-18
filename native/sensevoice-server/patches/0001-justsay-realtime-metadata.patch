@@ -1,0 +1,26 @@
+diff --git a/runtime/llama.cpp/sensevoice-server/sensevoice-server.cpp b/runtime/llama.cpp/sensevoice-server/sensevoice-server.cpp
+index 2351a18..9f74b44 100644
+--- a/runtime/llama.cpp/sensevoice-server/sensevoice-server.cpp
++++ b/runtime/llama.cpp/sensevoice-server/sensevoice-server.cpp
+@@ -682,0 +683 @@ private:
++    int64_t audio_offset_samples_ = 0;  // samples trimmed from the start of this session
+@@ -759,0 +761 @@ private:
++                audio_offset_samples_ += samples_.size();
+@@ -766,0 +769 @@ private:
++        const int64_t event_audio_offset_samples = audio_offset_samples_;
+@@ -769 +772,2 @@ private:
+-                send(ws, ev("input_audio_buffer.speech_started", "\"audio_start_ms\":"+std::to_string(e.start_ms)));
++                send(ws, ev("input_audio_buffer.speech_started", "\"audio_start_ms\":"+
++                    std::to_string(event_audio_offset_samples/16+e.start_ms)));
+@@ -771 +775,2 @@ private:
+-                send(ws, ev("input_audio_buffer.speech_stopped",""));
++                send(ws, ev("input_audio_buffer.speech_stopped",
++                    "\"audio_end_ms\":"+std::to_string(event_audio_offset_samples/16+e.start_ms)));
+@@ -787,0 +793 @@ private:
++            audio_offset_samples_ += dropped;
+@@ -820 +826,2 @@ private:
+-            "\"item_id\":"+json_str(item_id)+",\"delta\":"+json_str(delta)));
++            "\"item_id\":"+json_str(item_id)+",\"delta\":"+json_str(delta)+
++            ",\"transcript\":"+json_str(r.text)));
+@@ -856,0 +864 @@ private:
++        audio_offset_samples_=0;

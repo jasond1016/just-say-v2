@@ -5,6 +5,7 @@
   "packageManager": "pnpm@10.11.0",
   "scripts": {
     "build": "node scripts/build.mjs",
+    "setup:native-sensevoice": "node scripts/setup-native-sensevoice.mjs",
     "dev": "pnpm build && electron .",
     "debug:ui": "node scripts/run-electron-debug.mjs",
     "start": "electron .",

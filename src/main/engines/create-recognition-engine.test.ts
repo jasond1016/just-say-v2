@@ -5,6 +5,7 @@ import { establishRuntimeReadiness } from '../services/runtime-readiness'
 import { LocalServiceSupervisor } from '../services/local-service-supervisor'
 import { createRecognitionEngine } from './create-recognition-engine'
 import { LocalEngineAdapter } from './local-engine-adapter'
+import { SenseVoiceRealtimeEngineAdapter } from './sensevoice-realtime-engine-adapter'
 
 describe('createRecognitionEngine', () => {
   it('creates a local engine adapter for local profiles', () => {
@@ -15,8 +16,23 @@ describe('createRecognitionEngine', () => {
     expect(engine).toBeInstanceOf(LocalEngineAdapter)
   })
 
+  it('creates the native SenseVoice adapter for the experimental realtime protocol', () => {
+    const config = createConfig(profileCatalog[0]!)
+    config.engineConfig.localService = {
+      ...config.engineConfig.localService!,
+      protocol: 'openai-realtime'
+    }
+    const engine = createRecognitionEngine(config, {
+      establishReadiness: createEstablishReadiness()
+    })
+
+    expect(engine).toBeInstanceOf(SenseVoiceRealtimeEngineAdapter)
+  })
+
   it('returns a structured unsupported engine for cloud profiles', async () => {
-    const engine = createRecognitionEngine(createConfig(profileCatalog[2]!), {
+    const cloudProfile = profileCatalog.find((profile) => profile.kind === 'cloud')
+    expect(cloudProfile).toBeDefined()
+    const engine = createRecognitionEngine(createConfig(cloudProfile!), {
       establishReadiness: createEstablishReadiness()
     })
 

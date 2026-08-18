@@ -12,8 +12,10 @@ const distDir = path.join(rootDir, 'dist')
 const rendererSourceDir = path.join(rootDir, 'src', 'renderer')
 const resourcesSourceDir = path.join(rootDir, 'resources')
 const localServiceSourceDir = path.join(resourcesSourceDir, 'local-service')
+const nativeSenseVoiceSourceDir = path.join(resourcesSourceDir, 'local-service-native')
 const resourcesOutputDir = path.join(distDir, 'resources')
 const localServiceOutputDir = path.join(resourcesOutputDir, 'local-service')
+const nativeSenseVoiceOutputDir = path.join(resourcesOutputDir, 'local-service-native')
 const windowsHotkeyProjectDir = path.join(rootDir, 'native', 'windows-hotkey-helper')
 const windowsHotkeyOutputDir = path.join(resourcesOutputDir, 'windows-hotkey-helper')
 const windowsHotkeyExecutablePath = path.join(
@@ -79,6 +81,10 @@ await Promise.all([
   cp(path.join(localServiceSourceDir, 'service.py'), path.join(localServiceOutputDir, 'service.py')),
   cp(path.join(localServiceSourceDir, 'uv.lock'), path.join(localServiceOutputDir, 'uv.lock'))
 ])
+await cp(nativeSenseVoiceSourceDir, nativeSenseVoiceOutputDir, {
+  recursive: true,
+  force: true
+})
 await publishWindowsHotkeyHelper()
 
 async function publishWindowsHotkeyHelper() {

@@ -64,7 +64,12 @@ export type AppRuntime = {
 
 export async function createRuntime(options: CreateRuntimeOptions): Promise<AppRuntime> {
   const { userDataPath, paths, platform, ipcMain, appVersion, safeStorage } = options
-  const { resourcesPath, localServicePath, qwenLocalServicePath } = paths
+  const {
+    resourcesPath,
+    localServicePath,
+    nativeSenseVoiceServicePath,
+    qwenLocalServicePath
+  } = paths
 
   const transcriptDatabase = openSqliteDatabase(path.join(userDataPath, 'history.db'))
   const transcriptRepository = new SqliteTranscriptRepository(transcriptDatabase)
@@ -99,6 +104,7 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<AppR
     localServiceController: new ConfigurableLocalServiceController({
       managedRuntimePaths: {
         sensevoice: localServicePath,
+        sensevoiceNative: nativeSenseVoiceServicePath,
         ...(platform === 'win32'
           ? {}
           : {

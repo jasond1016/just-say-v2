@@ -7,11 +7,13 @@ import {
   type WebSocketLike
 } from './sidecar-protocol'
 import { PythonLocalServiceController } from './python-local-service-controller'
+import { NativeSenseVoiceServiceController } from './native-sensevoice-service-controller'
 import type { LocalServiceController, LocalServiceHealthResult } from './local-service-supervisor'
 import type { SessionMode } from '../../shared/primitive-types'
 
 type ManagedRuntimePaths = {
   sensevoice: string
+  sensevoiceNative?: string
   'qwen3-asr'?: string
 }
 
@@ -121,6 +123,16 @@ export class ConfigurableLocalServiceController implements LocalServiceControlle
   }
 
   private createDefaultManagedController(config: ManagedLocalServiceConfig): LocalServiceController {
+    if (config.protocol === 'openai-realtime') {
+      return new NativeSenseVoiceServiceController({
+        host: config.host,
+        port: config.port,
+        modelIdentifier: config.modelIdentifier,
+        servicePath: config.servicePath,
+        healthTimeoutMs: this.healthTimeoutMs
+      })
+    }
+
     return new PythonLocalServiceController({
       host: config.host,
       port: config.port,
@@ -232,11 +244,15 @@ export function resolveLocalServiceControllerConfig(
       host: target.host,
       port: target.port,
       runtimeFamilyId: target.runtimeFamilyId,
-      modelIdentifier: target.modelIdentifier
+      modelIdentifier: target.modelIdentifier,
+      ...(target.protocol !== undefined ? { protocol: target.protocol } : {})
     }
   }
 
-  const servicePath = managedRuntimePaths[target.runtimeFamilyId as keyof ManagedRuntimePaths]
+  const servicePath =
+    target.protocol === 'openai-realtime'
+      ? managedRuntimePaths.sensevoiceNative
+      : managedRuntimePaths[target.runtimeFamilyId]
 
   if (!servicePath) {
     return {

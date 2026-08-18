@@ -7,3 +7,6 @@ out
 coverage
 *.log
 *.tsbuildinfo
+.cache/native-sensevoice/
+resources/local-service-native/bin/
+resources/local-service-native/models/

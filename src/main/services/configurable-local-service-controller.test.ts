@@ -31,6 +31,19 @@ describe('resolveLocalServiceControllerConfig', () => {
       }
     })
   })
+
+  it('resolves the dedicated native path for the OpenAI realtime protocol', () => {
+    expect(
+      resolveLocalServiceControllerConfig(
+        createManagedTarget({ protocol: 'openai-realtime' }),
+        createManagedRuntimePaths()
+      )
+    ).toMatchObject({
+      mode: 'managed-local',
+      protocol: 'openai-realtime',
+      servicePath: 'C:\\native-sensevoice'
+    })
+  })
 })
 
 describe('ConfigurableLocalServiceController', () => {
@@ -135,6 +148,7 @@ class FakeLocalServiceController implements LocalServiceController {
 function createManagedRuntimePaths() {
   return {
     sensevoice: 'C:\\local-service',
+    sensevoiceNative: 'C:\\native-sensevoice',
     'qwen3-asr': 'C:\\qwen-local-service'
   } as const
 }

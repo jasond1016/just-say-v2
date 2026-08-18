@@ -21,6 +21,8 @@ export type TranslationProvider = 'openai-compatible'
 
 export type LocalServiceMode = 'managed-local' | 'remote-service'
 
+export type LocalServiceProtocol = 'justsay-sidecar' | 'openai-realtime'
+
 export type RuntimeFamilyId =
   | 'sensevoice'
   | 'qwen3-asr'
@@ -253,6 +255,7 @@ export type ResolvedLocalServiceConfig = {
   port: number
   runtimeFamilyId: LocalRuntimeFamilyId
   modelIdentifier: string
+  protocol?: LocalServiceProtocol
 }
 
 export type ResolvedEngineConfig = {
