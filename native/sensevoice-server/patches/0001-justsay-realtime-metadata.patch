@@ -24,3 +24,12 @@ index 2351a18..9f74b44 100644
 +            ",\"transcript\":"+json_str(r.text)));
 @@ -856,0 +864 @@ private:
 +        audio_offset_samples_=0;
+diff --git a/runtime/llama.cpp/CMakeLists.txt b/runtime/llama.cpp/CMakeLists.txt
+index b2af3fa..926a2a1 100644
+--- a/runtime/llama.cpp/CMakeLists.txt
++++ b/runtime/llama.cpp/CMakeLists.txt
+@@ -46,0 +47,4 @@ funasr_add(sensevoice-server sensevoice-server/sensevoice-server.cpp ggml)
++if(WIN32)
++    target_compile_definitions(sensevoice-server PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
++    target_compile_options(sensevoice-server PRIVATE /utf-8)
++endif()
