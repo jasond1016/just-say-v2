@@ -160,29 +160,80 @@ async function resolveCmakeCommand() {
   }
 
   if (process.platform === 'win32') {
-    const programFiles = process.env.ProgramFiles ?? 'C:\\Program Files'
-    for (const edition of ['BuildTools', 'Community', 'Professional', 'Enterprise']) {
-      const candidate = path.join(
-        programFiles,
-        'Microsoft Visual Studio',
-        '2022',
-        edition,
-        'Common7',
-        'IDE',
-        'CommonExtensions',
-        'Microsoft',
-        'CMake',
-        'CMake',
-        'bin',
-        'cmake.exe'
-      )
-      if (await exists(candidate)) {
-        return candidate
-      }
+    const visualStudioCmake = await findVisualStudioCmake()
+    if (visualStudioCmake) {
+      return visualStudioCmake
     }
   }
 
   throw new Error(
     'CMake was not found. On Windows, add "C++ CMake tools for Windows" in Visual Studio Installer.'
   )
+}
+
+async function findVisualStudioCmake() {
+  const installationPaths = []
+  if (process.env.VSINSTALLDIR) {
+    installationPaths.push(process.env.VSINSTALLDIR)
+  }
+
+  const programFilesX86 = process.env['ProgramFiles(x86)'] ?? 'C:\\Program Files (x86)'
+  const vswherePath = path.join(
+    programFilesX86,
+    'Microsoft Visual Studio',
+    'Installer',
+    'vswhere.exe'
+  )
+  if (await exists(vswherePath)) {
+    try {
+      const { stdout } = await execFile(vswherePath, [
+        '-all',
+        '-products',
+        '*',
+        '-property',
+        'installationPath'
+      ])
+      installationPaths.push(
+        ...stdout
+          .split(/\r?\n/u)
+          .map((value) => value.trim())
+          .filter(Boolean)
+      )
+    } catch {
+      // Continue with conventional Visual Studio locations below.
+    }
+  }
+
+  const programFileRoots = [
+    process.env.ProgramFiles ?? 'C:\\Program Files',
+    programFilesX86
+  ]
+  for (const programFiles of programFileRoots) {
+    for (const version of ['18', '2022']) {
+      for (const edition of ['BuildTools', 'Community', 'Professional', 'Enterprise']) {
+        installationPaths.push(
+          path.join(programFiles, 'Microsoft Visual Studio', version, edition)
+        )
+      }
+    }
+  }
+
+  for (const installationPath of new Set(installationPaths)) {
+    const candidate = path.join(
+      installationPath,
+      'Common7',
+      'IDE',
+      'CommonExtensions',
+      'Microsoft',
+      'CMake',
+      'CMake',
+      'bin',
+      'cmake.exe'
+    )
+    if (await exists(candidate)) {
+      return candidate
+    }
+  }
+
+  return null
 }
