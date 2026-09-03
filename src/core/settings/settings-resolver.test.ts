@@ -63,6 +63,30 @@ describe('resolveRuntimeConfig', () => {
         translationApiKey: 'translation-secret'
       }
     })
+    expect(config.translationConfig?.thinkingEnabled).toBeUndefined()
+  })
+
+  it('passes DeepSeek thinking through to translation runtime config only when enabled', () => {
+    const config = resolveRuntimeConfig({
+      settings: {
+        ...DEFAULT_SETTINGS,
+        translation: {
+          ...DEFAULT_SETTINGS.translation,
+          enabledForMeeting: true,
+          endpoint: 'https://api.deepseek.com/v1',
+          thinkingEnabled: true
+        }
+      },
+      mode: 'meeting',
+      credentials: {
+        translationApiKey: 'translation-secret'
+      }
+    })
+
+    expect(config.translationConfig).toMatchObject({
+      endpoint: 'https://api.deepseek.com/v1',
+      thinkingEnabled: true
+    })
   })
 
   it('does not enable meeting translation for ptt resolution', () => {

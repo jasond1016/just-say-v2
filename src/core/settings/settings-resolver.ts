@@ -96,6 +96,7 @@ export function resolveRuntimeConfig(input: ResolveRuntimeConfigInput): Resolved
             sourceLanguage: settings.speech.language,
             ...(settings.translation.endpoint ? { endpoint: settings.translation.endpoint } : {}),
             ...(settings.translation.model ? { model: settings.translation.model } : {}),
+            ...(settings.translation.thinkingEnabled ? { thinkingEnabled: true } : {}),
             credentials: {
               translationApiKey: input.credentials!.translationApiKey!
             }

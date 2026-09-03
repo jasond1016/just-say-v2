@@ -284,6 +284,7 @@ describe('AppController', () => {
     await controller.setTranslationProvider('openai-compatible')
     await controller.setTranslationEndpoint('https://example.test/v1')
     await controller.setTranslationModel('gpt-4o-mini')
+    await controller.setTranslationThinkingEnabled(true)
     await controller.setLocalServiceMode('remote-service')
     await controller.setLocalServiceHost('10.0.0.8')
     await controller.setLocalServicePort(9001)
@@ -303,6 +304,7 @@ describe('AppController', () => {
     expect(updateSettings).toHaveBeenCalledWith({ translation: { provider: 'openai-compatible' } })
     expect(updateSettings).toHaveBeenCalledWith({ translation: { endpoint: 'https://example.test/v1' } })
     expect(updateSettings).toHaveBeenCalledWith({ translation: { model: 'gpt-4o-mini' } })
+    expect(updateSettings).toHaveBeenCalledWith({ translation: { thinkingEnabled: true } })
     expect(updateSettings).toHaveBeenCalledWith({ advanced: { localServiceMode: 'remote-service' } })
     expect(updateSettings).toHaveBeenCalledWith({ advanced: { localServiceHost: '10.0.0.8' } })
     expect(updateSettings).toHaveBeenCalledWith({ advanced: { localServicePort: 9001 } })
@@ -330,7 +332,8 @@ describe('AppController', () => {
         targetLanguage: 'fr',
         provider: 'openai-compatible',
         endpoint: 'https://example.test/v1',
-        model: 'gpt-4o-mini'
+        model: 'gpt-4o-mini',
+        thinkingEnabled: true
       },
       advanced: {
         localServiceMode: 'remote-service',

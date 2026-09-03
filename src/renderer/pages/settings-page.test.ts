@@ -4,6 +4,7 @@ import {
   hasConnectionDraftChanges,
   hasTranslationDraftChanges,
   getTranslationTargetSelectValue,
+  shouldShowTranslationThinkingToggle,
   TRANSLATION_TARGET_OPTIONS
 } from './settings-page'
 
@@ -24,6 +25,15 @@ describe('translation target dropdown', () => {
 
   it('falls back to English for unsupported stored values', () => {
     expect(getTranslationTargetSelectValue('fr')).toBe('en')
+  })
+})
+
+describe('DeepSeek translation thinking toggle', () => {
+  it('appears for DeepSeek endpoints, including unsaved draft URLs', () => {
+    expect(shouldShowTranslationThinkingToggle('https://api.deepseek.com/v1', undefined)).toBe(true)
+    expect(shouldShowTranslationThinkingToggle('', 'https://api.deepseek.com')).toBe(true)
+    expect(shouldShowTranslationThinkingToggle('https://api.openai.com/v1', 'https://api.deepseek.com')).toBe(false)
+    expect(shouldShowTranslationThinkingToggle('https://api.openai.com/v1', undefined)).toBe(false)
   })
 })
 

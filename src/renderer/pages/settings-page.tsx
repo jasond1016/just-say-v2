@@ -12,6 +12,7 @@ import type {
   ThemeSetting,
   TranslationProvider
 } from '../../shared/api-types'
+import { isDeepSeekChatEndpoint } from '../../shared/deepseek-chat'
 import type { Messages } from '../../i18n'
 import type { SettingsSectionId } from '../app/app-model'
 import { Button, SelectField } from '../ui/controls'
@@ -60,6 +61,7 @@ export function SettingsPage(props: {
   onTranslationProviderChange: (provider: TranslationProvider) => void
   onTranslationEndpointChange: (endpoint: string) => void
   onTranslationModelChange: (model: string) => void
+  onTranslationThinkingEnabledChange: (enabled: boolean) => void
   onSaveTranslationApiKey: (apiKey: string) => Promise<void>
   onLocalServiceModeChange: (mode: LocalServiceMode) => void
   onLocalServiceHostChange: (host: string) => void
@@ -90,6 +92,10 @@ export function SettingsPage(props: {
   const invalidManagedPort = managedPortValue.length > 0 && !/^\d+$/.test(managedPortValue)
   const invalidRemotePort = remotePortValue.length > 0 && !/^\d+$/.test(remotePortValue)
   const selectedTranslationTarget = getTranslationTargetSelectValue(props.settings.translation.targetLanguage)
+  const showTranslationThinkingToggle = shouldShowTranslationThinkingToggle(
+    draftTranslationEndpoint,
+    props.settings.translation.endpoint
+  )
   const translationDraftDirty = hasTranslationDraftChanges(props.settings.translation, {
     endpoint: draftTranslationEndpoint,
     model: draftTranslationModel,
@@ -399,6 +405,17 @@ export function SettingsPage(props: {
                       onChange={(e) => setDraftTranslationApiKey(e.target.value)}
                     />
                   </CardRow>
+                  {showTranslationThinkingToggle ? (
+                    <CardRow label={t.settingsTranslationThinking}>
+                      <ToggleSwitch
+                        checked={props.settings.translation.thinkingEnabled === true}
+                        disabled={disabled}
+                        onClick={() => props.onTranslationThinkingEnabledChange(
+                          props.settings.translation.thinkingEnabled !== true
+                        )}
+                      />
+                    </CardRow>
+                  ) : null}
                   {translationDraftDirty ? (
                     <div className="settings-card__actions-row">
                       <Button label={t.settingsDiscard} size="small" variant="ghost" disabled={disabled} onClick={discardTranslationDrafts} />
@@ -656,6 +673,13 @@ export function hasTranslationDraftChanges(
     draft.model.trim() !== (translation.model ?? '') ||
     draft.apiKey.trim().length > 0
   )
+}
+
+export function shouldShowTranslationThinkingToggle(
+  draftEndpoint: string,
+  savedEndpoint: string | undefined
+): boolean {
+  return isDeepSeekChatEndpoint(draftEndpoint.trim() || savedEndpoint)
 }
 
 export function hasConnectionDraftChanges(

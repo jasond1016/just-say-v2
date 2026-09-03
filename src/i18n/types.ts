@@ -137,6 +137,7 @@ export type Messages = {
   settingsTranslationEndpoint: string
   settingsTranslationModel: string
   settingsTranslationApiKey: string
+  settingsTranslationThinking: string
   settingsDiagnosticsTitle: string
   settingsDiagnosticsLabel: string
   settingsDiagnosticsEnabled: string

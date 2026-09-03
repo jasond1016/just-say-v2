@@ -76,6 +76,7 @@ describe('TranslationPipeline', () => {
         body: expect.stringContaining('"model":"demo-model"')
       })
     )
+    expect(readChatCompletionBody(fetchFn).thinking).toBeUndefined()
   })
 
   it('prefers runtime endpoint and model over environment defaults', async () => {
@@ -119,6 +120,109 @@ describe('TranslationPipeline', () => {
         body: expect.stringContaining('"model":"runtime-model"')
       })
     )
+    expect(readChatCompletionBody(fetchFn).thinking).toBeUndefined()
+  })
+
+  it('disables DeepSeek thinking by default', async () => {
+    const fetchFn = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        choices: [
+          {
+            message: {
+              content: 'translated'
+            }
+          }
+        ]
+      })
+    }))
+
+    const createProvider = createTranslationProviderFromEnvironment(
+      {},
+      {
+        fetchFn: fetchFn as unknown as typeof fetch
+      }
+    )
+    const provider = createProvider({
+      ...createRuntimeConfig().translationConfig!,
+      endpoint: 'https://api.deepseek.com/v1'
+    })
+
+    await provider.translateText({
+      text: 'hello world',
+      sourceLanguage: 'auto',
+      targetLanguage: 'zh'
+    })
+
+    expect(readChatCompletionBody(fetchFn).thinking).toEqual({ type: 'disabled' })
+  })
+
+  it('enables DeepSeek thinking when the user opts in', async () => {
+    const fetchFn = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        choices: [
+          {
+            message: {
+              content: 'translated'
+            }
+          }
+        ]
+      })
+    }))
+
+    const createProvider = createTranslationProviderFromEnvironment(
+      {},
+      {
+        fetchFn: fetchFn as unknown as typeof fetch
+      }
+    )
+    const provider = createProvider({
+      ...createRuntimeConfig().translationConfig!,
+      endpoint: 'https://api.deepseek.com',
+      thinkingEnabled: true
+    })
+
+    await provider.translateText({
+      text: 'hello world',
+      sourceLanguage: 'auto',
+      targetLanguage: 'zh'
+    })
+
+    expect(readChatCompletionBody(fetchFn).thinking).toEqual({ type: 'enabled' })
+  })
+
+  it('disables DeepSeek thinking when the environment default endpoint is DeepSeek', async () => {
+    const fetchFn = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        choices: [
+          {
+            message: {
+              content: 'translated'
+            }
+          }
+        ]
+      })
+    }))
+
+    const createProvider = createTranslationProviderFromEnvironment(
+      {
+        JUSTSAY_TRANSLATION_BASE_URL: 'https://api.deepseek.com/v1'
+      },
+      {
+        fetchFn: fetchFn as unknown as typeof fetch
+      }
+    )
+    const provider = createProvider(createRuntimeConfig().translationConfig!)
+
+    await provider.translateText({
+      text: 'hello world',
+      sourceLanguage: 'auto',
+      targetLanguage: 'zh'
+    })
+
+    expect(readChatCompletionBody(fetchFn).thinking).toEqual({ type: 'disabled' })
   })
 })
 
@@ -184,6 +288,23 @@ function createRuntimeConfig(): ResolvedRuntimeConfig {
     },
     outputConfig: {
       method: 'simulate_input'
+    }
+  }
+}
+
+function readChatCompletionBody(fetchFn: ReturnType<typeof vi.fn>): {
+  thinking?: {
+    type?: string
+  }
+} {
+  const call = fetchFn.mock.calls[0]
+  const init = call?.[1] as { body?: string } | undefined
+
+  expect(typeof init?.body).toBe('string')
+
+  return JSON.parse(init?.body ?? '{}') as {
+    thinking?: {
+      type?: string
     }
   }
 }

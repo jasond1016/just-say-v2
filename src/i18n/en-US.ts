@@ -139,6 +139,7 @@ export const enUS: Messages = {
   settingsTranslationEndpoint: 'Endpoint',
   settingsTranslationModel: 'Model',
   settingsTranslationApiKey: 'API Key',
+  settingsTranslationThinking: 'Thinking mode',
   settingsDiagnosticsTitle: 'Diagnostics',
   settingsDiagnosticsLabel: 'Diagnostics logging',
   settingsDiagnosticsEnabled: 'Enabled',

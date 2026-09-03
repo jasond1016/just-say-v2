@@ -34,6 +34,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     enabledForMeeting: false,
     targetLanguage: 'en',
     provider: 'openai-compatible',
+    thinkingEnabled: false,
     apiKeyConfigured: false
   },
   advanced: {
@@ -118,6 +119,7 @@ export function normalizeSettings(patch?: SettingsPatch): AppSettings {
       provider: TRANSLATION_PROVIDERS.has(merged.translation.provider)
         ? merged.translation.provider
         : DEFAULT_SETTINGS.translation.provider,
+      thinkingEnabled: merged.translation.thinkingEnabled === true,
       ...(translationEndpoint !== undefined ? { endpoint: translationEndpoint } : {}),
       ...(translationModel !== undefined ? { model: translationModel } : {}),
       apiKeyConfigured: merged.translation.apiKeyConfigured === true
@@ -168,6 +170,7 @@ function mergeSettings(base: AppSettings, patch?: SettingsPatch): AppSettings {
       enabledForMeeting: patch.translation?.enabledForMeeting ?? base.translation.enabledForMeeting,
       targetLanguage: patch.translation?.targetLanguage ?? base.translation.targetLanguage,
       provider: patch.translation?.provider ?? base.translation.provider,
+      thinkingEnabled: patch.translation?.thinkingEnabled ?? base.translation.thinkingEnabled ?? false,
       ...(patch.translation?.endpoint !== undefined || base.translation.endpoint !== undefined
         ? { endpoint: patch.translation?.endpoint ?? base.translation.endpoint }
         : {}),

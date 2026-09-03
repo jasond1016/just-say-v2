@@ -139,6 +139,7 @@ export const zhCN: Messages = {
   settingsTranslationEndpoint: '接口地址',
   settingsTranslationModel: '模型',
   settingsTranslationApiKey: 'API 密钥',
+  settingsTranslationThinking: '思考模式',
   settingsDiagnosticsTitle: '诊断',
   settingsDiagnosticsLabel: '诊断记录',
   settingsDiagnosticsEnabled: '已启用',

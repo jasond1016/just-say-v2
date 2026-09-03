@@ -327,6 +327,7 @@ function WorkspaceAppContent(props: {
             onTranslationProviderChange={(provider) => { void controller.setTranslationProvider(provider) }}
             onTranslationEndpointChange={(endpoint) => { void controller.setTranslationEndpoint(endpoint) }}
             onTranslationModelChange={(model) => { void controller.setTranslationModel(model) }}
+            onTranslationThinkingEnabledChange={(enabled) => { void controller.setTranslationThinkingEnabled(enabled) }}
             onSaveTranslationApiKey={(apiKey) => controller.saveTranslationCredentials(apiKey)}
             onLocalServiceModeChange={(mode) => { void controller.setLocalServiceMode(mode) }}
             onLocalServiceHostChange={(host) => { void controller.setLocalServiceHost(host) }}

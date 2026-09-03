@@ -2,10 +2,14 @@ import type { TranslationUpdatedPayload } from '../../core/contracts/engine'
 import type {
   ResolvedRuntimeConfig,
   TranscriptBlock,
-  TranslationProvider,
   TranslationRuntimeConfig
 } from '../../shared/api-types'
-import { OpenAiCompatibleChatClient, normalizeOptionalString } from './openai-compatible-chat'
+import { isDeepSeekChatEndpoint } from '../../shared/deepseek-chat'
+import {
+  OpenAiCompatibleChatClient,
+  normalizeOptionalString,
+  type OpenAiCompatibleThinking
+} from './openai-compatible-chat'
 
 export interface TranslationProviderClient {
   translateText(input: {
@@ -55,18 +59,22 @@ export type OpenAiCompatibleTranslationProviderOptions = {
   model?: string
   timeoutMs?: number
   fetchFn?: typeof fetch
+  thinkingEnabled?: boolean
 }
 
 export class OpenAiCompatibleTranslationProvider implements TranslationProviderClient {
   private readonly client: OpenAiCompatibleChatClient
 
   constructor(options: OpenAiCompatibleTranslationProviderOptions) {
+    const thinking = resolveTranslationThinking(options.baseUrl, options.thinkingEnabled)
+
     this.client = new OpenAiCompatibleChatClient({
       apiKey: options.apiKey,
       ...(options.baseUrl ? { baseUrl: options.baseUrl } : {}),
       ...(options.model ? { model: options.model } : {}),
       ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
-      ...(options.fetchFn ? { fetchFn: options.fetchFn } : {})
+      ...(options.fetchFn ? { fetchFn: options.fetchFn } : {}),
+      ...(thinking ? { thinking } : {})
     })
   }
 
@@ -109,12 +117,26 @@ export function createTranslationProviderFromEnvironment(
           apiKey: config.credentials.translationApiKey,
           ...(config.endpoint ? { baseUrl: config.endpoint } : baseUrl ? { baseUrl } : {}),
           ...(config.model ? { model: config.model } : model ? { model } : {}),
+          ...(config.thinkingEnabled ? { thinkingEnabled: true } : {}),
           ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
           ...(options.fetchFn ? { fetchFn: options.fetchFn } : {})
         })
       default:
         return assertNever(config.provider)
     }
+  }
+}
+
+function resolveTranslationThinking(
+  baseUrl: string | undefined,
+  thinkingEnabled: boolean | undefined
+): OpenAiCompatibleThinking | undefined {
+  if (!isDeepSeekChatEndpoint(baseUrl)) {
+    return undefined
+  }
+
+  return {
+    type: thinkingEnabled === true ? 'enabled' : 'disabled'
   }
 }
 

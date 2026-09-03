@@ -3,12 +3,17 @@ export type OpenAiCompatibleChatMessage = {
   content: string
 }
 
+export type OpenAiCompatibleThinking = {
+  type: 'enabled' | 'disabled'
+}
+
 export type OpenAiCompatibleChatClientOptions = {
   apiKey: string
   baseUrl?: string
   model?: string
   timeoutMs?: number
   fetchFn?: typeof fetch
+  thinking?: OpenAiCompatibleThinking
 }
 
 export class OpenAiCompatibleChatClient {
@@ -49,7 +54,8 @@ export class OpenAiCompatibleChatClient {
           model: this.model,
           temperature: input.temperature ?? 0,
           messages: input.messages,
-          ...(input.responseFormat ? { response_format: { type: input.responseFormat } } : {})
+          ...(input.responseFormat ? { response_format: { type: input.responseFormat } } : {}),
+          ...(this.options.thinking ? { thinking: this.options.thinking } : {})
         }),
         signal: controller.signal
       })

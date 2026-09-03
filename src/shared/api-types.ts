@@ -221,6 +221,7 @@ export type AppSettings = {
     provider: TranslationProvider
     endpoint?: string
     model?: string
+    thinkingEnabled?: boolean
     apiKeyConfigured?: boolean
   }
   advanced: {
@@ -242,6 +243,7 @@ export type TranslationRuntimeConfig = {
   sourceLanguage: SpeechLanguage
   endpoint?: string
   model?: string
+  thinkingEnabled?: boolean
   credentials: {
     translationApiKey: string
   }

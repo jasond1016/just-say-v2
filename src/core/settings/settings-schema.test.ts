@@ -55,6 +55,7 @@ describe('settings-schema', () => {
     expect(normalized.output.method).toBe(DEFAULT_SETTINGS.output.method)
     expect(normalized.translation.targetLanguage).toBe(DEFAULT_SETTINGS.translation.targetLanguage)
     expect(normalized.translation.provider).toBe(DEFAULT_SETTINGS.translation.provider)
+    expect(normalized.translation.thinkingEnabled).toBe(false)
     expect(normalized.translation.endpoint).toBe('https://example.test/v1/')
     expect(normalized.translation.model).toBe('demo-model')
     expect(normalized.translation.apiKeyConfigured).toBe(true)
@@ -84,6 +85,26 @@ describe('settings-schema', () => {
     expect(patched.general.language).toBe(DEFAULT_SETTINGS.general.language)
     expect(patched.translation.enabledForMeeting).toBe(true)
     expect(patched.translation.enabledForPtt).toBe(false)
+    expect(patched.translation.thinkingEnabled).toBe(false)
     expect(patched.advanced.experimentalFlags).toEqual(['exp-a'])
+  })
+
+  it('keeps DeepSeek translation thinking off until the user opts in', () => {
+    expect(DEFAULT_SETTINGS.translation.thinkingEnabled).toBe(false)
+
+    const enabled = applySettingsPatch(DEFAULT_SETTINGS, {
+      translation: {
+        thinkingEnabled: true
+      }
+    })
+
+    expect(enabled.translation.thinkingEnabled).toBe(true)
+    expect(
+      applySettingsPatch(enabled, {
+        translation: {
+          thinkingEnabled: false
+        }
+      }).translation.thinkingEnabled
+    ).toBe(false)
   })
 })

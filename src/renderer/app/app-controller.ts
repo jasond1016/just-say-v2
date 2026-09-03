@@ -552,6 +552,14 @@ export class AppController {
     })
   }
 
+  async setTranslationThinkingEnabled(thinkingEnabled: boolean): Promise<void> {
+    await this.updateSettings('settings:translation-thinking', {
+      translation: {
+        thinkingEnabled
+      }
+    })
+  }
+
   async saveTranslationCredentials(apiKey: string): Promise<void> {
     await this.runAction('settings:translation-api-key', async () => {
       const updated = await this.deps.api.saveTranslationCredentials({ apiKey })
