@@ -33,6 +33,12 @@ CAPABILITIES = {
 
 MIN_DRAFT_CHUNKS = 4
 DRAFT_REFRESH_CHUNKS = 3
+# FunASR replaces emotion and event tags with these characters after recognition.
+SENSEVOICE_EVENT_EMOJI = frozenset("😊😔😡😰🤢😮🎼👏😀😭🤧😷")
+
+
+def strip_sensevoice_event_emoji(text: str) -> str:
+    return "".join(character for character in text if character not in SENSEVOICE_EVENT_EMOJI).strip()
 
 
 class SenseVoiceRuntime:
@@ -86,7 +92,7 @@ class SenseVoiceRuntime:
                 use_itn=True,
             )
             raw_text = result[0].get("text", "") if result else ""
-            return rich_transcription_postprocess(raw_text).strip()
+            return strip_sensevoice_event_emoji(rich_transcription_postprocess(raw_text))
         finally:
             try:
                 temp_path.unlink(missing_ok=True)

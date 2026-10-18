@@ -11,6 +11,8 @@ import torch
 from websockets.asyncio.server import serve
 from websockets.exceptions import ConnectionClosed
 
+from audio_level import DEFAULT_MIN_UTTERANCE_RMS, is_audible
+
 HOST = os.environ.get("JUSTSAY_LOCAL_SERVICE_HOST", "127.0.0.1")
 PORT = int(os.environ.get("JUSTSAY_LOCAL_SERVICE_PORT", "8765"))
 MODEL_NAME = os.environ.get("JUSTSAY_LOCAL_SERVICE_MODEL", "Qwen/Qwen3-ASR-1.7B")
@@ -27,6 +29,7 @@ CHUNK_SIZE_SEC = float(os.environ.get("JUSTSAY_QWEN_CHUNK_SIZE_SEC", "1.0"))
 UNFIXED_CHUNK_NUM = int(os.environ.get("JUSTSAY_QWEN_UNFIXED_CHUNK_NUM", "4"))
 UNFIXED_TOKEN_NUM = int(os.environ.get("JUSTSAY_QWEN_UNFIXED_TOKEN_NUM", "5"))
 VAD_THRESHOLD = float(os.environ.get("JUSTSAY_QWEN_VAD_THRESHOLD", "0.5"))
+MIN_UTTERANCE_RMS = float(os.environ.get("JUSTSAY_QWEN_MIN_UTTERANCE_RMS", str(DEFAULT_MIN_UTTERANCE_RMS)))
 VAD_WINDOW_SAMPLES = 512
 PREWARM_POLICY = os.environ.get("JUSTSAY_QWEN_PREWARM_POLICY", "background").strip().lower()
 
@@ -211,6 +214,14 @@ class SourceState:
     def utterance_duration_ms(self) -> int:
         total_samples = sum(chunk.shape[0] for chunk in self.utterance_samples)
         return int(total_samples / 16)
+
+    def utterance_audio(self) -> np.ndarray:
+        if not self.utterance_samples:
+            return np.zeros((0,), dtype=np.float32)
+        return np.concatenate(self.utterance_samples)
+
+    def utterance_is_audible(self) -> bool:
+        return is_audible(self.utterance_audio(), MIN_UTTERANCE_RMS)
 
     def should_push(self) -> bool:
         total_samples = sum(chunk.shape[0] for chunk in self.push_buffer)
@@ -449,6 +460,9 @@ class JustSayQwenService:
     async def maybe_emit_streaming_draft(
         self, websocket: Any, session: SessionState, source: str, source_state: SourceState
     ) -> None:
+        if source_state.stream_state is None or not source_state.utterance_is_audible():
+            return
+
         text = await self.consume_push_buffer(source_state)
         if not text:
             return
@@ -479,6 +493,11 @@ class JustSayQwenService:
         self, websocket: Any, session: SessionState, source: str, source_state: SourceState
     ) -> None:
         if source_state.stream_state is None:
+            return
+
+        if not source_state.utterance_is_audible():
+            source_state.block_index += 1
+            source_state.clear()
             return
 
         if source_state.push_buffer:

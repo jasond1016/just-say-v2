@@ -18,6 +18,7 @@ The sidecar speaks the same JustSay WebSocket protocol as the SenseVoice service
 - Health can report `warming` while that background preload is still running
 - Meeting mode uses Silero VAD for utterance boundaries and native vLLM streaming state for incremental drafts.
 - PTT mode skips VAD and finalizes on key-up / `stop-session`
+- Drafts and the final commit wait until the utterance so far reaches `JUSTSAY_QWEN_MIN_UTTERANCE_RMS` (default `0.01`). Near-silent audio is not fed to the stream, because that level still produces text.
 
 ## Startup prewarm policy
 

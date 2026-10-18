@@ -4,7 +4,12 @@ from unittest.mock import patch
 
 import numpy as np
 
-from service import JustSayLocalService, SenseVoiceRuntime, SessionState
+from service import (
+    JustSayLocalService,
+    SenseVoiceRuntime,
+    SessionState,
+    strip_sensevoice_event_emoji,
+)
 
 
 class FakeRuntime:
@@ -66,6 +71,14 @@ class JustSayLocalServiceDraftTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(websocket.messages[1]["payload"]["block"]["text"], "hello from commit")
         self.assertEqual(source_state.block_index, 1)
         self.assertEqual(source_state.chunk_count, 0)
+
+
+class SenseVoiceEventEmojiTests(unittest.TestCase):
+    def test_removes_emotion_and_event_emoji_without_changing_words(self) -> None:
+        self.assertEqual(strip_sensevoice_event_emoji("でしょうか。😊"), "でしょうか。")
+        self.assertEqual(strip_sensevoice_event_emoji("👏こんにちは😔"), "こんにちは")
+        self.assertEqual(strip_sensevoice_event_emoji("うん、そうです"), "うん、そうです")
+        self.assertEqual(strip_sensevoice_event_emoji("英語"), "英語")
 
 
 class SenseVoiceRuntimeTests(unittest.TestCase):

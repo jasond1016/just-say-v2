@@ -7,6 +7,7 @@ RUN python -m pip install --no-cache-dir \
     "websockets>=12.0"
 
 COPY resources/local-service-qwen/service.py /workspace/resources/local-service-qwen/service.py
+COPY resources/local-service-qwen/audio_level.py /workspace/resources/local-service-qwen/audio_level.py
 
 ENV JUSTSAY_LOCAL_SERVICE_HOST=0.0.0.0
 ENV JUSTSAY_LOCAL_SERVICE_PORT=8765
