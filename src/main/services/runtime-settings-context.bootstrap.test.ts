@@ -13,7 +13,8 @@ describe('RuntimeSettingsContext bootstrap credential wiring', () => {
       ...DEFAULT_SETTINGS,
       translation: {
         ...DEFAULT_SETTINGS.translation,
-        enabledForMeeting: true
+        enabledForMeeting: true,
+        provider: 'openai-compatible'
       }
     })
 
@@ -54,7 +55,8 @@ describe('RuntimeSettingsContext bootstrap credential wiring', () => {
       ...DEFAULT_SETTINGS,
       translation: {
         ...DEFAULT_SETTINGS.translation,
-        enabledForMeeting: true
+        enabledForMeeting: true,
+        provider: 'openai-compatible'
       }
     })
 

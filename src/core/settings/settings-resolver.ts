@@ -9,7 +9,13 @@ import type {
 } from '../../shared/api-types'
 import type { SessionMode } from '../../shared/primitive-types'
 import { getProfileById, profileCatalog } from './profile-catalog'
-import { normalizeSettings } from './settings-schema'
+import {
+  DEFAULT_INDEX_TRANSLATE_HOST,
+  DEFAULT_INDEX_TRANSLATE_PORT,
+  normalizeSettings
+} from './settings-schema'
+
+export { DEFAULT_INDEX_TRANSLATE_HOST, DEFAULT_INDEX_TRANSLATE_PORT }
 
 export type ResolverCredentials = {
   cloudApiKey?: string
@@ -22,12 +28,21 @@ export type PlatformCapabilities = {
   supportedManagedLocalRuntimes: LocalRuntimeFamilyId[]
 }
 
+export function indexTranslateClientEndpoint(host: string | undefined, port: number | undefined): string {
+  const trimmed = host?.trim()
+  const connectHost = !trimmed || trimmed === '0.0.0.0' || trimmed === '::'
+    ? DEFAULT_INDEX_TRANSLATE_HOST
+    : trimmed
+  return `http://${connectHost}:${port ?? DEFAULT_INDEX_TRANSLATE_PORT}/v1`
+}
+
 export type ResolveRuntimeConfigInput = {
   settings: AppSettings
   mode: SessionMode
   credentials?: ResolverCredentials
   platform?: Partial<PlatformCapabilities>
   profiles?: readonly EngineProfile[]
+  localIndexTranslateAvailable?: boolean
 }
 
 export class SettingsResolverError extends Error {
@@ -90,17 +105,7 @@ export function resolveRuntimeConfig(input: ResolveRuntimeConfigInput): Resolved
     },
     ...(translationEnabled
       ? {
-          translationConfig: {
-            provider: settings.translation.provider,
-            targetLanguage: settings.translation.targetLanguage,
-            sourceLanguage: settings.speech.language,
-            ...(settings.translation.endpoint ? { endpoint: settings.translation.endpoint } : {}),
-            ...(settings.translation.model ? { model: settings.translation.model } : {}),
-            ...(settings.translation.thinkingEnabled ? { thinkingEnabled: true } : {}),
-            credentials: {
-              translationApiKey: input.credentials!.translationApiKey!
-            }
-          } satisfies TranslationRuntimeConfig
+          translationConfig: resolveTranslationConfig(settings, input)
         }
       : {}),
     captureConfig: DEFAULT_CAPTURE_CONFIG,
@@ -254,7 +259,7 @@ function assertCredentialAvailability(
   const translationEnabled =
     mode === 'ptt' ? settings.translation.enabledForPtt : settings.translation.enabledForMeeting
 
-  if (!translationEnabled) {
+  if (!translationEnabled || settings.translation.provider === 'index-translate') {
     return
   }
 
@@ -265,6 +270,67 @@ function assertCredentialAvailability(
       true,
       { mode, provider: settings.translation.provider, missingCredential: 'translationApiKey' }
     )
+  }
+}
+
+function resolveTranslationConfig(
+  settings: AppSettings,
+  input: ResolveRuntimeConfigInput
+): TranslationRuntimeConfig {
+  if (settings.translation.provider === 'index-translate') {
+    if (settings.translation.deployment === 'remote-service') {
+      const host = settings.translation.remoteHost?.trim()
+
+      if (!host) {
+        throw createSettingsResolverError(
+          'E_INVALID_SETTINGS',
+          'Remote translation host is required when Index-Translate-2B remote service mode is enabled',
+          false,
+          { provider: 'index-translate', missingField: 'translation.remoteHost' }
+        )
+      }
+
+      return indexTranslateRuntimeConfig(
+        settings,
+        indexTranslateClientEndpoint(host, settings.translation.remotePort)
+      )
+    }
+
+    if (!input.localIndexTranslateAvailable) {
+      throw createSettingsResolverError(
+        'E_INVALID_SETTINGS',
+        'Index-Translate-2B is selected, but the local model or llama-server was not found',
+        true,
+        { provider: 'index-translate' }
+      )
+    }
+
+    return indexTranslateRuntimeConfig(
+      settings,
+      indexTranslateClientEndpoint(settings.translation.localHost, settings.translation.localPort)
+    )
+  }
+
+  return {
+    provider: settings.translation.provider,
+    targetLanguage: settings.translation.targetLanguage,
+    sourceLanguage: settings.speech.language,
+    ...(settings.translation.endpoint ? { endpoint: settings.translation.endpoint } : {}),
+    ...(settings.translation.model ? { model: settings.translation.model } : {}),
+    ...(settings.translation.thinkingEnabled ? { thinkingEnabled: true } : {}),
+    credentials: {
+      translationApiKey: input.credentials!.translationApiKey!
+    }
+  }
+}
+
+function indexTranslateRuntimeConfig(settings: AppSettings, endpoint: string): TranslationRuntimeConfig {
+  return {
+    provider: 'openai-compatible',
+    targetLanguage: settings.translation.targetLanguage,
+    sourceLanguage: settings.speech.language,
+    endpoint,
+    discoverModel: true
   }
 }
 

@@ -8,7 +8,7 @@ export type OpenAiCompatibleThinking = {
 }
 
 export type OpenAiCompatibleChatClientOptions = {
-  apiKey: string
+  apiKey?: string
   baseUrl?: string
   model?: string
   timeoutMs?: number
@@ -47,7 +47,7 @@ export class OpenAiCompatibleChatClient {
       const response = await this.fetchFn(`${this.baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${this.options.apiKey}`,
+          ...(this.options.apiKey ? { Authorization: `Bearer ${this.options.apiKey}` } : {}),
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({

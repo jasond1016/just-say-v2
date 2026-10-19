@@ -42,6 +42,7 @@ describe('resolveRuntimeConfig', () => {
         translation: {
           ...DEFAULT_SETTINGS.translation,
           enabledForMeeting: true,
+          provider: 'openai-compatible',
           targetLanguage: 'ja',
           endpoint: 'https://example.test/v1',
           model: 'demo-model'
@@ -73,6 +74,7 @@ describe('resolveRuntimeConfig', () => {
         translation: {
           ...DEFAULT_SETTINGS.translation,
           enabledForMeeting: true,
+          provider: 'openai-compatible',
           endpoint: 'https://api.deepseek.com/v1',
           thinkingEnabled: true
         }
@@ -304,7 +306,8 @@ describe('resolveRuntimeConfig', () => {
         ...DEFAULT_SETTINGS,
         translation: {
           ...DEFAULT_SETTINGS.translation,
-          enabledForPtt: true
+          enabledForPtt: true,
+          provider: 'openai-compatible'
         }
       },
       mode: 'ptt',
@@ -318,5 +321,81 @@ describe('resolveRuntimeConfig', () => {
       provider: 'openai-compatible',
       targetLanguage: 'en'
     })
+  })
+
+  it('uses the local Index-Translate target without an API key', () => {
+    const config = resolveRuntimeConfig({
+      settings: {
+        ...DEFAULT_SETTINGS,
+        translation: {
+          ...DEFAULT_SETTINGS.translation,
+          enabledForPtt: true
+        }
+      },
+      mode: 'ptt',
+      localIndexTranslateAvailable: true
+    })
+
+    expect(config.translationConfig).toEqual({
+      provider: 'openai-compatible',
+      targetLanguage: 'en',
+      sourceLanguage: 'auto',
+      endpoint: 'http://127.0.0.1:8088/v1',
+      discoverModel: true
+    })
+  })
+
+  it('uses an intranet Index-Translate server without loading the local model', () => {
+    const config = resolveRuntimeConfig({
+      settings: {
+        ...DEFAULT_SETTINGS,
+        translation: {
+          ...DEFAULT_SETTINGS.translation,
+          enabledForMeeting: true,
+          deployment: 'remote-service',
+          remoteHost: '10.0.0.8',
+          remotePort: 8088
+        }
+      },
+      mode: 'meeting'
+    })
+
+    expect(config.translationConfig).toMatchObject({
+      endpoint: 'http://10.0.0.8:8088/v1',
+      discoverModel: true
+    })
+    expect(config.translationConfig?.model).toBeUndefined()
+    expect(config.translationConfig?.credentials).toBeUndefined()
+  })
+
+  it('requires a host for a remote Index-Translate server', () => {
+    expect(() =>
+      resolveRuntimeConfig({
+        settings: {
+          ...DEFAULT_SETTINGS,
+          translation: {
+            ...DEFAULT_SETTINGS.translation,
+            enabledForPtt: true,
+            deployment: 'remote-service'
+          }
+        },
+        mode: 'ptt'
+      })
+    ).toThrowError(SettingsResolverError)
+  })
+
+  it('fails when Index-Translate is selected but the local model is missing', () => {
+    expect(() =>
+      resolveRuntimeConfig({
+        settings: {
+          ...DEFAULT_SETTINGS,
+          translation: {
+            ...DEFAULT_SETTINGS.translation,
+            enabledForPtt: true
+          }
+        },
+        mode: 'ptt'
+      })
+    ).toThrowError(SettingsResolverError)
   })
 })

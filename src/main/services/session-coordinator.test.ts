@@ -214,6 +214,7 @@ describe('SessionCoordinator + PTTCoordinator', () => {
         translation: {
           ...DEFAULT_SETTINGS.translation,
           enabledForPtt: true,
+          provider: 'openai-compatible',
           targetLanguage: 'ja'
         }
       },
@@ -408,6 +409,7 @@ describe('SessionCoordinator + PTTCoordinator', () => {
         translation: {
           ...DEFAULT_SETTINGS.translation,
           enabledForMeeting: true,
+          provider: 'openai-compatible',
           targetLanguage: 'en'
         }
       },
@@ -665,6 +667,7 @@ describe('SessionCoordinator + PTTCoordinator', () => {
         translation: {
           ...DEFAULT_SETTINGS.translation,
           enabledForMeeting: true,
+          provider: 'openai-compatible',
           targetLanguage: 'en'
         }
       }
@@ -708,6 +711,7 @@ describe('SessionCoordinator + PTTCoordinator', () => {
         translation: {
           ...DEFAULT_SETTINGS.translation,
           enabledForPtt: true,
+          provider: 'openai-compatible',
           targetLanguage: 'ja'
         }
       },

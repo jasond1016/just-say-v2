@@ -33,6 +33,12 @@ import { SessionService } from '../services/session-service'
 import { SettingsService } from '../services/settings-service'
 import { SpeechRuntime } from '../services/speech-runtime'
 import { TranslationPipeline } from '../services/translation-pipeline'
+import { DEFAULT_INDEX_TRANSLATE_HOST, DEFAULT_INDEX_TRANSLATE_PORT } from '../../core/settings/settings-resolver'
+import {
+  IndexTranslateServer,
+  resolveIndexTranslateLaunch,
+  shouldRunIndexTranslate
+} from '../services/index-translate-server'
 
 export type SafeStorageAdapter = {
   isEncryptionAvailable(): boolean
@@ -64,7 +70,8 @@ export type AppRuntime = {
 
 export async function createRuntime(options: CreateRuntimeOptions): Promise<AppRuntime> {
   const { userDataPath, paths, platform, ipcMain, appVersion, safeStorage } = options
-  const { resourcesPath, localServicePath, qwenLocalServicePath } = paths
+  const { resourcesPath, localServicePath, qwenLocalServicePath, appRoot } = paths
+  const indexTranslateLaunch = resolveIndexTranslateLaunch(appRoot)
 
   const transcriptDatabase = openSqliteDatabase(path.join(userDataPath, 'history.db'))
   const transcriptRepository = new SqliteTranscriptRepository(transcriptDatabase)
@@ -88,7 +95,8 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<AppR
   const baseSettingsService = new SettingsService(settingsRepository, {
     platformProvider: () => ({
       supportedManagedLocalRuntimes: [...supportedManagedLocalRuntimes]
-    })
+    }),
+    ...(indexTranslateLaunch ? { localIndexTranslateAvailable: true } : {})
   })
   const runtimeSettings = await RuntimeSettingsContext.create({
     settingsService: baseSettingsService,
@@ -127,6 +135,31 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<AppR
       runtimeSettings.saveTranslationCredentials(input),
     onChanged: (listener: (settings: AppSettings) => void) => runtimeSettings.onChanged(listener)
   }
+  const indexTranslateServer = indexTranslateLaunch
+    ? new IndexTranslateServer({ launch: indexTranslateLaunch })
+    : undefined
+  const syncIndexTranslate = async (): Promise<void> => {
+    if (!indexTranslateServer) {
+      return
+    }
+
+    const settings = runtimeSettings.getSettings()
+
+    if (shouldRunIndexTranslate(settings)) {
+      await indexTranslateServer.align({
+        host: settings.translation.localHost?.trim() || DEFAULT_INDEX_TRANSLATE_HOST,
+        port: settings.translation.localPort ?? DEFAULT_INDEX_TRANSLATE_PORT
+      })
+      return
+    }
+
+    await indexTranslateServer.stop()
+  }
+  runtimeSettings.onChanged(() => {
+    void syncIndexTranslate().catch((error: unknown) => {
+      console.error('[index-translate]', error)
+    })
+  })
   const settingsProvider = runtimeSettings.createSettingsProvider()
   const captureTransport = new ElectronCaptureWindowTransport(ipcMain)
   const captureWindowService = new CaptureWindowService(captureTransport)
@@ -195,6 +228,9 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<AppR
     diagnosticsService.setLocalServiceStatus(status)
   })
   void scheduleSelectedLocalServiceProbe()
+  void syncIndexTranslate().catch((error: unknown) => {
+    console.error('[index-translate]', error)
+  })
   sessionCoordinator.onSnapshot((snapshot) => {
     if (snapshot.liveSession?.status === 'stopped_unexpectedly' || snapshot.ptt.error) {
       diagnosticsService.setLatestFailedSession(snapshot)
@@ -228,6 +264,7 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<AppR
       pttHotkeyController.dispose()
       pttHudService.dispose()
       await speechRuntime.stop()
+      await indexTranslateServer?.stop()
       transcriptDatabase.close()
     }
   }

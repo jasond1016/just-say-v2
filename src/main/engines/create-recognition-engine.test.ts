@@ -16,7 +16,9 @@ describe('createRecognitionEngine', () => {
   })
 
   it('returns a structured unsupported engine for cloud profiles', async () => {
-    const engine = createRecognitionEngine(createConfig(profileCatalog[2]!), {
+    const cloudProfile = profileCatalog.find((profile) => profile.kind === 'cloud')
+    expect(cloudProfile).toBeDefined()
+    const engine = createRecognitionEngine(createConfig(cloudProfile!), {
       establishReadiness: createEstablishReadiness()
     })
 

@@ -249,6 +249,10 @@ function resolveTranscriptNotesRuntimeConfig(
   settings: AppSettings,
   credentials: ResolverCredentials | undefined
 ): TranscriptNotesRuntimeConfig {
+  if (settings.translation.provider === 'index-translate') {
+    throw new Error('Transcript notes require an OpenAI-compatible translation endpoint')
+  }
+
   const translationApiKey = credentials?.translationApiKey?.trim()
 
   if (!translationApiKey) {
@@ -259,7 +263,7 @@ function resolveTranscriptNotesRuntimeConfig(
   const envModel = process.env.JUSTSAY_TRANSLATION_MODEL?.trim()
 
   return {
-    provider: settings.translation.provider,
+    provider: 'openai-compatible',
     language: settings.translation.targetLanguage,
     ...(settings.translation.endpoint?.trim()
       ? { endpoint: settings.translation.endpoint.trim() }

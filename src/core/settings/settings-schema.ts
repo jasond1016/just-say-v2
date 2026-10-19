@@ -6,6 +6,7 @@ import type {
   SettingsPatch,
   SpeechLanguage,
   ThemeSetting,
+  TranslationConnectionPatch,
   TranslationProvider
 } from '../../shared/api-types'
 import { getProfileById } from './profile-catalog'
@@ -33,7 +34,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
     enabledForPtt: false,
     enabledForMeeting: false,
     targetLanguage: 'en',
-    provider: 'openai-compatible',
+    provider: 'index-translate',
+    deployment: 'managed-local',
     thinkingEnabled: false,
     apiKeyConfigured: false
   },
@@ -51,9 +53,27 @@ const THEME_SETTINGS = new Set<ThemeSetting>(['system', 'light', 'dark'])
 const SPEECH_LANGUAGES = new Set<SpeechLanguage>(['auto', 'zh', 'en', 'ja', 'ko'])
 const PTT_HOTKEYS = new Set<PttHotkey>(['RCtrl', 'RAlt'])
 const OUTPUT_METHODS = new Set<OutputMethod>(['simulate_input', 'clipboard', 'popup'])
-const TRANSLATION_PROVIDERS = new Set<TranslationProvider>(['openai-compatible'])
+const TRANSLATION_PROVIDERS = new Set<TranslationProvider>(['openai-compatible', 'index-translate'])
 const LOCAL_SERVICE_MODES = new Set<LocalServiceMode>(['managed-local', 'remote-service'])
 const DEFAULT_LOCAL_SERVICE_PORT = 8765
+export const DEFAULT_INDEX_TRANSLATE_HOST = '127.0.0.1'
+export const DEFAULT_INDEX_TRANSLATE_PORT = 8088
+
+export function definedTranslationConnection(patch: {
+  deployment?: LocalServiceMode | undefined
+  localHost?: string | undefined
+  localPort?: number | undefined
+  remoteHost?: string | undefined
+  remotePort?: number | undefined
+}): TranslationConnectionPatch {
+  return {
+    ...(patch.deployment !== undefined ? { deployment: patch.deployment } : {}),
+    ...(patch.localHost !== undefined ? { localHost: patch.localHost } : {}),
+    ...(patch.localPort !== undefined ? { localPort: patch.localPort } : {}),
+    ...(patch.remoteHost !== undefined ? { remoteHost: patch.remoteHost } : {}),
+    ...(patch.remotePort !== undefined ? { remotePort: patch.remotePort } : {})
+  }
+}
 
 export function createDefaultSettings(): AppSettings {
   return cloneSettings(DEFAULT_SETTINGS)
@@ -75,6 +95,14 @@ export function normalizeSettings(patch?: SettingsPatch): AppSettings {
   )
   const translationEndpoint = normalizeOptionalString(merged.translation.endpoint)
   const translationModel = normalizeOptionalString(merged.translation.model)
+  const translationDeployment: LocalServiceMode =
+    merged.translation.deployment && LOCAL_SERVICE_MODES.has(merged.translation.deployment)
+      ? merged.translation.deployment
+      : 'managed-local'
+  const translationLocalHost = normalizeOptionalString(merged.translation.localHost)
+  const translationLocalPort = normalizePort(merged.translation.localPort, DEFAULT_INDEX_TRANSLATE_PORT)
+  const translationRemoteHost = normalizeOptionalString(merged.translation.remoteHost)
+  const translationRemotePort = normalizePort(merged.translation.remotePort, DEFAULT_INDEX_TRANSLATE_PORT)
   const localServiceMode = LOCAL_SERVICE_MODES.has(merged.advanced.localServiceMode)
     ? merged.advanced.localServiceMode
     : DEFAULT_SETTINGS.advanced.localServiceMode
@@ -120,6 +148,14 @@ export function normalizeSettings(patch?: SettingsPatch): AppSettings {
         ? merged.translation.provider
         : DEFAULT_SETTINGS.translation.provider,
       thinkingEnabled: merged.translation.thinkingEnabled === true,
+      ...definedTranslationConnection({
+        deployment: translationDeployment,
+        localHost: translationLocalHost,
+        localPort: translationLocalPort,
+        remoteHost: translationRemoteHost,
+        remotePort: translationRemotePort
+      }),
+      deployment: translationDeployment,
       ...(translationEndpoint !== undefined ? { endpoint: translationEndpoint } : {}),
       ...(translationModel !== undefined ? { model: translationModel } : {}),
       apiKeyConfigured: merged.translation.apiKeyConfigured === true
@@ -171,6 +207,14 @@ function mergeSettings(base: AppSettings, patch?: SettingsPatch): AppSettings {
       targetLanguage: patch.translation?.targetLanguage ?? base.translation.targetLanguage,
       provider: patch.translation?.provider ?? base.translation.provider,
       thinkingEnabled: patch.translation?.thinkingEnabled ?? base.translation.thinkingEnabled ?? false,
+      ...definedTranslationConnection({
+        deployment: patch.translation?.deployment ?? base.translation.deployment ?? 'managed-local',
+        localHost: patch.translation?.localHost ?? base.translation.localHost,
+        localPort: patch.translation?.localPort ?? base.translation.localPort,
+        remoteHost: patch.translation?.remoteHost ?? base.translation.remoteHost,
+        remotePort: patch.translation?.remotePort ?? base.translation.remotePort
+      }),
+      deployment: patch.translation?.deployment ?? base.translation.deployment ?? 'managed-local',
       ...(patch.translation?.endpoint !== undefined || base.translation.endpoint !== undefined
         ? { endpoint: patch.translation?.endpoint ?? base.translation.endpoint }
         : {}),
@@ -241,13 +285,13 @@ function normalizeOptionalString(value: string | undefined): string | undefined 
   return normalized.length > 0 ? normalized : undefined
 }
 
-function normalizePort(value: number | undefined): number | undefined {
+function normalizePort(value: number | undefined, fallback = DEFAULT_LOCAL_SERVICE_PORT): number | undefined {
   if (value === undefined) {
     return undefined
   }
 
   if (!Number.isInteger(value) || value < 1 || value > 65535) {
-    return DEFAULT_LOCAL_SERVICE_PORT
+    return fallback
   }
 
   return value

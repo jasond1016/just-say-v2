@@ -17,9 +17,17 @@ export type PttHotkey = 'RCtrl' | 'RAlt'
 
 export type OutputMethod = 'simulate_input' | 'clipboard' | 'popup'
 
-export type TranslationProvider = 'openai-compatible'
+export type TranslationProvider = 'openai-compatible' | 'index-translate'
 
 export type LocalServiceMode = 'managed-local' | 'remote-service'
+
+export type TranslationConnectionPatch = {
+  deployment?: LocalServiceMode
+  localHost?: string
+  localPort?: number
+  remoteHost?: string
+  remotePort?: number
+}
 
 export type RuntimeFamilyId =
   | 'sensevoice'
@@ -219,6 +227,11 @@ export type AppSettings = {
     enabledForMeeting: boolean
     targetLanguage: string
     provider: TranslationProvider
+    deployment?: LocalServiceMode
+    localHost?: string
+    localPort?: number
+    remoteHost?: string
+    remotePort?: number
     endpoint?: string
     model?: string
     thinkingEnabled?: boolean
@@ -238,13 +251,14 @@ export type AppSettings = {
 export type SettingsPatch = DeepPartial<AppSettings>
 
 export type TranslationRuntimeConfig = {
-  provider: TranslationProvider
+  provider: 'openai-compatible'
   targetLanguage: string
   sourceLanguage: SpeechLanguage
   endpoint?: string
   model?: string
+  discoverModel?: boolean
   thinkingEnabled?: boolean
-  credentials: {
+  credentials?: {
     translationApiKey: string
   }
 }
@@ -271,7 +285,7 @@ export type ResolvedEngineConfig = {
 }
 
 export type TranscriptNotesRuntimeConfig = {
-  provider: TranslationProvider
+  provider: 'openai-compatible'
   language: string
   endpoint?: string
   model?: string

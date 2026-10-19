@@ -7,6 +7,7 @@ describe('resolveAppPaths', () => {
     const paths = resolveAppPaths('C:\\my_project\\just-say-v2\\dist\\main')
 
     expect(paths).toEqual({
+      appRoot: 'C:\\my_project\\just-say-v2',
       preloadPath: 'C:\\my_project\\just-say-v2\\dist\\preload\\index.js',
       resourcesPath: 'C:\\my_project\\just-say-v2\\dist\\resources',
       localServicePath: 'C:\\my_project\\just-say-v2\\resources\\local-service',
@@ -20,6 +21,7 @@ describe('resolveAppPaths', () => {
     const paths = resolveAppPaths('C:\\my_project\\just-say-v2\\release\\main')
 
     expect(paths).toEqual({
+      appRoot: 'C:\\my_project\\just-say-v2\\release',
       preloadPath: 'C:\\my_project\\just-say-v2\\release\\preload\\index.js',
       resourcesPath: 'C:\\my_project\\just-say-v2\\release\\resources',
       localServicePath: 'C:\\my_project\\just-say-v2\\release\\resources\\local-service',

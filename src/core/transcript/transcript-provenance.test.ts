@@ -14,6 +14,7 @@ const runtimeConfig = resolveRuntimeConfig({
       ...DEFAULT_SETTINGS.translation,
       enabledForMeeting: true,
       enabledForPtt: true,
+      provider: 'openai-compatible',
       targetLanguage: 'en'
     }
   },

@@ -1,6 +1,7 @@
 import path from 'node:path'
 
 export type AppPaths = {
+  appRoot: string
   preloadPath: string
   resourcesPath: string
   localServicePath: string
@@ -24,6 +25,7 @@ export function resolveAppPaths(baseDir: string): AppPaths {
   const preloadRoot = isDevRun ? path.join(buildRoot, 'preload') : path.join(appRoot, 'preload')
 
   return {
+    appRoot,
     preloadPath: path.join(preloadRoot, 'index.js'),
     resourcesPath,
     localServicePath,

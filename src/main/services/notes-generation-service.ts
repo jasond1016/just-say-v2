@@ -189,37 +189,31 @@ export function createNotesProviderFromEnvironment(
   const timeoutMs = resolveNotesTimeoutMs(env, options.timeoutMs)
 
   return (config) => {
-    switch (config.provider) {
-      case 'openai-compatible': {
-        const client = new OpenAiCompatibleChatClient({
-          apiKey: config.credentials.translationApiKey,
-          ...(config.endpoint ? { baseUrl: config.endpoint } : baseUrl ? { baseUrl } : {}),
-          ...(config.model ? { model: config.model } : model ? { model } : {}),
-          ...(timeoutMs !== undefined ? { timeoutMs } : {}),
-          ...(options.fetchFn ? { fetchFn: options.fetchFn } : {})
-        })
+    const client = new OpenAiCompatibleChatClient({
+      apiKey: config.credentials.translationApiKey,
+      ...(config.endpoint ? { baseUrl: config.endpoint } : baseUrl ? { baseUrl } : {}),
+      ...(config.model ? { model: config.model } : model ? { model } : {}),
+      ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+      ...(options.fetchFn ? { fetchFn: options.fetchFn } : {})
+    })
 
-        return {
-          generateJson: ({ systemPrompt, userPrompt }) =>
-            client.complete({
-              temperature: 0,
-              responseFormat: 'json_object',
-              messages: [
-                {
-                  role: 'system',
-                  content: systemPrompt
-                },
-                {
-                  role: 'user',
-                  content: userPrompt
-                }
-              ]
-            }),
-          getModel: () => client.getModel()
-        }
-      }
-      default:
-        return assertNever(config.provider)
+    return {
+      generateJson: ({ systemPrompt, userPrompt }) =>
+        client.complete({
+          temperature: 0,
+          responseFormat: 'json_object',
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt
+            },
+            {
+              role: 'user',
+              content: userPrompt
+            }
+          ]
+        }),
+      getModel: () => client.getModel()
     }
   }
 }
@@ -536,8 +530,4 @@ function normalizeOptionalText(value: unknown): string | undefined {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function assertNever(value: never): never {
-  throw new Error(`Unsupported notes provider: ${String(value)}`)
 }

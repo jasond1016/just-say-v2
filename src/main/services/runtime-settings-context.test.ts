@@ -58,6 +58,11 @@ describe('RuntimeSettingsContext', () => {
     const credentialsRepository = createCredentialsRepository()
     const context = await createContext({ credentialsRepository })
 
+    await context.updateSettings({
+      translation: {
+        provider: 'openai-compatible'
+      }
+    })
     await context.saveTranslationCredentials({
       apiKey: 'translation-secret'
     })
@@ -68,6 +73,22 @@ describe('RuntimeSettingsContext', () => {
       }
     })
     expect(context.getSettings().translation.apiKeyConfigured).toBe(true)
+  })
+
+  it('refuses transcript notes for Index-Translate before asking for an API key', async () => {
+    const context = await createContext()
+
+    expect(() => context.resolveTranscriptNotesRuntimeConfig()).toThrow(
+      'Transcript notes require an OpenAI-compatible translation endpoint'
+    )
+
+    await context.saveTranslationCredentials({
+      apiKey: 'translation-secret'
+    })
+
+    expect(() => context.resolveTranscriptNotesRuntimeConfig()).toThrow(
+      'Transcript notes require an OpenAI-compatible translation endpoint'
+    )
   })
 
   it('resolves profile checks from the cached Runtime Settings snapshot', async () => {

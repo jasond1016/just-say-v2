@@ -227,6 +227,56 @@ describe('TranslationPipeline', () => {
 })
 
 describe('OpenAiCompatibleTranslationProvider', () => {
+  it('asks the server which model is loaded and does not send an API key', async () => {
+    const fetchFn = vi.fn(async (url: string, init?: { headers?: Record<string, string>; body?: string }) => {
+      if (String(url).endsWith('/models')) {
+        return {
+          ok: true,
+          json: async () => ({
+            data: [{ id: 'Index-Translate-2B.Q4_K_M.gguf' }]
+          })
+        }
+      }
+
+      return {
+        ok: true,
+        json: async () => ({
+          choices: [
+            {
+              message: {
+                content: 'translated'
+              }
+            }
+          ]
+        })
+      }
+    })
+    const provider = new OpenAiCompatibleTranslationProvider({
+      baseUrl: 'http://127.0.0.1:8088/v1',
+      discoverModel: true,
+      fetchFn: fetchFn as unknown as typeof fetch
+    })
+
+    await expect(
+      provider.translateText({
+        text: '今日はいい天気です。',
+        sourceLanguage: 'ja',
+        targetLanguage: 'en'
+      })
+    ).resolves.toBe('translated')
+
+    const modelsCall = fetchFn.mock.calls[0]
+    const completionCall = fetchFn.mock.calls[1]
+    const completionInit = completionCall?.[1]
+
+    expect(String(modelsCall?.[0])).toBe('http://127.0.0.1:8088/v1/models')
+    expect(modelsCall?.[1]).toBeUndefined()
+    expect(completionInit?.headers?.Authorization).toBeUndefined()
+    expect(JSON.parse(completionInit?.body ?? '{}')).toMatchObject({
+      model: 'Index-Translate-2B.Q4_K_M.gguf'
+    })
+  })
+
   it('extracts text from structured content arrays', async () => {
     const provider = new OpenAiCompatibleTranslationProvider({
       apiKey: 'translation-secret',

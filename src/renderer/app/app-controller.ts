@@ -12,10 +12,11 @@ import type {
   SpeechLanguage,
   ThemeSetting,
   TranscriptNotes,
+  TranslationConnectionPatch,
   TranslationProvider
 } from '../../shared/api-types'
 import type { CaptureSource } from '../../shared/primitive-types'
-import { createDefaultSettings } from '../../core/settings/settings-schema'
+import { createDefaultSettings, definedTranslationConnection } from '../../core/settings/settings-schema'
 import type { AppApi } from '../../preload/api'
 import type { AppSection, SettingsSectionId } from './app-model'
 import { getPreferredSection } from './app-model'
@@ -533,6 +534,12 @@ export class AppController {
       translation: {
         provider
       }
+    })
+  }
+
+  async setTranslationConnection(patch: TranslationConnectionPatch): Promise<void> {
+    await this.updateSettings('settings:translation-connection', {
+      translation: definedTranslationConnection(patch)
     })
   }
 

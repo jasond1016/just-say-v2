@@ -93,7 +93,8 @@ describe('SettingsService', () => {
 
     await service.updateSettings({
       translation: {
-        enabledForMeeting: true
+        enabledForMeeting: true,
+        provider: 'openai-compatible'
       }
     })
 

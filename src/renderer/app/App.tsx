@@ -325,6 +325,7 @@ function WorkspaceAppContent(props: {
             onTranslateMeetingChange={(enabled) => { void controller.setTranslationEnabledForMeeting(enabled) }}
             onTranslationTargetLanguageChange={(targetLanguage) => { void controller.setTranslationTargetLanguage(targetLanguage) }}
             onTranslationProviderChange={(provider) => { void controller.setTranslationProvider(provider) }}
+            onTranslationConnectionChange={(patch) => { void controller.setTranslationConnection(patch) }}
             onTranslationEndpointChange={(endpoint) => { void controller.setTranslationEndpoint(endpoint) }}
             onTranslationModelChange={(model) => { void controller.setTranslationModel(model) }}
             onTranslationThinkingEnabledChange={(enabled) => { void controller.setTranslationThinkingEnabled(enabled) }}

@@ -114,6 +114,9 @@ export type Messages = {
   settingsMeetingTranslation: string
   settingsTranslationTarget: string
   settingsTranslationService: string
+  settingsTranslationProviderIndex: string
+  settingsTranslationIndexLocalHint: string
+  settingsTranslationIndexRemoteHint: string
   settingsTranslationTargetZh: string
   settingsTranslationTargetEn: string
   settingsTranslationTargetJa: string

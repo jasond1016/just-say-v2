@@ -10,8 +10,10 @@ import type {
   PttHotkey,
   SpeechLanguage,
   ThemeSetting,
+  TranslationConnectionPatch,
   TranslationProvider
 } from '../../shared/api-types'
+import { DEFAULT_INDEX_TRANSLATE_HOST, DEFAULT_INDEX_TRANSLATE_PORT } from '../../core/settings/settings-schema'
 import { isDeepSeekChatEndpoint } from '../../shared/deepseek-chat'
 import type { Messages } from '../../i18n'
 import type { SettingsSectionId } from '../app/app-model'
@@ -59,6 +61,7 @@ export function SettingsPage(props: {
   onTranslateMeetingChange: (enabled: boolean) => void
   onTranslationTargetLanguageChange: (targetLanguage: string) => void
   onTranslationProviderChange: (provider: TranslationProvider) => void
+  onTranslationConnectionChange: (patch: TranslationConnectionPatch) => void
   onTranslationEndpointChange: (endpoint: string) => void
   onTranslationModelChange: (model: string) => void
   onTranslationThinkingEnabledChange: (enabled: boolean) => void
@@ -79,6 +82,12 @@ export function SettingsPage(props: {
   const [draftRemotePort, setDraftRemotePort] = useState(
     props.settings.advanced.remoteServicePort?.toString() ?? ''
   )
+  const [localAddressDraft, setLocalAddressDraft] = useState<TextSettingsDraft>(
+    addressDraftFrom(props.settings.translation.localHost, props.settings.translation.localPort)
+  )
+  const [remoteAddressDraft, setRemoteAddressDraft] = useState<TextSettingsDraft>(
+    addressDraftFrom(props.settings.translation.remoteHost, props.settings.translation.remotePort)
+  )
   const [draftTranslationEndpoint, setDraftTranslationEndpoint] = useState(props.settings.translation.endpoint ?? '')
   const [draftTranslationModel, setDraftTranslationModel] = useState(props.settings.translation.model ?? '')
   const [draftTranslationApiKey, setDraftTranslationApiKey] = useState('')
@@ -96,6 +105,10 @@ export function SettingsPage(props: {
     draftTranslationEndpoint,
     props.settings.translation.endpoint
   )
+  const translationDeployment = props.settings.translation.deployment ?? 'managed-local'
+  const translationAddressIsLocal = translationDeployment === 'managed-local'
+  const translationAddressDraft = translationAddressIsLocal ? localAddressDraft : remoteAddressDraft
+  const invalidTranslationAddressPort = invalidPortDraft(translationAddressDraft.port)
   const translationDraftDirty = hasTranslationDraftChanges(props.settings.translation, {
     endpoint: draftTranslationEndpoint,
     model: draftTranslationModel,
@@ -110,6 +123,12 @@ export function SettingsPage(props: {
       host: draftManagedHost,
       port: draftManagedPort
     }
+  )
+  const translationAddressDraftDirty = hasConnectionDraftChanges(
+    translationAddressIsLocal
+      ? { host: props.settings.translation.localHost, port: props.settings.translation.localPort }
+      : { host: props.settings.translation.remoteHost, port: props.settings.translation.remotePort },
+    translationAddressDraft
   )
   const remoteConnectionDraftDirty = hasConnectionDraftChanges(
     {
@@ -142,9 +161,48 @@ export function SettingsPage(props: {
   ])
 
   useEffect(() => {
+    setLocalAddressDraft(addressDraftFrom(props.settings.translation.localHost, props.settings.translation.localPort))
+    setRemoteAddressDraft(addressDraftFrom(props.settings.translation.remoteHost, props.settings.translation.remotePort))
+  }, [
+    props.settings.translation.localHost,
+    props.settings.translation.localPort,
+    props.settings.translation.remoteHost,
+    props.settings.translation.remotePort
+  ])
+
+  useEffect(() => {
     setDraftTranslationEndpoint(props.settings.translation.endpoint ?? '')
     setDraftTranslationModel(props.settings.translation.model ?? '')
   }, [props.settings.translation.endpoint, props.settings.translation.model])
+
+  const saveTranslationAddress = () => {
+    if (invalidTranslationAddressPort) {
+      return
+    }
+
+    const port = translationAddressDraft.port.trim()
+    const portNumber = port ? Number.parseInt(port, 10) : undefined
+    props.onTranslationConnectionChange(
+      translationAddressIsLocal
+        ? {
+            localHost: translationAddressDraft.host.trim(),
+            ...(portNumber !== undefined ? { localPort: portNumber } : {})
+          }
+        : {
+            remoteHost: translationAddressDraft.host.trim(),
+            ...(portNumber !== undefined ? { remotePort: portNumber } : {})
+          }
+    )
+  }
+
+  const discardTranslationAddress = () => {
+    if (translationAddressIsLocal) {
+      setLocalAddressDraft(addressDraftFrom(props.settings.translation.localHost, props.settings.translation.localPort))
+      return
+    }
+
+    setRemoteAddressDraft(addressDraftFrom(props.settings.translation.remoteHost, props.settings.translation.remotePort))
+  }
 
   const discardTranslationDrafts = () => {
     setDraftTranslationEndpoint(props.settings.translation.endpoint ?? '')
@@ -366,6 +424,7 @@ export function SettingsPage(props: {
                       disabled={disabled}
                       onChange={(e) => props.onTranslationProviderChange(e.target.value as TranslationProvider)}
                     >
+                      <option value="index-translate">{t.settingsTranslationProviderIndex}</option>
                       <option value="openai-compatible">OpenAI-compatible</option>
                     </SelectField>
                   </CardRow>
@@ -375,6 +434,48 @@ export function SettingsPage(props: {
               <div className="settings-card settings-card--wide">
                 <h2 className="settings-card__title">{t.settingsTranslationConfigTitle}</h2>
                 <div className="settings-card__body">
+                  {props.settings.translation.provider === 'index-translate' ? (
+                    <>
+                      <CardRow label={t.settingsDeployMode}>
+                        <SelectField
+                          className="settings-select"
+                          value={translationDeployment}
+                          disabled={disabled}
+                          onChange={(e) => props.onTranslationConnectionChange({
+                            deployment: e.target.value as LocalServiceMode
+                          })}
+                        >
+                          <option value="managed-local">{t.settingsDeployLocal}</option>
+                          <option value="remote-service">{t.settingsDeployRemote}</option>
+                        </SelectField>
+                      </CardRow>
+                      <TranslationServiceAddressFields
+                        hint={translationAddressIsLocal ? t.settingsTranslationIndexLocalHint : t.settingsTranslationIndexRemoteHint}
+                        hostLabel={translationAddressIsLocal ? t.settingsLocalHost : t.settingsRemoteHost}
+                        portLabel={translationAddressIsLocal ? t.settingsLocalPort : t.settingsRemotePort}
+                        hostPlaceholder={translationAddressIsLocal ? DEFAULT_INDEX_TRANSLATE_HOST : '10.0.0.8'}
+                        portPlaceholder={String(DEFAULT_INDEX_TRANSLATE_PORT)}
+                        host={translationAddressDraft.host}
+                        port={translationAddressDraft.port}
+                        invalidPort={invalidTranslationAddressPort}
+                        dirty={translationAddressDraftDirty}
+                        disabled={disabled}
+                        discardLabel={t.settingsDiscard}
+                        saveLabel={t.settingsSave}
+                        onHostChange={(host) => {
+                          const setDraft = translationAddressIsLocal ? setLocalAddressDraft : setRemoteAddressDraft
+                          setDraft((current) => ({ ...current, host }))
+                        }}
+                        onPortChange={(port) => {
+                          const setDraft = translationAddressIsLocal ? setLocalAddressDraft : setRemoteAddressDraft
+                          setDraft((current) => ({ ...current, port }))
+                        }}
+                        onDiscard={discardTranslationAddress}
+                        onSave={saveTranslationAddress}
+                      />
+                    </>
+                  ) : null}
+                  {props.settings.translation.provider === 'openai-compatible' ? (<>
                   <CardRow label={t.settingsTranslationEndpoint}>
                     <input
                       type="text"
@@ -422,6 +523,7 @@ export function SettingsPage(props: {
                       <Button label={t.settingsSaveTranslation} size="small" disabled={disabled} onClick={() => { void saveTranslationDrafts() }} />
                     </div>
                   ) : null}
+                  </>) : null}
                 </div>
               </div>
             </div>
@@ -712,6 +814,81 @@ export function getTranslationTargetSelectValue(targetLanguage: string): Transla
     default:
       return 'en'
   }
+}
+
+function addressDraftFrom(host: string | undefined, port: number | undefined): TextSettingsDraft {
+  return {
+    host: host ?? '',
+    port: port?.toString() ?? ''
+  }
+}
+
+function invalidPortDraft(port: string): boolean {
+  const value = port.trim()
+  return value.length > 0 && !/^\d+$/.test(value)
+}
+
+function TranslationServiceAddressFields(props: {
+  hint: string
+  hostLabel: string
+  portLabel: string
+  hostPlaceholder: string
+  portPlaceholder: string
+  host: string
+  port: string
+  invalidPort: boolean
+  dirty: boolean
+  disabled: boolean
+  discardLabel: string
+  saveLabel: string
+  onHostChange: (host: string) => void
+  onPortChange: (port: string) => void
+  onDiscard: () => void
+  onSave: () => void
+}) {
+  return (
+    <>
+      <p className="settings-card__note">{props.hint}</p>
+      <CardRow label={props.hostLabel}>
+        <input
+          type="text"
+          className="settings-text-input"
+          value={props.host}
+          disabled={props.disabled}
+          placeholder={props.hostPlaceholder}
+          onChange={(event) => props.onHostChange(event.target.value)}
+        />
+      </CardRow>
+      <CardRow label={props.portLabel}>
+        <input
+          type="text"
+          className={`settings-text-input ${props.invalidPort ? 'settings-text-input--invalid' : ''}`}
+          value={props.port}
+          disabled={props.disabled}
+          placeholder={props.portPlaceholder}
+          inputMode="numeric"
+          onChange={(event) => props.onPortChange(event.target.value)}
+        />
+      </CardRow>
+      {props.dirty ? (
+        <div className="settings-card__actions-row">
+          <Button
+            label={props.discardLabel}
+            size="small"
+            variant="ghost"
+            disabled={props.disabled}
+            onClick={props.onDiscard}
+          />
+          <Button
+            label={props.saveLabel}
+            size="small"
+            disabled={props.disabled || props.invalidPort}
+            onClick={props.onSave}
+          />
+        </div>
+      ) : null}
+    </>
+  )
 }
 
 function Segmented(props: { children: ReactNode }) {

@@ -54,22 +54,25 @@ export class TranslationPipeline {
 }
 
 export type OpenAiCompatibleTranslationProviderOptions = {
-  apiKey: string
+  apiKey?: string
   baseUrl?: string
   model?: string
+  discoverModel?: boolean
   timeoutMs?: number
   fetchFn?: typeof fetch
   thinkingEnabled?: boolean
 }
 
+const discoveredModelIds = new Map<string, string>()
+
 export class OpenAiCompatibleTranslationProvider implements TranslationProviderClient {
   private readonly client: OpenAiCompatibleChatClient
 
-  constructor(options: OpenAiCompatibleTranslationProviderOptions) {
+  constructor(private readonly options: OpenAiCompatibleTranslationProviderOptions) {
     const thinking = resolveTranslationThinking(options.baseUrl, options.thinkingEnabled)
 
     this.client = new OpenAiCompatibleChatClient({
-      apiKey: options.apiKey,
+      ...(options.apiKey ? { apiKey: options.apiKey } : {}),
       ...(options.baseUrl ? { baseUrl: options.baseUrl } : {}),
       ...(options.model ? { model: options.model } : {}),
       ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
@@ -83,7 +86,19 @@ export class OpenAiCompatibleTranslationProvider implements TranslationProviderC
     sourceLanguage: string
     targetLanguage: string
   }): Promise<string> {
-    return this.client.complete({
+    const thinking = resolveTranslationThinking(this.options.baseUrl, this.options.thinkingEnabled)
+    const client = this.options.discoverModel
+      ? new OpenAiCompatibleChatClient({
+          ...(this.options.apiKey ? { apiKey: this.options.apiKey } : {}),
+          ...(this.options.baseUrl ? { baseUrl: this.options.baseUrl } : {}),
+          model: await discoverLoadedModel(this.options.baseUrl, this.options.apiKey, this.options.fetchFn ?? fetch),
+          ...(this.options.timeoutMs !== undefined ? { timeoutMs: this.options.timeoutMs } : {}),
+          ...(this.options.fetchFn ? { fetchFn: this.options.fetchFn } : {}),
+          ...(thinking ? { thinking } : {})
+        })
+      : this.client
+
+    return client.complete({
       temperature: 0,
       messages: [
         {
@@ -110,21 +125,46 @@ export function createTranslationProviderFromEnvironment(
   const baseUrl = normalizeOptionalString(env.JUSTSAY_TRANSLATION_BASE_URL)
   const model = normalizeOptionalString(env.JUSTSAY_TRANSLATION_MODEL)
 
-  return (config) => {
-    switch (config.provider) {
-      case 'openai-compatible':
-        return new OpenAiCompatibleTranslationProvider({
-          apiKey: config.credentials.translationApiKey,
-          ...(config.endpoint ? { baseUrl: config.endpoint } : baseUrl ? { baseUrl } : {}),
-          ...(config.model ? { model: config.model } : model ? { model } : {}),
-          ...(config.thinkingEnabled ? { thinkingEnabled: true } : {}),
-          ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
-          ...(options.fetchFn ? { fetchFn: options.fetchFn } : {})
-        })
-      default:
-        return assertNever(config.provider)
-    }
+  return (config) =>
+    new OpenAiCompatibleTranslationProvider({
+      ...(config.credentials ? { apiKey: config.credentials.translationApiKey } : {}),
+      ...(config.endpoint ? { baseUrl: config.endpoint } : baseUrl ? { baseUrl } : {}),
+      ...(config.model ? { model: config.model } : model ? { model } : {}),
+      ...(config.discoverModel ? { discoverModel: true } : {}),
+      ...(config.thinkingEnabled ? { thinkingEnabled: true } : {}),
+      ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
+      ...(options.fetchFn ? { fetchFn: options.fetchFn } : {})
+    })
+}
+
+async function discoverLoadedModel(
+  baseUrl: string | undefined,
+  apiKey: string | undefined,
+  fetchFn: typeof fetch
+): Promise<string> {
+  const normalized = (baseUrl ?? 'https://api.openai.com/v1').replace(/\/+$/, '')
+  const cached = discoveredModelIds.get(normalized)
+
+  if (cached) {
+    return cached
   }
+
+  const response = apiKey
+    ? await fetchFn(`${normalized}/models`, {
+        headers: {
+          Authorization: `Bearer ${apiKey}`
+        }
+      })
+    : await fetchFn(`${normalized}/models`)
+  const payload = (await response.json()) as { data?: Array<{ id?: string }> }
+  const id = payload.data?.[0]?.id?.trim()
+
+  if (!response.ok || !id) {
+    throw new Error('Index-Translate-2B server did not report a loaded model')
+  }
+
+  discoveredModelIds.set(normalized, id)
+  return id
 }
 
 function resolveTranslationThinking(
@@ -138,8 +178,4 @@ function resolveTranslationThinking(
   return {
     type: thinkingEnabled === true ? 'enabled' : 'disabled'
   }
-}
-
-function assertNever(value: never): never {
-  throw new Error(`Unsupported translation provider: ${String(value)}`)
 }

@@ -15,6 +15,7 @@ import {
 
 export type SettingsServiceOptions = {
   platformProvider?: () => Partial<PlatformCapabilities> | undefined
+  localIndexTranslateAvailable?: boolean
 }
 
 export class SettingsService {
@@ -58,7 +59,10 @@ export class SettingsService {
       settings,
       mode,
       ...(credentials ? { credentials } : {}),
-      ...(platform ? { platform } : {})
+      ...(platform ? { platform } : {}),
+      ...(this.options.localIndexTranslateAvailable
+        ? { localIndexTranslateAvailable: true }
+        : {})
     })
   }
 
